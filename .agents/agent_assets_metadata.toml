@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "hLizkZfnxbbxwi2-9ioRY"
+uri = "file://app/build/outputs/apk/debug/app-debug.tar.gz"
+type = "unspecified"
+title = "app-debug.apk (tar.gz) — 8 Ball Pool Mod"
