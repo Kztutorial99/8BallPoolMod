@@ -18,3 +18,9 @@ id = "JCfe7kOEwYWBAcJPBmLyV"
 uri = "file://app/build/outputs/apk/debug/app-debug-v3.tar.gz"
 type = "unspecified"
 title = "app-debug-v3.apk — Enemy Line fix + 9-Ball One Shoot"
+
+[[outputs]]
+id = "IMLVramWOw90mRTLBh1K9"
+uri = "file://app/build/outputs/apk/debug/app-debug-v4.tar.gz"
+type = "unspecified"
+title = "app-debug-v4.apk — 9-Ball fix: no lag + button + thinking animation"

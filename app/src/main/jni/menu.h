@@ -341,7 +341,6 @@ INLINE void DrawESP(ImDrawList* draw) {
             DrawToggleButton(false);
             AutoPlay::Update();
         }
-        //if (persistent_bool[O("bAutoAim")]) AutoAim::AIM();
 
         auto stateId = gameStateManager.getCurrentStateId();
         if (stateId == 4) gPrediction->determineShotResult(false);
@@ -574,14 +573,19 @@ static void DrawCalculating(ImGuiIO& io) {
 #include "mod/PowerSlider.h"
 
 // ── NineBall One Shoot ────────────────────────────────────────────────────────
-// Follows official 9-ball rules:
-//   • Must hit the LOWEST numbered ball on table first every shot
-//   • Legally pocket the 9-ball at any point (combo/combination) → instant win
-//   • No scratch (cue ball must stay on table)
+// Rules enforced:
+//   • Must hit LOWEST numbered ball first every shot (legal play)
+//   • If 9-ball can be combo-pocketed → instant win shot preferred
+//   • No scratch (cue ball stays on table)
+//
+// PERFORMANCE: AIM is calculated ONCE per turn (bCalculated flag).
+//   angleStep = 0.25 rad → max ~25 physics-sim iterations total (was 125/frame).
 namespace NineBall {
 
-    // Returns the index (1..9) of the lowest numbered ball still on the table.
-    // Ball index in guiData.balls corresponds directly to ball number (1=ball#1, 9=ball#9).
+    inline bool  bCalculated = false; // true = aim angle already set for this turn
+    inline int   g_prevStateId = -1;  // detect turn transitions
+    inline float g_spinAngle   = 0.f; // thinking spinner animation angle
+
     static int findLowestBall() {
         for (int i = 1; i < gPrediction->guiData.ballsCount && i <= 9; i++) {
             auto& b = gPrediction->guiData.balls[i];
@@ -591,54 +595,44 @@ namespace NineBall {
         return -1;
     }
 
-    // Scan all angles for a LEGAL combination: cue→lowestBall→9ball pocketed.
-    // A finer angle step (0.05 rad ≈ 2.9°) gives better combo detection.
-    // Returns true and sets the aim angle when a winning shot is found.
-    static bool AIM_Combo(int lowestIdx, double angleStep = 0.05) {
+    // step = 0.25 rad → 25 iterations max for full circle (vs 125 at step=0.05)
+    static bool AIM_Combo(int lowestIdx, double step = 0.25) {
         if (gPrediction->guiData.ballsCount <= 9) return false;
-        if (!gPrediction->guiData.balls[9].originalOnTable) return false; // already won
+        if (!gPrediction->guiData.balls[9].originalOnTable) return false;
 
-        double startAngle = NumberUtils::normalizeDoublePrecision(
+        double base = NumberUtils::normalizeDoublePrecision(
             sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
 
-        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(startAngle + angleStep));
-             a != startAngle;
-             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + angleStep))) {
+        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(base + step));
+             a != base;
+             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + step))) {
 
             gPrediction->determineShotResult(true, a);
-
-            auto& cueBall = gPrediction->guiData.balls[0];
-            auto& ball9   = gPrediction->guiData.balls[9];
-
-            if (!cueBall.onTable) continue;                          // scratch — illegal
-            if (!ball9.originalOnTable || ball9.onTable) continue;  // 9-ball not pocketed
+            auto& cue  = gPrediction->guiData.balls[0];
+            auto& b9   = gPrediction->guiData.balls[9];
+            if (!cue.onTable)  continue;
+            if (!b9.originalOnTable || b9.onTable) continue;
             if (!gPrediction->guiData.collision.firstHitBall) continue;
             if (gPrediction->guiData.collision.firstHitBall->index != lowestIdx) continue;
-
             AutoAim::setAimAngle(a);
-            return true; // Winning combo found
+            return true;
         }
         return false;
     }
 
-    // Fallback: find a legal shot that pockets ANY ball while hitting lowestBall first.
-    static void AIM_Standard(int lowestIdx, double angleStep = 0.1) {
-        double startAngle = NumberUtils::normalizeDoublePrecision(
+    static void AIM_Standard(int lowestIdx, double step = 0.25) {
+        double base = NumberUtils::normalizeDoublePrecision(
             sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
 
-        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(startAngle + angleStep));
-             a != startAngle;
-             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + angleStep))) {
+        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(base + step));
+             a != base;
+             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + step))) {
 
             gPrediction->determineShotResult(true, a);
-
-            auto& cueBall = gPrediction->guiData.balls[0];
-            if (!cueBall.onTable) continue; // no scratch allowed
-
+            auto& cue = gPrediction->guiData.balls[0];
+            if (!cue.onTable) continue;
             if (!gPrediction->guiData.collision.firstHitBall) continue;
             if (gPrediction->guiData.collision.firstHitBall->index != lowestIdx) continue;
-
-            // Any ball pocketed is legal in 9-ball once lowest is hit first
             bool anyPotted = false;
             for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
                 auto& b = gPrediction->guiData.balls[i];
@@ -648,22 +642,131 @@ namespace NineBall {
         }
     }
 
-    // Master entry — tries combo first (1→9 instant win), falls back to standard aim
-    static void AIM() {
+    // Called ONCE per turn — not every frame
+    static void DoAIM() {
         if (!sharedGameManager.is9BallGame()) return;
-        if (!AutoAim::shouldAutoAIM()) return;
-
-        double startAngle = NumberUtils::normalizeDoublePrecision(
+        double base = NumberUtils::normalizeDoublePrecision(
             sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
-        gPrediction->determineShotResult(true, startAngle);
-
+        gPrediction->determineShotResult(true, base);
         int lowestIdx = findLowestBall();
         if (lowestIdx < 0) return;
+        bool combo = false;
+        if (lowestIdx < 9) combo = AIM_Combo(lowestIdx);
+        if (!combo) AIM_Standard(lowestIdx);
+    }
 
-        // If the 9-ball itself is the lowest remaining, target it directly
-        bool comboFound = false;
-        if (lowestIdx < 9) comboFound = AIM_Combo(lowestIdx);
-        if (!comboFound)   AIM_Standard(lowestIdx);
+    // ── Visual button (play icon + thinking spinner) ──────────────────────────
+    // Shown whenever bNineBallOneShoot is ON in a 9-ball game.
+    // Positioned below the AutoPlay toggle button (or below the floating button
+    // if AutoPlay button is not visible).
+    static void DrawButton(ImGuiIO& io) {
+        const float bsz    = 80.f;
+        const float pad    = 6.0f;
+        const float winW   = bsz + pad * 2.f;
+        const float winH   = bsz + pad * 2.f;
+        const float fbnSz  = 120.f; // floating button window size
+        const float apWinH = 80.f + pad * 2.f; // autoplay toggle window height
+        const float margin = 8.f;
+
+        // Stack below autoplay button when it's visible
+        float apOffset = persistent_bool[O("bAutoPlay")] ? (apWinH + margin) : 0.f;
+        float posX = (g_btnX < 0.f) ? (io.DisplaySize.x - 20.f - winW) : g_btnX;
+        float posY = (g_btnY < 0.f)
+                     ? (io.DisplaySize.y - 20.f - winH)
+                     : (g_btnY + fbnSz + margin + apOffset);
+        posX = ImClamp(posX, 0.f, io.DisplaySize.x - winW);
+        posY = ImClamp(posY, 0.f, io.DisplaySize.y - winH);
+
+        SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
+        SetNextWindowPos(ImVec2(posX, posY), ImGuiCond_Always);
+        PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 0));
+        PushStyleColor(ImGuiCol_Border,   IM_COL32(0, 0, 0, 0));
+        PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(pad, pad));
+        PushStyleVar(ImGuiStyleVar_WindowRounding, 99.f);
+
+        if (Begin(O("##NineBallBtn"), nullptr,
+                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings |
+                  ImGuiWindowFlags_NoMove)) {
+
+            ImVec2  p      = GetCursorScreenPos();
+            ImVec2  center(p.x + bsz * 0.5f, p.y + bsz * 0.5f);
+            float   r      = bsz * 0.5f;
+            ImDrawList* dl = GetWindowDrawList();
+
+            InvisibleButton(O("##NBHit"), ImVec2(bsz, bsz));
+
+            // Background circle
+            ImU32 bgCol = bCalculated
+                ? IM_COL32(10, 155, 60, 235)    // green = shot found
+                : IM_COL32(18, 18, 45, 235);     // dark = thinking
+            dl->AddCircleFilled(center, r, bgCol);
+
+            // Outer ring
+            ImU32 ringCol = bCalculated
+                ? IM_COL32(0, 220, 90, 220)
+                : IM_COL32(80, 100, 220, 160);
+            dl->AddCircle(center, r - 2.f, ringCol, 48, 2.5f);
+
+            // ── Thinking spinner (arc) ──────────────────────────────────────
+            if (!bCalculated) {
+                g_spinAngle += io.DeltaTime * 5.0f;
+                const int segs   = 12;
+                const float arcR = r - 10.f;
+                for (int i = 0; i < segs; i++) {
+                    float a0 = g_spinAngle + (float)i       / segs * (float)(M_PI * 1.6);
+                    float a1 = g_spinAngle + (float)(i + 1) / segs * (float)(M_PI * 1.6);
+                    int   al = (i * 230) / segs;
+                    dl->PathArcTo(center, arcR, a0, a1, 3);
+                    dl->PathStroke(IM_COL32(120, 180, 255, al), false, 3.0f);
+                }
+                // Small "9" in centre while thinking
+                const char* lbl = "9";
+                ImVec2 ts = CalcTextSize(lbl);
+                dl->AddText(ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),
+                            IM_COL32(200, 200, 255, 200), lbl);
+            } else {
+                // ── Shot found: play-triangle icon ─────────────────────────
+                float th = r * 0.38f, tw = r * 0.34f;
+                dl->AddTriangleFilled(
+                    ImVec2(center.x - tw * 0.6f, center.y - th),
+                    ImVec2(center.x - tw * 0.6f, center.y + th),
+                    ImVec2(center.x + tw * 1.1f, center.y),
+                    IM_COL32(255, 255, 255, 235));
+            }
+        }
+        End();
+        PopStyleVar(2);
+        PopStyleColor(2);
+    }
+
+    // ── Main update — called from DrawESP, NOT from AutoPlay ─────────────────
+    // Calculates aim ONCE per turn, then holds the result until turn ends.
+    static void Update(ImDrawList* /*draw*/, ImGuiIO& io) {
+        if (!persistent_bool[O("bNineBallOneShoot")]) return;
+        if (!sharedGameManager || !sharedGameManager.is9BallGame()) return;
+
+        auto sm = sharedGameManager.mStateManager();
+        if (!sm) return;
+        int stateId = sm.getCurrentStateId();
+
+        // Draw button every frame so user always sees it
+        DrawButton(io);
+
+        if (stateId != 4) {
+            // Not our turn — reset so we calculate fresh next turn
+            if (g_prevStateId == 4) bCalculated = false;
+            g_prevStateId = stateId;
+            return;
+        }
+        g_prevStateId = stateId;
+
+        // Calculate exactly once when turn starts
+        if (!bCalculated) {
+            DoAIM();
+            bCalculated = true;
+        }
+        // Angle is now set — user shoots manually
     }
 
 } // namespace NineBall
@@ -697,12 +800,8 @@ namespace AutoPlay {
         // Only act when it is our turn (stateId 4)
         if (stateId != 4) return;
 
-        // Aim the cue — use 9-ball aim when in 9-ball mode, otherwise standard
-        if (sharedGameManager.is9BallGame() && persistent_bool[O("bNineBallOneShoot")]) {
-            NineBall::AIM();
-        } else {
-            AutoAim::AIM();
-        }
+        // Aim and shoot — standard AutoPlay (8-ball and 9-ball)
+        AutoAim::AIM();
         powerSlider.SimulateDrag(getPowerBarRect(), SHOT_POWER, DRAG_TIME, HOLD_TIME);
     }
 } // namespace AutoPlay
@@ -1043,6 +1142,10 @@ INLINE void DrawMenu(ImGuiIO& io) {
             if (!sigsetjmp(jump_buffer, 1)) DrawESP(GetBackgroundDrawList());
             jump_buffer_active = 0;
         }
+
+        // 9-Ball One Shoot: manual aim helper with button + thinking animation.
+        // Called here (after NineBall namespace is defined) to avoid forward-decl issues.
+        NineBall::Update(nullptr, io);
 
         if (g_menu.isOpen) {
             g_menu.menuAlpha += (1.0f - g_menu.menuAlpha) * io.DeltaTime * 14.0f;
