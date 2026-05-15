@@ -386,20 +386,31 @@ INLINE void DrawESP(ImDrawList* draw) {
             }
         }
 
-        // ── Enemy Line — highlight opponent ball predicted positions ──────────
+        // ── Enemy Line — orange trajectories for OPPONENT balls only ────────
         if (persistent_bool[O("bESP_EnemyLine")]) {
+            bool is9Ball = sharedGameManager.is9BallGame();
+            // 8-ball: show only the opposing classification; 9-ball: show all numbered balls
+            Ball::Classification enemyClass = Ball::Classification::ANY;
+            if (!is9Ball) {
+                if (myclass == Ball::Classification::SOLID)
+                    enemyClass = Ball::Classification::STRIPE;
+                else if (myclass == Ball::Classification::STRIPE)
+                    enemyClass = Ball::Classification::SOLID;
+            }
             for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
                 auto& ball = gPrediction->guiData.balls[i];
+                if (!ball.originalOnTable) continue;
+                // In 8-ball mode filter to opponent class only
+                if (!is9Ball && ball.classification != enemyClass) continue;
                 if (ball.initialPosition == ball.predictedPosition) continue;
                 auto ip = WorldToScreen(ball.initialPosition);
                 auto pp = WorldToScreen(ball.predictedPosition);
-                // Orange prediction line for enemy balls
                 draw->AddLine(ImVec2(ip.x, ip.y), ImVec2(pp.x, pp.y),
-                              IM_COL32(255, 130, 0, 160), 2.5f);
-                draw->AddCircle(ImVec2(pp.x, pp.y), 20.f,
-                                IM_COL32(255, 140, 0, 220), 0, 3.f);
-                draw->AddCircleFilled(ImVec2(pp.x, pp.y), 7.f,
-                                     IM_COL32(255, 100, 0, 230));
+                              IM_COL32(255, 130, 0, 175), 3.0f);
+                draw->AddCircle(ImVec2(pp.x, pp.y), 22.f,
+                                IM_COL32(255, 145, 0, 235), 0, 3.5f);
+                draw->AddCircleFilled(ImVec2(pp.x, pp.y), 8.f,
+                                     IM_COL32(255, 100, 0, 245));
             }
         }
     }
@@ -562,6 +573,101 @@ static void DrawCalculating(ImGuiIO& io) {
 #include "game/inc/AutoAim.h"
 #include "mod/PowerSlider.h"
 
+// ── NineBall One Shoot ────────────────────────────────────────────────────────
+// Follows official 9-ball rules:
+//   • Must hit the LOWEST numbered ball on table first every shot
+//   • Legally pocket the 9-ball at any point (combo/combination) → instant win
+//   • No scratch (cue ball must stay on table)
+namespace NineBall {
+
+    // Returns the index (1..9) of the lowest numbered ball still on the table.
+    // Ball index in guiData.balls corresponds directly to ball number (1=ball#1, 9=ball#9).
+    static int findLowestBall() {
+        for (int i = 1; i < gPrediction->guiData.ballsCount && i <= 9; i++) {
+            auto& b = gPrediction->guiData.balls[i];
+            if (b.originalOnTable && b.classification == Ball::Classification::NINE_BALL_RULE)
+                return i;
+        }
+        return -1;
+    }
+
+    // Scan all angles for a LEGAL combination: cue→lowestBall→9ball pocketed.
+    // A finer angle step (0.05 rad ≈ 2.9°) gives better combo detection.
+    // Returns true and sets the aim angle when a winning shot is found.
+    static bool AIM_Combo(int lowestIdx, double angleStep = 0.05) {
+        if (gPrediction->guiData.ballsCount <= 9) return false;
+        if (!gPrediction->guiData.balls[9].originalOnTable) return false; // already won
+
+        double startAngle = NumberUtils::normalizeDoublePrecision(
+            sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+
+        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(startAngle + angleStep));
+             a != startAngle;
+             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + angleStep))) {
+
+            gPrediction->determineShotResult(true, a);
+
+            auto& cueBall = gPrediction->guiData.balls[0];
+            auto& ball9   = gPrediction->guiData.balls[9];
+
+            if (!cueBall.onTable) continue;                          // scratch — illegal
+            if (!ball9.originalOnTable || ball9.onTable) continue;  // 9-ball not pocketed
+            if (!gPrediction->guiData.collision.firstHitBall) continue;
+            if (gPrediction->guiData.collision.firstHitBall->index != lowestIdx) continue;
+
+            AutoAim::setAimAngle(a);
+            return true; // Winning combo found
+        }
+        return false;
+    }
+
+    // Fallback: find a legal shot that pockets ANY ball while hitting lowestBall first.
+    static void AIM_Standard(int lowestIdx, double angleStep = 0.1) {
+        double startAngle = NumberUtils::normalizeDoublePrecision(
+            sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+
+        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(startAngle + angleStep));
+             a != startAngle;
+             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + angleStep))) {
+
+            gPrediction->determineShotResult(true, a);
+
+            auto& cueBall = gPrediction->guiData.balls[0];
+            if (!cueBall.onTable) continue; // no scratch allowed
+
+            if (!gPrediction->guiData.collision.firstHitBall) continue;
+            if (gPrediction->guiData.collision.firstHitBall->index != lowestIdx) continue;
+
+            // Any ball pocketed is legal in 9-ball once lowest is hit first
+            bool anyPotted = false;
+            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+                auto& b = gPrediction->guiData.balls[i];
+                if (b.originalOnTable && !b.onTable) { anyPotted = true; break; }
+            }
+            if (anyPotted) { AutoAim::setAimAngle(a); return; }
+        }
+    }
+
+    // Master entry — tries combo first (1→9 instant win), falls back to standard aim
+    static void AIM() {
+        if (!sharedGameManager.is9BallGame()) return;
+        if (!AutoAim::shouldAutoAIM()) return;
+
+        double startAngle = NumberUtils::normalizeDoublePrecision(
+            sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+        gPrediction->determineShotResult(true, startAngle);
+
+        int lowestIdx = findLowestBall();
+        if (lowestIdx < 0) return;
+
+        // If the 9-ball itself is the lowest remaining, target it directly
+        bool comboFound = false;
+        if (lowestIdx < 9) comboFound = AIM_Combo(lowestIdx);
+        if (!comboFound)   AIM_Standard(lowestIdx);
+    }
+
+} // namespace NineBall
+
 // ── AutoPlay::Update() ────────────────────────────────────────────────────────
 namespace AutoPlay {
     static ImVec4 getPowerBarRect() {
@@ -591,8 +697,12 @@ namespace AutoPlay {
         // Only act when it is our turn (stateId 4)
         if (stateId != 4) return;
 
-        // Aim the cue, then immediately queue the power-bar drag
-        AutoAim::AIM();
+        // Aim the cue — use 9-ball aim when in 9-ball mode, otherwise standard
+        if (sharedGameManager.is9BallGame() && persistent_bool[O("bNineBallOneShoot")]) {
+            NineBall::AIM();
+        } else {
+            AutoAim::AIM();
+        }
         powerSlider.SimulateDrag(getPowerBarRect(), SHOT_POWER, DRAG_TIME, HOLD_TIME);
     }
 } // namespace AutoPlay
@@ -713,12 +823,15 @@ static void DrawContentArea(float winW, float winH) {
         case 1: {
             Dummy(ImVec2(0, 10));
             need_save |= ToggleSwitch(O("Enable AutoPlay"), &persistent_bool[O("bAutoPlay")]);
-            
-            //need_save |= ToggleSwitch(O("Auto Aiming"), &persistent_bool[O("bAutoAim")]);
-            
-            Dummy(ImVec2(0, 20));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("Auto play will automatically"));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("aim and shoot for you"));
+
+            Dummy(ImVec2(0, 14));
+            need_save |= ToggleSwitch(O("9-Ball One Shoot"), &persistent_bool[O("bNineBallOneShoot")]);
+
+            Dummy(ImVec2(0, 16));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("AutoPlay: auto aim & shoot"));
+            Dummy(ImVec2(0, 6));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("9-Ball One Shoot: hit lowest"));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("ball first, combo 9-ball win"));
             break;
         }
         

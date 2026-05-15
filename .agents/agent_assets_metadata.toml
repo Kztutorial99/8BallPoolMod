@@ -12,3 +12,9 @@ id = "FGovR52nbfuYgiIbygwK2"
 uri = "file://app/build/outputs/apk/debug/app-debug-v2.tar.gz"
 type = "unspecified"
 title = "app-debug-v2.apk — 8BP Mod (semua perubahan)"
+
+[[outputs]]
+id = "JCfe7kOEwYWBAcJPBmLyV"
+uri = "file://app/build/outputs/apk/debug/app-debug-v3.tar.gz"
+type = "unspecified"
+title = "app-debug-v3.apk — Enemy Line fix + 9-Ball One Shoot"
