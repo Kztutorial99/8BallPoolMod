@@ -89,12 +89,25 @@ static bool SidebarButton(const char* label, GLuint iconTex, bool selected, floa
         bb.Min.y + vPad + iconSize * 0.5f
     );
 
-    // Selected: red rounded rect behind icon only
+    // Selected: modern accent highlight behind icon
     if (selected) {
+        // Soft glow fill
         dl->AddRectFilled(
             ImVec2(iconCenter.x - iconBgSize * 0.5f, iconCenter.y - iconBgSize * 0.5f),
             ImVec2(iconCenter.x + iconBgSize * 0.5f, iconCenter.y + iconBgSize * 0.5f),
-            IM_COL32(255, 0, 0, 255), 12.0f
+            IM_COL32(200, 30, 30, 200), 14.0f
+        );
+        // Bright inner ring
+        dl->AddRect(
+            ImVec2(iconCenter.x - iconBgSize * 0.5f + 2, iconCenter.y - iconBgSize * 0.5f + 2),
+            ImVec2(iconCenter.x + iconBgSize * 0.5f - 2, iconCenter.y + iconBgSize * 0.5f - 2),
+            IM_COL32(255, 80, 80, 120), 12.0f, 0, 1.5f
+        );
+    } else if (hovered) {
+        dl->AddRectFilled(
+            ImVec2(iconCenter.x - iconBgSize * 0.5f, iconCenter.y - iconBgSize * 0.5f),
+            ImVec2(iconCenter.x + iconBgSize * 0.5f, iconCenter.y + iconBgSize * 0.5f),
+            IM_COL32(60, 60, 75, 120), 14.0f
         );
     }
 
@@ -372,6 +385,23 @@ INLINE void DrawESP(ImDrawList* draw) {
                 }
             }
         }
+
+        // ── Enemy Line — highlight opponent ball predicted positions ──────────
+        if (persistent_bool[O("bESP_EnemyLine")]) {
+            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+                auto& ball = gPrediction->guiData.balls[i];
+                if (ball.initialPosition == ball.predictedPosition) continue;
+                auto ip = WorldToScreen(ball.initialPosition);
+                auto pp = WorldToScreen(ball.predictedPosition);
+                // Orange prediction line for enemy balls
+                draw->AddLine(ImVec2(ip.x, ip.y), ImVec2(pp.x, pp.y),
+                              IM_COL32(255, 130, 0, 160), 2.5f);
+                draw->AddCircle(ImVec2(pp.x, pp.y), 20.f,
+                                IM_COL32(255, 140, 0, 220), 0, 3.f);
+                draw->AddCircleFilled(ImVec2(pp.x, pp.y), 7.f,
+                                     IM_COL32(255, 100, 0, 230));
+            }
+        }
     }
 }
 
@@ -467,12 +497,18 @@ static std::string ReadNSString(ptr str) {
     return result;
 }
 
-// Shared vertical position for DrawToggleButton and DrawFloatingButton (they move together)
-static float g_sideBtnsY      = 0.0f;
-// Kept for linker compatibility — no longer used for animation
+// Floating button position — both X and Y, draggable freely
+static float g_btnX           = -1.0f;
+static float g_btnY           = -1.0f;
+// Keep g_sideBtnsY alias so nothing else breaks
+static float& g_sideBtnsY     = g_btnY;
+// Kept for linker compatibility
 static float g_toggleRotAngle = 0.0f;
-// Set true by AutoPlay when in SLOW scan state — shows CALCULATING overlay
+// CALCULATING overlay (unused now — AutoPlay simplified)
 static bool  g_autoPlayCalculating = false;
+// Main menu saved position (-1 = not yet initialised)
+static float g_menuPosX = -1.0f;
+static float g_menuPosY = -1.0f;
 
 // ── svConfig ──────────────────────────────────────────────────────────────────
 static void svConfig_Save() {
@@ -527,12 +563,7 @@ static void DrawCalculating(ImGuiIO& io) {
 #include "mod/PowerSlider.h"
 
 // ── AutoPlay::Update() ────────────────────────────────────────────────────────
-// Defined here (after all game objects, mod globals, and g_autoPlayCalculating
-// are in scope). Declaration lives in game/inc/AutoPlay.h.
 namespace AutoPlay {
-    // Estimate the on-screen rect of the 8BP power bar.
-    // Reference resolution (ScreenTable.h): REF_WIDTH=1280, REF_HEIGHT=640.
-    // Power bar is to the right of the table — approx ref-x≈1120, ref-y 162..572.
     static ImVec4 getPowerBarRect() {
         float hs = static_cast<float>(Height) / static_cast<float>(REF_HEIGHT);
         float ox = (static_cast<float>(Width) - hs * static_cast<float>(REF_WIDTH)) * 0.5f;
@@ -546,78 +577,23 @@ namespace AutoPlay {
     static void Update() {
         if (!bAutoPlaying) return;
 
-        float dt      = ImGui::GetIO().DeltaTime;
-
-        // Guard: need valid game state
-        auto stateManager = sharedGameManager.mStateManager();
-        if (!stateManager) { ClearState(); return; }
-        int stateId = stateManager.getCurrentStateId();
-
-        // Drive the CALCULATING overlay flag
-        g_autoPlayCalculating = (currentState == State::SCANNING);
-
-        // Keep PowerSlider running every frame regardless of our state
+        // Tick the drag slider every single frame so the touch events fire correctly
         powerSlider.Update();
 
-        switch (currentState) {
+        // If a shot is already in progress, wait for it to complete
+        if (powerSlider.Active) return;
 
-            case State::IDLE:
-                if (stateId == 4) {          // Player's turn — begin scan
-                    AutoAim::AIM();
-                    stateTimer   = 0.f;
-                    currentState = State::SCANNING;
-                }
-                break;
+        // Need a valid game state
+        auto stateManager = sharedGameManager.mStateManager();
+        if (!stateManager) return;
+        int stateId = stateManager.getCurrentStateId();
 
-            case State::SCANNING:
-                stateTimer += dt;
-                AutoAim::AIM();              // Keep refining angle each frame
-                if (stateId != 4) {          // Turn ended unexpectedly
-                    ClearState();
-                    break;
-                }
-                if (stateTimer >= SCAN_DURATION) {
-                    powerSlider.SimulateDrag(getPowerBarRect(), SHOT_POWER, DRAG_TIME, HOLD_TIME);
-                    stateTimer   = 0.f;
-                    currentState = State::SHOOTING;
-                }
-                break;
+        // Only act when it is our turn (stateId 4)
+        if (stateId != 4) return;
 
-            case State::SHOOTING:
-                stateTimer += dt;
-                if (!powerSlider.Active) {
-                    stateTimer   = 0.f;
-                    currentState = State::COOLDOWN;
-                }
-                // Timeout safety: if shot takes too long, force cooldown
-                if (stateTimer > 5.0f) {
-                    powerSlider.Cancel();
-                    stateTimer   = 0.f;
-                    currentState = State::COOLDOWN;
-                }
-                // Turn changed before shot completed — reset
-                if (stateId != 4 && stateId != 6 && stateId != 7 && stateId != 8) {
-                    powerSlider.Cancel();
-                    ClearState();
-                }
-                break;
-
-            case State::COOLDOWN:
-                stateTimer += dt;
-                // Our turn came back early — jump straight to scanning
-                if (stateId == 4 && stateTimer > 0.4f) {
-                    currentState = State::IDLE;
-                    break;
-                }
-                if (stateTimer >= COOLDOWN_DUR) {
-                    currentState = State::IDLE;
-                }
-                break;
-
-            default:
-                ClearState();
-                break;
-        }
+        // Aim the cue, then immediately queue the power-bar drag
+        AutoAim::AIM();
+        powerSlider.SimulateDrag(getPowerBarRect(), SHOT_POWER, DRAG_TIME, HOLD_TIME);
     }
 } // namespace AutoPlay
 
@@ -682,8 +658,8 @@ static void DrawContentArea(float winW, float winH) {
         case 0: {
             Dummy(ImVec2(0, 10));
             need_save |= ToggleSwitch(O("Draw Lines"), &persistent_bool[O("bESP_DrawPredictionLine")]);
-           // need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPockets")]);
             need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
+            need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
 
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
@@ -955,9 +931,8 @@ INLINE void DrawMenu(ImGuiIO& io) {
             jump_buffer_active = 0;
         }
 
-        float targetAlpha = g_menu.isOpen ? 1.0f : 0.0f;
         if (g_menu.isOpen) {
-            g_menu.menuAlpha += (1.0f - g_menu.menuAlpha) * io.DeltaTime * 12.0f;
+            g_menu.menuAlpha += (1.0f - g_menu.menuAlpha) * io.DeltaTime * 14.0f;
         } else {
             g_menu.menuAlpha = 0.0f;
         }
@@ -967,26 +942,55 @@ INLINE void DrawMenu(ImGuiIO& io) {
             if (sizeScale < 0.3f) sizeScale = 0.3f;
             float winW = g_menu.sidebarWidth * sizeScale;
             float winH = 560.0f * sizeScale;
-            
+
+            // Initialise to screen centre on first open
+            if (g_menuPosX < 0.0f) g_menuPosX = (Width  - winW) * 0.5f;
+            if (g_menuPosY < 0.0f) g_menuPosY = (Height - winH) * 0.5f;
+
+            // Clamp to screen every frame so it never leaves the display
+            g_menuPosX = ImClamp(g_menuPosX, 0.0f, ImMax(0.0f, io.DisplaySize.x - winW));
+            g_menuPosY = ImClamp(g_menuPosY, 0.0f, ImMax(0.0f, io.DisplaySize.y - winH));
+
             SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
-            SetNextWindowPos(ImVec2(Width / 2.0f, Height / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-            
+            SetNextWindowPos(ImVec2(g_menuPosX, g_menuPosY), ImGuiCond_Always);
+
             PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.13f, 0.f));
-            PushStyleVar(ImGuiStyleVar_WindowRounding, 16.0f);
+            PushStyleVar(ImGuiStyleVar_WindowRounding, 20.0f);
             PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
             PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
             PushStyleVar(ImGuiStyleVar_Alpha, g_menu.menuAlpha);
-            
+
+            // NoMove kept — we handle dragging manually so we can clamp
             ImGuiWindowFlags winFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar |
                                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-            
+
             if (Begin(O("##MainMenu"), &g_menu.isOpen, winFlags)) {
+                // ── Draw border glow ──────────────────────────────────────────
+                ImDrawList* bdl = GetWindowDrawList();
+                ImVec2      bwp = GetWindowPos();
+                bdl->AddRect(bwp, ImVec2(bwp.x + winW, bwp.y + winH),
+                             IM_COL32(200, 30, 30, 60), 20.0f, 0, 1.5f);
+                bdl->AddRect(ImVec2(bwp.x + 1, bwp.y + 1),
+                             ImVec2(bwp.x + winW - 1, bwp.y + winH - 1),
+                             IM_COL32(255, 60, 60, 25), 20.0f, 0, 1.0f);
+
                 DrawSidebar(winW);
                 DrawContentArea(winW, winH);
+
+                // ── Drag: any area of the window not captured by a widget ────
+                if (IsWindowHovered(ImGuiHoveredFlags_AnyWindow) &&
+                    IsMouseDragging(ImGuiMouseButton_Left, 4.0f) &&
+                    !IsAnyItemActive()) {
+                    g_menuPosX += io.MouseDelta.x;
+                    g_menuPosY += io.MouseDelta.y;
+                    g_menuPosX = ImClamp(g_menuPosX, 0.0f, ImMax(0.0f, io.DisplaySize.x - winW));
+                    g_menuPosY = ImClamp(g_menuPosY, 0.0f, ImMax(0.0f, io.DisplaySize.y - winH));
+                    SetWindowPos(ImVec2(g_menuPosX, g_menuPosY), ImGuiCond_Always);
+                }
             }
             End();
-            
+
             PopStyleVar(4);
             PopStyleColor();
         }
@@ -998,20 +1002,25 @@ INLINE void DrawMenu(ImGuiIO& io) {
 static void DrawToggleButton(bool cancelMode) {
     ImGuiIO& io = GetIO();
 
-    // Compact button — fits neatly on screen regardless of resolution
     float button_size  = 80.f;
     float winPad       = 6.0f;
     float windowWidth  = button_size + winPad * 2.0f;
     float windowHeight = button_size + winPad * 2.0f;
+    float margin       = 8.0f;
 
-    const float rightMargin = 16.0f;
-    float fixedX = io.DisplaySize.x - rightMargin - windowWidth;
+    // Position the AutoPlay/Cancel button just below the floating button
+    // g_btnX/g_btnY tracks the floating button position
+    float floatBtnSize = 140.0f; // floating button window size
+    float posX = (g_btnX < 0.0f) ? (io.DisplaySize.x - 20.0f - windowWidth) : g_btnX;
+    float posY = (g_btnY < 0.0f) ? (io.DisplaySize.y - 20.0f - windowHeight)
+                                  : (g_btnY + floatBtnSize + margin);
 
-    if (g_sideBtnsY == 0.0f)
-        g_sideBtnsY = io.DisplaySize.y - 20.0f - windowHeight;
+    // Clamp so it never goes off screen
+    posX = ImClamp(posX, 0.0f, io.DisplaySize.x - windowWidth);
+    posY = ImClamp(posY, 0.0f, io.DisplaySize.y - windowHeight);
 
     SetNextWindowSize(ImVec2(windowWidth, windowHeight), ImGuiCond_Always);
-    SetNextWindowPos(ImVec2(fixedX, g_sideBtnsY), ImGuiCond_Always);
+    SetNextWindowPos(ImVec2(posX, posY), ImGuiCond_Always);
 
     PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 0));
     PushStyleColor(ImGuiCol_Border,   IM_COL32(0, 0, 0, 0));
@@ -1078,13 +1087,6 @@ static void DrawToggleButton(bool cancelMode) {
                               ImVec2(center.x + gap + bw,  center.y + bh), ic, 3.f);
         }
 
-        // Vertical-only drag
-        if (IsItemActive() && IsMouseDragging(ImGuiMouseButton_Left)) {
-            g_sideBtnsY += io.MouseDelta.y;
-            g_sideBtnsY = ImClamp(g_sideBtnsY, 0.0f, io.DisplaySize.y - windowHeight);
-            SetWindowPos(ImVec2(fixedX, g_sideBtnsY), ImGuiCond_Always);
-        }
-
         if (clicked) {
             if (cancelMode) {
                 persistent_bool[O("bAutoQueue")] = false;
@@ -1101,56 +1103,76 @@ static void DrawToggleButton(bool cancelMode) {
 }
 
 static void DrawFloatingButton(ImGuiIO& io) {
-    static GLuint logo_tex   = LoadTextureFromMemory(logo_png, logo_png_len);
-    static bool   isDragging = false;
+    static bool isDragging = false;
 
-    float buttonRadius = 65.0f;
-    float buttonSize   = buttonRadius * 2.0f;
-    float winSize      = buttonSize + 10.0f;
-    float margin       = 8.0f;
+    // Button is a circle of radius 55px inside a 120×120 window
+    const float r       = 55.0f;
+    const float winSize = 120.0f;
 
-    float toggleWinH = GetFrameHeight() * 1.7f + GetStyle().WindowPadding.y * 2.0f;
-    const float rightMargin = 20.0f;
-    float toggleWinW = GetFrameHeight() * 1.7f + GetStyle().WindowPadding.x * 2.0f;
-    float fixedX = io.DisplaySize.x - rightMargin - ImMax(winSize, toggleWinW);
+    // Initialise to bottom-right on first frame
+    if (g_btnX < 0.0f) g_btnX = io.DisplaySize.x - winSize - 16.0f;
+    if (g_btnY < 0.0f) g_btnY = io.DisplaySize.y - winSize - 24.0f;
 
-    if (g_sideBtnsY == 0.0f)
-        g_sideBtnsY = io.DisplaySize.y - 80.0f - toggleWinH;
+    // Hard clamp every frame — button never leaves screen
+    g_btnX = ImClamp(g_btnX, 0.0f, io.DisplaySize.x - winSize);
+    g_btnY = ImClamp(g_btnY, 0.0f, io.DisplaySize.y - winSize);
 
-    float posY = g_sideBtnsY - winSize - margin;
-
-    SetNextWindowPos(ImVec2(fixedX, posY), ImGuiCond_Always);
+    SetNextWindowPos(ImVec2(g_btnX, g_btnY), ImGuiCond_Always);
     SetNextWindowSize(ImVec2(winSize, winSize), ImGuiCond_Always);
-    PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
-    PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 0));
+    PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(0, 0));
     PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
     if (Begin(O("##FloatBtn"), nullptr,
-              ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar |
-              ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings)) {
+              ImGuiWindowFlags_NoTitleBar  | ImGuiWindowFlags_NoResize    |
+              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground |
+              ImGuiWindowFlags_NoMove      | ImGuiWindowFlags_NoSavedSettings)) {
 
+        ImVec2      wp     = GetWindowPos();
+        ImVec2      center = ImVec2(wp.x + winSize * 0.5f, wp.y + winSize * 0.5f);
         ImDrawList* dl     = GetWindowDrawList();
-        ImVec2      center = ImVec2(fixedX + buttonRadius + 5, posY + buttonRadius + 5);
 
         SetCursorPos(ImVec2(0, 0));
-        InvisibleButton(O("##FloatBtnHit"), ImVec2(winSize, winSize));
+        bool clicked = InvisibleButton(O("##FloatBtnHit"), ImVec2(winSize, winSize));
+        bool hovered = IsItemHovered();
 
-        // Draw logo — no animations, fixed size
-        dl->AddImage((void*)(intptr_t)logo_tex,
-                     ImVec2(center.x - buttonRadius, center.y - buttonRadius),
-                     ImVec2(center.x + buttonRadius, center.y + buttonRadius));
+        // ── Background circle (dark with subtle depth rings) ─────────────
+        dl->AddCircleFilled(center, r + 3.0f, IM_COL32(0, 0, 0, 60));  // shadow
+        dl->AddCircleFilled(center, r,         IM_COL32(14, 14, 26, 248));
 
-        // Vertical-only drag moves both buttons together via g_sideBtnsY
-        if (IsItemActive() && IsMouseDragging(0)) {
-            isDragging = true;
-            g_sideBtnsY += io.MouseDelta.y;
-            g_sideBtnsY = ImClamp(g_sideBtnsY, winSize + margin,
-                                  io.DisplaySize.y - 80.0f - toggleWinH);
+        // Red glow rings — brighter when hovered / menu open
+        ImU32 ringAlpha = (hovered || g_menu.isOpen) ? 230u : 140u;
+        dl->AddCircle(center, r - 1.0f,        IM_COL32(220, 35,  35, ringAlpha), 48, 2.5f);
+        dl->AddCircle(center, r - 6.0f,        IM_COL32(160, 30,  30, ringAlpha / 3), 48, 1.0f);
+
+        // ── Hamburger icon (3 horizontal lines) ──────────────────────────
+        float lw  = r * 0.54f;   // full line half-width
+        float lsp = r * 0.31f;   // spacing between lines
+        float lth = 3.2f;        // line thickness
+        ImU32 ic  = IM_COL32(255, 255, 255, 228);
+        for (int i = -1; i <= 1; i++) {
+            float ly   = center.y + i * lsp;
+            float half = (i == 0) ? lw * 0.70f : lw;  // middle line shorter
+            dl->AddLine(ImVec2(center.x - half, ly),
+                        ImVec2(center.x + half, ly), ic, lth);
         }
 
-        if (IsItemHovered() && IsMouseReleased(0) && !isDragging)
-            g_menu.isOpen = !g_menu.isOpen;
+        // ── Active glow when menu is open ─────────────────────────────────
+        if (g_menu.isOpen) {
+            dl->AddCircle(center, r + 1.5f, IM_COL32(255, 80, 80, 50), 48, 4.0f);
+        }
 
+        // ── X+Y free drag ─────────────────────────────────────────────────
+        if (IsItemActive() && IsMouseDragging(ImGuiMouseButton_Left, 4.0f)) {
+            isDragging = true;
+            g_btnX += io.MouseDelta.x;
+            g_btnY += io.MouseDelta.y;
+            g_btnX = ImClamp(g_btnX, 0.0f, io.DisplaySize.x - winSize);
+            g_btnY = ImClamp(g_btnY, 0.0f, io.DisplaySize.y - winSize);
+            SetWindowPos(ImVec2(g_btnX, g_btnY), ImGuiCond_Always);
+        }
+
+        if (clicked && !isDragging) g_menu.isOpen = !g_menu.isOpen;
         if (!IsItemActive()) isDragging = false;
     }
     End();
