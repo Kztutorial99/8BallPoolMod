@@ -2,6 +2,7 @@
 
 #include "Prediction.fast.h"
 #include <imgui/imgui.h>
+#include <ctime>
 
 using namespace ImGui;
 
@@ -22,31 +23,107 @@ namespace AutoAim {
 
     void setAimAngle(double angle) {
         lastSetAngle = angle;
-        // Stealth mode: add small random noise so aiming looks human
-        if (persistent_bool[O("bStealth")]) {
-            double range = (double)persistent_float[O("fStealthNoise")] * M_PI / 180.0;
-            double noise = (((double)rand() / (double)RAND_MAX) * 2.0 - 1.0) * range;
-            angle += noise;
-            angle = normalizeAngle(angle);
-        }
         sharedGameManager.mVisualCue().mVisualGuide().mAimAngle(angle);
     }
 
-    // Targeted ball aim — scan for the angle that pots ball at index targetIdx
+    // Targeted ball aim — scan for angle that FIRST HITS the target ball AND pots it
     void AIM_Targeted(int targetIdx, double angleStep = 0.1) {
         if (targetIdx < 1 || targetIdx >= gPrediction->guiData.ballsCount) return;
+        // Target ball must be on table
+        if (!gPrediction->guiData.balls[targetIdx].originalOnTable) return;
+
         double startingAngle = NumberUtils::normalizeDoublePrecision(
             sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
-        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(startingAngle + angleStep));
-             a != startingAngle;
-             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + angleStep))) {
+
+        const int maxIter = (int)((2.0 * M_PI) / fabs(angleStep)) + 2;
+        for (int iter = 0; iter < maxIter; iter++) {
+            double a = NumberUtils::normalizeDoublePrecision(
+                normalizeAngle(startingAngle + angleStep * (double)(iter + 1)));
+
             gPrediction->determineShotResult(true, a);
             auto& cue = gPrediction->guiData.balls[0];
             if (!cue.onTable) continue; // no scratch
+
+            // The FIRST ball hit MUST be the exact target ball — ensures legal clean shot
+            if (!gPrediction->guiData.collision.firstHitBall) continue;
+            if (gPrediction->guiData.collision.firstHitBall->index != targetIdx) continue;
+
             auto& tgt = gPrediction->guiData.balls[targetIdx];
             if (tgt.originalOnTable && !tgt.onTable) {
                 setAimAngle(a);
                 return;
+            }
+        }
+    }
+
+    // Auto Aim Random — randomly targets a valid ball of player's class and aims to pot it
+    // Only accepts shots where the FIRST ball hit IS the target (solid/clean shot)
+    void AIM_Random(double angleStep = 0.1) {
+        Ball::Classification myclass = sharedGameManager.getPlayerClassification();
+        if (myclass != Ball::Classification::SOLID &&
+            myclass != Ball::Classification::STRIPE) return;
+
+        // Collect all on-table balls of our class
+        std::vector<int> candidates;
+        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+            auto& b = gPrediction->guiData.balls[i];
+            if (b.classification == myclass && b.originalOnTable)
+                candidates.push_back(i);
+        }
+
+        // If all our balls are potted, aim at 8-ball to win
+        if (candidates.empty()) {
+            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+                auto& b = gPrediction->guiData.balls[i];
+                if (b.classification == Ball::Classification::EIGHT_BALL && b.originalOnTable) {
+                    AIM_Targeted(i, angleStep);
+                    return;
+                }
+            }
+            return;
+        }
+
+        // Find 8-ball index dynamically
+        int eightBallIdx = -1;
+        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+            if (gPrediction->guiData.balls[i].classification == Ball::Classification::EIGHT_BALL) {
+                eightBallIdx = i;
+                break;
+            }
+        }
+
+        // Random starting point — changes each second so it picks different balls
+        int startIdx = (int)((int64_t)time(nullptr) % (int64_t)candidates.size());
+
+        for (int attempt = 0; attempt < (int)candidates.size(); attempt++) {
+            int ballIdx = candidates[(startIdx + attempt) % (int)candidates.size()];
+
+            double startingAngle = NumberUtils::normalizeDoublePrecision(
+                sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+
+            const int maxIter = (int)((2.0 * M_PI) / fabs(angleStep)) + 2;
+            for (int iter = 0; iter < maxIter; iter++) {
+                double a = NumberUtils::normalizeDoublePrecision(
+                    normalizeAngle(startingAngle + angleStep * (double)(iter + 1)));
+
+                gPrediction->determineShotResult(true, a);
+                auto& cue = gPrediction->guiData.balls[0];
+                if (!cue.onTable) continue; // no scratch
+
+                // First ball hit MUST be our chosen target ball
+                if (!gPrediction->guiData.collision.firstHitBall) continue;
+                if (gPrediction->guiData.collision.firstHitBall->index != ballIdx) continue;
+
+                // Don't accidentally pot the 8-ball before it's time
+                if (eightBallIdx >= 0 &&
+                    gPrediction->guiData.balls[eightBallIdx].originalOnTable &&
+                    !gPrediction->guiData.balls[eightBallIdx].onTable) continue;
+
+                auto& tgt = gPrediction->guiData.balls[ballIdx];
+                if (tgt.originalOnTable && !tgt.onTable) {
+                    setAimAngle(a);
+                    return;
+                }
             }
         }
     }
@@ -58,13 +135,28 @@ namespace AutoAim {
             if (idx >= 1) { AIM_Targeted(idx, angleStep); return; }
         }
 
+        // Random aim — targets a random solid ball of player's class
+        if (persistent_bool[O("bRandomAim")]) {
+            AIM_Random(angleStep);
+            return;
+        }
+
         auto startingAngle = NumberUtils::normalizeDoublePrecision(sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
 
-        // Use the actual player classification from the game — never guess
+        // Use the actual player classification from the game
         Ball::Classification myclass = sharedGameManager.getPlayerClassification();
         // Only aim when we have a valid classification (SOLID or STRIPE)
         if (myclass != Ball::Classification::SOLID &&
             myclass != Ball::Classification::STRIPE) return;
+
+        // Find 8-ball index dynamically — works for 8-ball and 16-ball modes
+        int eightBallIdx = -1;
+        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+            if (gPrediction->guiData.balls[i].classification == Ball::Classification::EIGHT_BALL) {
+                eightBallIdx = i;
+                break;
+            }
+        }
 
         gPrediction->determineShotResult(true, startingAngle);
         std::vector<int> startingPottedBalls;
@@ -75,7 +167,11 @@ namespace AutoAim {
             }
         }
 
-        for (double angle = NumberUtils::normalizeDoublePrecision(normalizeAngle(startingAngle + angleStep)); angle != startingAngle; angle = NumberUtils::normalizeDoublePrecision(normalizeAngle(angle + angleStep))) {
+        const int maxIter = (int)((2.0 * M_PI) / fabs(angleStep)) + 2;
+        for (int iter = 0; iter < maxIter; iter++) {
+            double angle = NumberUtils::normalizeDoublePrecision(
+                normalizeAngle(startingAngle + angleStep * (double)(iter + 1)));
+
             gPrediction->determineShotResult(true, angle);
 
             // Check if all our balls are already potted — only 8-ball left
@@ -105,17 +201,18 @@ namespace AutoAim {
                 }
             }
 
-            // First ball hit must be the correct target class
+            // First ball hit must be the correct target class — ensures legal shot
             if (isAngleGood && gPrediction->guiData.collision.firstHitBall &&
                 gPrediction->guiData.collision.firstHitBall->classification != targetClass)
                 isAngleGood = false;
 
-            auto& cueBall   = gPrediction->guiData.balls[0];
-            auto& eightBall = gPrediction->guiData.balls[8];
+            auto& cueBall = gPrediction->guiData.balls[0];
             // Never scratch the cue ball
             if (isAngleGood && cueBall.originalOnTable && !cueBall.onTable) isAngleGood = false;
             // Never accidentally pot the 8-ball before it's time
-            if (isAngleGood && !only8BPleft && eightBall.originalOnTable && !eightBall.onTable) isAngleGood = false;
+            if (isAngleGood && !only8BPleft && eightBallIdx >= 0 &&
+                gPrediction->guiData.balls[eightBallIdx].originalOnTable &&
+                !gPrediction->guiData.balls[eightBallIdx].onTable) isAngleGood = false;
 
             if (!currentPottedBalls.empty() && startingPottedBalls != currentPottedBalls && isAngleGood) {
                 setAimAngle(angle);

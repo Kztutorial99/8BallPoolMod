@@ -324,9 +324,6 @@ INLINE void DrawESP(ImDrawList* draw) {
         MainStateManager mainStateManager = sharedMainManager.mStateManager;
         if (!mainStateManager) return;
         if (!mainStateManager.isInGame()) {
-            if (persistent_bool[O("bAutoQueue")]) {
-                if (!sharedMenuManager.isInQueue()) DrawAutoQueue();
-            }
             return;
         }
 
@@ -354,25 +351,30 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         auto stateId = gameStateManager.getCurrentStateId();
 
-        // ── Per-frame stat tracking & heatmap computation ─────────────────
-        SessionStats::Update(stateId);
-        HeatmapESP::Compute(stateId);
-
-        // ── One-shot aim helpers: fire once when player's turn starts ─────
+        // ── Combo Finder: fire once when player's turn starts ─────────────
         static int sc_prevStateId = -1;
         bool sc_turnStart = (sc_prevStateId != 4 && stateId == 4);
         sc_prevStateId = stateId;
         if (sc_turnStart) {
-            if (persistent_bool[O("bDefensiveFinder")]) SafetyFinder::Find();
-            if (persistent_bool[O("bComboFinder")])    ComboFinder::Find();
+            if (persistent_bool[O("bComboFinder")]) ComboFinder::Find();
         }
 
-        // ── VIP Unlock: patch once when enabled ───────────────────────────
-        if (persistent_bool[O("bVIPUnlock")]) PhysicsHack::PatchVIP();
-
         // Always update prediction data every frame so enemy line & pockets
-        // are visible regardless of whose turn it is
-        gPrediction->determineShotResult(false);
+        // are visible regardless of whose turn it is.
+        // During enemy turn, cap power to a realistic value so the line matches
+        // where enemy balls actually travel (not max-power phantom trajectory).
+        {
+            double shotPwr = sharedGameManager.mVisualCue().getShotPower();
+            if (stateId != 4) {
+                // Enemy's turn — use actual power but clamp to realistic range
+                if (shotPwr > 450.0 || shotPwr < 20.0) shotPwr = 320.0;
+                double shotAng = sharedGameManager.mVisualCue().getShotAngle();
+                Vec2d  shotSpin = sharedGameManager.getShotSpin();
+                gPrediction->determineShotResult(false, shotAng, shotPwr, shotSpin);
+            } else {
+                gPrediction->determineShotResult(false);
+            }
+        }
 
         // ── Enemy Line — orange trajectories for OPPONENT balls ─────────────
         // Drawn BEFORE the early-return so it shows during enemy's turn too
@@ -389,11 +391,16 @@ INLINE void DrawESP(ImDrawList* draw) {
                 auto& ball = gPrediction->guiData.balls[i];
                 if (!ball.originalOnTable) continue;
                 if (!is9Ball && ball.classification != enemyClass) continue;
-                if (ball.initialPosition == ball.predictedPosition) continue;
-                auto ip = WorldToScreen(ball.initialPosition);
+                if (ball.positions.size() < 2) continue;
+                // Draw smooth continuous trajectory through all waypoints (no breaks)
+                for (int j = 1; j < (int)ball.positions.size(); j++) {
+                    auto sp0 = WorldToScreen(ball.positions[j - 1]);
+                    auto sp1 = WorldToScreen(ball.positions[j]);
+                    draw->AddLine(ImVec2(sp0.x, sp0.y), ImVec2(sp1.x, sp1.y),
+                                  IM_COL32(255, 130, 0, 200), 3.5f);
+                }
+                // End marker circle at predicted final position
                 auto pp = WorldToScreen(ball.predictedPosition);
-                draw->AddLine(ImVec2(ip.x, ip.y), ImVec2(pp.x, pp.y),
-                              IM_COL32(255, 130, 0, 200), 3.5f);
                 draw->AddCircle(ImVec2(pp.x, pp.y), 22.f,
                                 IM_COL32(255, 145, 0, 235), 0, 3.5f);
                 draw->AddCircleFilled(ImVec2(pp.x, pp.y), 8.f,
@@ -403,12 +410,6 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         // Skip prediction drawing during ball-motion states
         if (stateId == 6 || stateId == 7 || stateId == 8) return;
-
-        // ── Heatmap ESP — scoring dots around cue ball ────────────────────
-        if (persistent_bool[O("bESP_Heatmap")] && gPrediction->guiData.ballsCount > 0) {
-            auto cueSP = WorldToScreen(gPrediction->guiData.balls[0].initialPosition);
-            HeatmapESP::Draw(draw, ImVec2(cueSP.x, cueSP.y));
-        }
 
         if (persistent_bool[O("bESP_DrawPocketsShotState")]) {
             for (int i = 0; i < 6; i++) {
@@ -464,7 +465,7 @@ static void DrawSidebar(float sidebarW) {
     float closeSize = 35.0f;
     float closeBtnW = 70.0f;
     float tabsW     = sidebarW - closeBtnW;
-    float btnW      = tabsW / 4.0f;
+    float btnW      = tabsW / 3.0f;
     float marginB   = 12.0f;
 
     // Split channels: 0 = background (drawn last, appears behind), 1 = buttons (drawn first)
@@ -478,9 +479,7 @@ static void DrawSidebar(float sidebarW) {
     SameLine(0, 0);
     if (SidebarButton(O("Play"),  play_icon_tex, g_menu.currentTab == 1, btnW)) g_menu.currentTab = 1;
     SameLine(0, 0);
-    if (SidebarButton(O("Queue"), q_icon_tex,    g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
-    SameLine(0, 0);
-    if (SidebarButton(O("User"),  user_icon_tex, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
+    if (SidebarButton(O("User"),  user_icon_tex, g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
     EndGroup();
 
     // Measure actual rendered height — this is the true wrap_content
@@ -797,7 +796,11 @@ namespace NineBall {
             float   r      = bsz * 0.5f;
             ImDrawList* dl = GetWindowDrawList();
 
-            InvisibleButton(O("##NBHit"), ImVec2(bsz, bsz));
+            // Button press triggers DoAIM once — no auto-calculation
+            if (InvisibleButton(O("##NBHit"), ImVec2(bsz, bsz)) && !bCalculated) {
+                DoAIM();
+                bCalculated = true;
+            }
 
             // Background circle
             ImU32 bgCol = bCalculated
@@ -843,8 +846,9 @@ namespace NineBall {
         PopStyleColor(2);
     }
 
-    // ── Main update — called from DrawESP, NOT from AutoPlay ─────────────────
-    // Calculates aim ONCE per turn, then holds the result until turn ends.
+    // ── Main update — called from DrawMenu every frame ────────────────────────
+    // Button is always visible; user taps it to trigger aim calculation once.
+    // No automatic calculation — player controls when to calculate.
     static void Update(ImDrawList* /*draw*/, ImGuiIO& io) {
         if (!persistent_bool[O("bNineBallOneShoot")]) return;
         if (!sharedGameManager || !sharedGameManager.is9BallGame()) return;
@@ -854,22 +858,17 @@ namespace NineBall {
         int stateId = sm.getCurrentStateId();
 
         // Draw button every frame so user always sees it
+        // The button itself handles DoAIM on press (see DrawButton InvisibleButton)
         DrawButton(io);
 
         if (stateId != 4) {
-            // Not our turn — reset so we calculate fresh next turn
+            // Not our turn — reset calculated flag so next turn starts fresh
             if (g_prevStateId == 4) bCalculated = false;
             g_prevStateId = stateId;
             return;
         }
         g_prevStateId = stateId;
-
-        // Calculate exactly once when turn starts
-        if (!bCalculated) {
-            DoAIM();
-            bCalculated = true;
-        }
-        // Angle is now set — user shoots manually
+        // Aim is set ONLY when user taps the button — no auto-calculation here
     }
 
 } // namespace NineBall
@@ -912,9 +911,11 @@ static void DrawContentArea(float winW, float winH) {
     const char* tabTitles[] = { 
     O("Draw Settings"), 
     O("Auto Aim"), 
-    O("Auto Queue"), 
     O("User"),
 };
+
+    // Clamp currentTab to valid range (guards against old saved values when tabs were removed)
+    if (g_menu.currentTab > 2) g_menu.currentTab = 0;
 
     // --- CENTRARE TITLU TAB ---
     const char* currentTitle = tabTitles[g_menu.currentTab];
@@ -955,14 +956,6 @@ static void DrawContentArea(float winW, float winH) {
             need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
             need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
             need_save |= ToggleSwitch(O("Pocket Circles"), &persistent_bool[O("bESP_DrawPockets")]);
-            need_save |= ToggleSwitch(O("Ghost Ball"), &persistent_bool[O("bESP_GhostBall")]);
-            need_save |= ToggleSwitch(O("Anti Foul"), &persistent_bool[O("bESP_AntiFoul")]);
-            need_save |= ToggleSwitch(O("Ball Count"), &persistent_bool[O("bESP_BallCount")]);
-            need_save |= ToggleSwitch(O("Full Trajectory"), &persistent_bool[O("bESP_FullTrajectory")]);
-            need_save |= ToggleSwitch(O("Heatmap ESP"), &persistent_bool[O("bESP_Heatmap")]);
-            need_save |= ToggleSwitch(O("Table Outline"), &persistent_bool[O("bESP_TableOutline")]);
-            need_save |= ToggleSwitch(O("Velocity ESP"), &persistent_bool[O("bESP_VelocityESP")]);
-            need_save |= ToggleSwitch(O("Session Stats"), &persistent_bool[O("bSessionStats")]);
 
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
@@ -1066,27 +1059,11 @@ static void DrawContentArea(float winW, float winH) {
             // ── Aim Options ───────────────────────────────────────────────
             DrawSecHdr(O("Aim Options"));
 
-            need_save |= ToggleSwitch(O("Stealth Mode"), &persistent_bool[O("bStealth")]);
-            if (persistent_bool[O("bStealth")]) {
-                Dummy(ImVec2(0, 6));
-                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Noise (degrees)"));
-                Dummy(ImVec2(0, 4));
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
-                SetNextItemWidth(GetContentRegionAvail().x);
-                need_save |= SliderFloat(O("##stealthnoise"), &persistent_float[O("fStealthNoise")], 0.5f, 15.0f, "%.1f deg");
-                PopStyleColor(3);
-                PopStyleVar(2);
-                Dummy(ImVec2(0, 6));
-            }
-
+            need_save |= ToggleSwitch(O("Auto Aim Random"), &persistent_bool[O("bRandomAim")]);
             need_save |= ToggleSwitch(O("Targeted Aim"), &persistent_bool[O("bTargetedAim")]);
             if (persistent_bool[O("bTargetedAim")]) {
                 Dummy(ImVec2(0, 6));
-                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Target Ball (1-9)"));
+                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Target Ball (1-15)"));
                 Dummy(ImVec2(0, 4));
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
@@ -1094,27 +1071,13 @@ static void DrawContentArea(float winW, float winH) {
                 PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
                 PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
-                need_save |= SliderInt(O("##targetball"), &persistent_int[O("iTargetBall")], 1, 9, "Ball %d");
+                need_save |= SliderInt(O("##targetball"), &persistent_int[O("iTargetBall")], 1, 15, "Ball %d");
                 PopStyleColor(3);
                 PopStyleVar(2);
                 Dummy(ImVec2(0, 6));
             }
 
-            need_save |= ToggleSwitch(O("Precise Power"), &persistent_bool[O("bPrecisePower")]);
-            need_save |= ToggleSwitch(O("Safety Finder"), &persistent_bool[O("bDefensiveFinder")]);
             need_save |= ToggleSwitch(O("Combo Finder"), &persistent_bool[O("bComboFinder")]);
-
-            Dummy(ImVec2(0, 8));
-            TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Power Bar Position"));
-            Dummy(ImVec2(0, 4));
-            PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-            PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(15, 10));
-            PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-            PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.16f, 0.16f, 0.20f, 1.0f));
-            SetNextItemWidth(GetContentRegionAvail().x);
-            need_save |= Combo(O("##powerbar"), &persistent_int[O("iPowerBarPreset")], O("Left\0Right (Default)\0Bottom\0"));
-            PopStyleColor(2);
-            PopStyleVar(2);
 
             // ── Physics ───────────────────────────────────────────────────
             DrawSecHdr(O("Physics"));
@@ -1148,136 +1111,10 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 6));
             }
 
-            need_save |= ToggleSwitch(O("Table Speed Hack"), &persistent_bool[O("bTableSpeedHack")]);
-            if (persistent_bool[O("bTableSpeedHack")]) {
-                Dummy(ImVec2(0, 6));
-                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Friction Multiplier"));
-                TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("<1 = faster, >1 = slower"));
-                Dummy(ImVec2(0, 4));
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
-                SetNextItemWidth(GetContentRegionAvail().x);
-                need_save |= SliderFloat(O("##tablefriction"), &persistent_float[O("fTableFriction")], 0.05f, 5.0f, "%.2fx");
-                PopStyleColor(3);
-                PopStyleVar(2);
-                Dummy(ImVec2(0, 6));
-            }
-
-            need_save |= ToggleSwitch(O("VIP Unlock"), &persistent_bool[O("bVIPUnlock")]);
-
             break;
         }
-        
+
         case 2: {
-            Dummy(ImVec2(0, 10));
-            need_save |= ToggleSwitch(O("Enable AutoQueue"), &persistent_bool[O("bAutoQueue")]);
-            Dummy(ImVec2(0, 20));
-            
-            TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Mode"));
-            Dummy(ImVec2(0, 8));
-            PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-            PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(15, 12));
-            PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-            PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.16f, 0.16f, 0.20f, 1.0f));
-            SetNextItemWidth(GetContentRegionAvail().x);
-            need_save |= Combo("##mode", &persistent_int["iAutoQueue_Mode"], "Last Selected\0Smart\0Fix Table\0");
-            PopStyleColor(2);
-            PopStyleVar(2);
-            
-            if (persistent_int["iAutoQueue_Mode"] == 1) {
-                Dummy(ImVec2(0, 15));
-                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Bet Percent"));
-                Dummy(ImVec2(0, 8));
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
-                SetNextItemWidth(GetContentRegionAvail().x);
-                need_save |= SliderInt("##betpercent", &persistent_int["iAutoQueue_BetPercent"], 1, 100, "%d%%");
-                PopStyleColor(3);
-                PopStyleVar(2);
-            }
-
-            if (persistent_int["iAutoQueue_Mode"] == 2) {
-                Dummy(ImVec2(0, 15));
-                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Select Table"));
-                Dummy(ImVec2(0, 8));
-
-                struct TableEntry { const char* label; ImU32 bg; ImU32 bgHov; };
-                static const TableEntry tables[17] = {
-                    { "100",   IM_COL32( 55,  90, 200, 255), IM_COL32( 75, 110, 220, 255) }, // M1  Blue
-                    { "200",   IM_COL32( 40, 150,  65, 255), IM_COL32( 55, 170,  80, 255) }, // M2  Green
-                    { "1k",    IM_COL32( 55,  90, 200, 255), IM_COL32( 75, 110, 220, 255) }, // M3  Blue
-                    { "2.5k",  IM_COL32(130,  25,  25, 255), IM_COL32(155,  40,  40, 255) }, // M4  Dark Red
-                    { "10k",   IM_COL32( 35,  35,  38, 255), IM_COL32( 55,  55,  60, 255) }, // M5  Black
-                    { "50k",   IM_COL32(110,   0,   0, 255), IM_COL32(135,  15,  15, 255) }, // M6  Maroon
-                    { "100k",  IM_COL32(140, 140, 145, 255), IM_COL32(160, 160, 165, 255) }, // M7  Light Grey
-                    { "500k",  IM_COL32(185, 160,   0, 255), IM_COL32(210, 185,  10, 255) }, // M8  Yellow
-                    { "1M",    IM_COL32( 20,  45, 130, 255), IM_COL32( 35,  60, 155, 255) }, // M9  Dark Blue
-                    { "2M",    IM_COL32(190,  90,  15, 255), IM_COL32(215, 110,  30, 255) }, // M10 Dark Orange
-                    { "5M",    IM_COL32(  0, 148, 110, 255), IM_COL32( 15, 170, 128, 255) }, // M11 Emerald
-                    { "8M",    IM_COL32(165,  65,  65, 255), IM_COL32(185,  85,  85, 255) }, // M12 Light Maroon
-                    { "10M",   IM_COL32( 18,  90,  35, 255), IM_COL32( 30, 112,  50, 255) }, // M13 Dark Green
-                    { "20M",   IM_COL32(100, 100, 110, 255), IM_COL32(120, 120, 130, 255) }, // M14 Grey
-                    { "30M",   IM_COL32(130,  15,  35, 255), IM_COL32(155,  30,  50, 255) }, // M15 Red Maroon
-                    { "50M",   IM_COL32(  0, 148, 110, 255), IM_COL32( 15, 170, 128, 255) }, // M16 Emerald
-                    { "200M",  IM_COL32( 20,  45, 130, 255), IM_COL32( 35,  60, 155, 255) }, // M17 Dark Blue
-                };
-
-                int& selected = persistent_int["iAutoQueue_FixTable"];
-                float avail   = GetContentRegionAvail().x;
-                int   cols    = 4;
-                float gap     = 8.0f;
-                float btnW    = (avail - gap * (cols - 1)) / cols;
-                float btnH    = 42.0f;
-
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 6));
-
-                for (int i = 0; i < 17; i++) {
-                    if (i % cols != 0) SameLine(0, gap);
-
-                    bool isSel = (selected == i);
-                    ImU32 bgCol = isSel ? tables[i].bgHov : tables[i].bg;
-
-                    PushStyleColor(ImGuiCol_Button,        (ImU32)bgCol);
-                    PushStyleColor(ImGuiCol_ButtonHovered, (ImU32)tables[i].bgHov);
-                    PushStyleColor(ImGuiCol_ButtonActive,  (ImU32)tables[i].bgHov);
-                    PushStyleColor(ImGuiCol_Text,          isSel ? IM_COL32(255,255,255,255) : IM_COL32(220,220,220,200));
-
-                    char btnId[32];
-                    snprintf(btnId, sizeof(btnId), "%s##ft%d", tables[i].label, i);
-                    if (Button(btnId, ImVec2(btnW, btnH))) {
-                        selected = i;
-                        need_save = true;
-                    }
-
-                    // Selected indicator: white outline
-                    if (isSel) {
-                        ImVec2 p = GetItemRectMin();
-                        ImVec2 q = GetItemRectMax();
-                        GetWindowDrawList()->AddRect(p, q, IM_COL32(255,255,255,200), 10.0f, 0, 2.0f);
-                    }
-
-                    PopStyleColor(4);
-                }
-
-                PopStyleVar(2);
-            }
-
-            if (persistent_int["iAutoQueue_Mode"] == 0) {
-                Dummy(ImVec2(0, 15));
-                TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("You will be auto queued to"));
-                TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("the last game mode you played"));
-            }
-            break;
-        }
-
-        case 3: {
             // ── helpers ──────────────────────────────────────────────────────
             auto DrawSectionHeader = [&](const char* title) {
                 Dummy(ImVec2(0, 14));
@@ -1382,9 +1219,6 @@ INLINE void DrawMenu(ImGuiIO& io) {
 
         // Tick ButtonClicker every frame (needed for AutoQueue tap)
         buttonClicker.Update();
-
-        // Session Stats HUD overlay
-        SessionStats::DrawHUD();
 
         // One-shot Auto Aim: runs AIM() once when activated, then stops
         AutoPlay::Update();
