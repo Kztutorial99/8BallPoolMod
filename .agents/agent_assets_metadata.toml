@@ -12,3 +12,9 @@ id = "f_G-YwxX5p-KiC_1r-Juv"
 uri = "file://app/build/outputs/apk/debug/app-debug-fixed.tar.gz"
 type = "unspecified"
 title = "app-debug-fixed.apk (All Features Fixed)"
+
+[[outputs]]
+id = "uuJzShFl6iYYnoCFfFE9c"
+uri = "file://library_arm64.tar.gz"
+type = "unspecified"
+title = "library.so (arm64-v8a) — FluxEngine8BP"
