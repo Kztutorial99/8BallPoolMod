@@ -28,11 +28,11 @@ using namespace std;
 struct MenuState {
     bool isOpen = false;
     int currentTab = 0;
-    float sidebarWidth = 750.0f;
+    float sidebarWidth = 780.0f;
     float animProgress = 0.0f;
     float menuAlpha = 0.0f;
     float menuScale = 0.9f;
-    ImVec4 accentColor = ImVec4(0.35f, 0.65f, 0.95f, 1.0f);
+    ImVec4 accentColor = ImVec4(0.12f, 0.55f, 1.0f, 1.0f);
 };
 static MenuState g_menu;
 
@@ -97,13 +97,13 @@ static bool SidebarButton(const char* label, GLuint iconTex, bool selected, floa
         dl->AddRectFilled(
             ImVec2(iconCenter.x - iconBgSize * 0.5f, iconCenter.y - iconBgSize * 0.5f),
             ImVec2(iconCenter.x + iconBgSize * 0.5f, iconCenter.y + iconBgSize * 0.5f),
-            IM_COL32(200, 30, 30, 200), 14.0f
+            IM_COL32(25, 110, 255, 210), 14.0f
         );
         // Bright inner ring
         dl->AddRect(
             ImVec2(iconCenter.x - iconBgSize * 0.5f + 2, iconCenter.y - iconBgSize * 0.5f + 2),
             ImVec2(iconCenter.x + iconBgSize * 0.5f - 2, iconCenter.y + iconBgSize * 0.5f - 2),
-            IM_COL32(255, 80, 80, 120), 12.0f, 0, 1.5f
+            IM_COL32(80, 170, 255, 140), 12.0f, 0, 1.5f
         );
     } else if (hovered) {
         dl->AddRectFilled(
@@ -172,8 +172,8 @@ static bool ToggleSwitch(const char* label, bool* v) {
     ImVec2 togglePos = ImVec2(bb.Max.x - width - 15.0f, bb.Min.y + (size.y - height) * 0.5f);
     ImVec2 toggleEnd = ImVec2(togglePos.x + width, togglePos.y + height);
     
-    ImVec4 offColor = ImVec4(0.27f, 0.27f, 0.31f, 1.0f);
-    ImVec4 onColor = ImVec4(1.0f, 0.f, 0.f, 1.0f);
+    ImVec4 offColor = ImVec4(0.22f, 0.22f, 0.28f, 1.0f);
+    ImVec4 onColor = ImVec4(0.12f, 0.55f, 1.0f, 1.0f);
     ImVec4 bgColorV = ImLerp(offColor, onColor, animT);
     dl->AddRectFilled(togglePos, toggleEnd, ImColor(bgColorV), radius);
     
@@ -267,7 +267,7 @@ INLINE void DrawAutoQueue() {
         std::string count_str = std::to_string((remaining_ms / 1000) + 1);
 
         SetNextWindowPos(ImVec2(Width * 0.5f, Height * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        PushStyleColor(ImGuiCol_WindowBg, IM_COL32(16, 18, 28, 240));
+        PushStyleColor(ImGuiCol_WindowBg, IM_COL32(10, 14, 32, 245));
         PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(40.0f, 24.0f));
         PushStyleVar(ImGuiStyleVar_WindowRounding, 28.0f);
 
@@ -278,7 +278,7 @@ INLINE void DrawAutoQueue() {
             ImDrawList* dl = GetWindowDrawList();
             ImVec2      wp = GetWindowPos();
             ImVec2      ws = GetWindowSize();
-            dl->AddRect(wp, ImVec2(wp.x + ws.x, wp.y + ws.y), IM_COL32(220, 40, 40, 120), 28.0f, 0, 1.5f);
+            dl->AddRect(wp, ImVec2(wp.x + ws.x, wp.y + ws.y), IM_COL32(30, 120, 255, 140), 28.0f, 0, 1.5f);
 
             SetWindowFontScale(1.0f);
             ImVec2 lblSz = CalcTextSize(O("Auto Queue"));
@@ -289,7 +289,7 @@ INLINE void DrawAutoQueue() {
             SetWindowFontScale(3.8f);
             ImVec2 numSz = CalcTextSize(count_str.c_str());
             SetCursorPosX((ws.x - numSz.x - GetStyle().WindowPadding.x * 2) * 0.5f + GetStyle().WindowPadding.x);
-            TextColored(ImVec4(1.f, 0.18f, 0.18f, 1.0f), "%s", count_str.c_str());
+            TextColored(ImVec4(0.20f, 0.65f, 1.0f, 1.0f), "%s", count_str.c_str());
             SetWindowFontScale(1.0f);
         }
         End();
@@ -509,7 +509,7 @@ static void DrawSidebar(float sidebarW) {
     dl->AddRectFilled(
         wp,
         ImVec2(wp.x + sidebarW, wp.y + sidebarH),
-        IM_COL32(22, 22, 30, 255),
+        IM_COL32(12, 14, 26, 255),
         22.0f,
         ImDrawFlags_RoundCornersTop
     );
@@ -517,7 +517,7 @@ static void DrawSidebar(float sidebarW) {
     dl->AddLine(
         ImVec2(wp.x + 12.f, wp.y + sidebarH - 1.f),
         ImVec2(wp.x + sidebarW - 12.f, wp.y + sidebarH - 1.f),
-        IM_COL32(200, 30, 30, 60), 1.0f
+        IM_COL32(30, 120, 255, 70), 1.2f
     );
     dl->ChannelsMerge();
 
@@ -615,8 +615,8 @@ static void DrawCalculating(ImGuiIO& io) {
     SetNextWindowPos(ImVec2(Width * 0.5f, Height * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     
     // Auto-resize face ca fereastra să aibă dimensiunea textului automat
-    PushStyleColor(ImGuiCol_WindowBg, IM_COL32(21, 21, 21, 255));
-    PushStyleColor(ImGuiCol_Border, IM_COL32(220, 30, 30, 255));
+    PushStyleColor(ImGuiCol_WindowBg, IM_COL32(12, 16, 32, 245));
+    PushStyleColor(ImGuiCol_Border, IM_COL32(30, 120, 255, 255));
     PushStyleVar(ImGuiStyleVar_WindowRounding, 18.0f);
     PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
 
@@ -666,19 +666,21 @@ namespace NineBall {
         return -1;
     }
 
-    // step = 0.25 rad → 25 iterations max for full circle (vs 125 at step=0.05)
-    static bool AIM_Combo(int lowestIdx, double step = 0.25) {
+    // step = 0.06 rad — uses count-based loop to avoid infinite float loop bug
+    static bool AIM_Combo(int lowestIdx, double step = 0.06) {
         if (gPrediction->guiData.ballsCount <= 9) return false;
         if (!gPrediction->guiData.balls[9].originalOnTable) return false;
 
         double base = NumberUtils::normalizeDoublePrecision(
             sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+        double pwr = CUE_PROPERTIES_MAX_POWER;
 
-        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(base + step));
-             a != base;
-             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + step))) {
+        const int maxIter = (int)((2.0 * M_PI) / fabs(step)) + 2;
+        for (int iter = 0; iter < maxIter; iter++) {
+            double a = NumberUtils::normalizeDoublePrecision(
+                normalizeAngle(base + step * (double)(iter + 1)));
 
-            gPrediction->determineShotResult(true, a);
+            gPrediction->determineShotResult(true, a, pwr);
             auto& cue  = gPrediction->guiData.balls[0];
             auto& b9   = gPrediction->guiData.balls[9];
             if (!cue.onTable)  continue;
@@ -691,15 +693,17 @@ namespace NineBall {
         return false;
     }
 
-    static void AIM_Standard(int lowestIdx, double step = 0.25) {
+    static void AIM_Standard(int lowestIdx, double step = 0.06) {
         double base = NumberUtils::normalizeDoublePrecision(
             sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+        double pwr = CUE_PROPERTIES_MAX_POWER;
 
-        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(base + step));
-             a != base;
-             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + step))) {
+        const int maxIter = (int)((2.0 * M_PI) / fabs(step)) + 2;
+        for (int iter = 0; iter < maxIter; iter++) {
+            double a = NumberUtils::normalizeDoublePrecision(
+                normalizeAngle(base + step * (double)(iter + 1)));
 
-            gPrediction->determineShotResult(true, a);
+            gPrediction->determineShotResult(true, a, pwr);
             auto& cue = gPrediction->guiData.balls[0];
             if (!cue.onTable) continue;
             if (!gPrediction->guiData.collision.firstHitBall) continue;
@@ -729,6 +733,7 @@ namespace NineBall {
 
     // Try multiple spin values and apply the one that gives the best outcome.
     // Spin candidates: (x,y) where x=left/right, y=top/bottom in [-1,1].
+    // Always applies best spin — even if no balls potted, picks the non-scratch best.
     static void ApplyBestSpin(double bestAngle, int lowestIdx) {
         static const Vec2d spinCandidates[] = {
             {0.0,   0.0},   // no spin
@@ -742,24 +747,29 @@ namespace NineBall {
             {-0.4, -0.4},   // bottom-left
             {0.0,   1.0},   // max top
             {0.0,  -1.0},   // max bottom
+            {0.7,   0.0},   // strong right
+            {-0.7,  0.0},   // strong left
+            {0.5,   0.5},   // strong top-right
+            {-0.5,  0.5},   // strong top-left
         };
-        int bestScore = -1;
+        int bestScore  = -9999;
         Vec2d bestSpin = {0.0, 0.0};
+        double pwr     = CUE_PROPERTIES_MAX_POWER;
 
-        for (auto& spin : spinCandidates) {
-            double pwr = sharedGameManager.mVisualCue().getShotPower();
+        for (const auto& spin : spinCandidates) {
             gPrediction->determineShotResult(true, bestAngle, pwr, spin);
+            auto& cue = gPrediction->guiData.balls[0];
+            if (!cue.onTable) continue; // scratch — skip
             int s = scoreResult(lowestIdx);
+            s += 1; // non-scratch bonus
             if (s > bestScore) {
                 bestScore = s;
                 bestSpin  = spin;
             }
         }
 
-        // Apply best spin to the game
-        if (bestScore > 0) {
-            sharedGameManager.mVisualEnglishControl().mEnglish(bestSpin);
-        }
+        // Always apply — best non-scratch spin is chosen
+        sharedGameManager.mVisualEnglishControl().mEnglish(bestSpin);
     }
 
     // Called ONCE per turn — not every frame
@@ -1042,7 +1052,7 @@ static void DrawContentArea(float winW, float winH) {
     dl->AddLine(
         ImVec2(wp.x + 20.0f, wp.y + lineY),
         ImVec2(wp.x + contentW - 20.0f, wp.y + lineY),
-        IM_COL32(60, 60, 75, 150), 1.0f
+        IM_COL32(40, 90, 200, 100), 1.2f
     );
 
     float headerH = (lineY - startY) + 10.0f;
@@ -1067,9 +1077,9 @@ static void DrawContentArea(float winW, float winH) {
                 if (persistent_int[O("iLineThickness")] < 1) persistent_int[O("iLineThickness")] = 4;
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.10f, 0.10f, 0.16f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab,       ImVec4(0.12f, 0.55f, 1.0f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.65f, 1.0f, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
                 need_save |= SliderInt(O("##lineThick"), &persistent_int[O("iLineThickness")], 1, 10, "%d");
                 PopStyleColor(3);
@@ -1082,9 +1092,9 @@ static void DrawContentArea(float winW, float winH) {
             {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_FrameBg,          ImVec4(0.10f, 0.10f, 0.16f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab,       ImVec4(0.12f, 0.55f, 1.0f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.65f, 1.0f, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
                 int& menuSz = persistent_int[O("iMenuSizeOffset")];
                 bool changed = SliderInt(O("##menuSize"), &menuSz, -10, 10,
@@ -1097,9 +1107,9 @@ static void DrawContentArea(float winW, float winH) {
             Dummy(ImVec2(0, 20));
             {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.12f, 0.55f, 0.20f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.68f, 0.26f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.09f, 0.42f, 0.15f, 1.0f));
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.42f, 0.90f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.55f, 1.00f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.32f, 0.75f, 1.0f));
                 if (Button(O("Save Config"), ImVec2(GetContentRegionAvail().x, 55.0f))) {
                     svConfig_Save();
                 }
@@ -1122,10 +1132,10 @@ static void DrawContentArea(float winW, float winH) {
                 float lw  = (av - ts.x - 16.0f) * 0.5f;
                 float ly  = p.y + GImGui->FontSize * 0.5f;
                 ImDrawList* d2 = GetWindowDrawList();
-                d2->AddLine(ImVec2(p.x, ly),          ImVec2(p.x + lw, ly),         IM_COL32(60,60,75,160), 1.0f);
-                d2->AddLine(ImVec2(p.x + lw+8+ts.x+8, ly), ImVec2(p.x + av, ly),   IM_COL32(60,60,75,160), 1.0f);
+                d2->AddLine(ImVec2(p.x, ly),          ImVec2(p.x + lw, ly),         IM_COL32(40,90,200,120), 1.0f);
+                d2->AddLine(ImVec2(p.x + lw+8+ts.x+8, ly), ImVec2(p.x + av, ly),   IM_COL32(40,90,200,120), 1.0f);
                 SetCursorPosX(GetCursorPosX() + lw + 8.0f);
-                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), "%s", title);
+                TextColored(ImVec4(0.45f, 0.65f, 1.0f, 0.85f), "%s", title);
                 Dummy(ImVec2(0, 4));
             };
 
@@ -1140,9 +1150,9 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 4));
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_FrameBg,          ImVec4(0.10f, 0.10f, 0.16f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab,       ImVec4(0.12f, 0.55f, 1.0f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.65f, 1.0f, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
                 need_save |= SliderInt(O("##targetball"), &persistent_int[O("iTargetBall")], 1, 15, "Ball %d");
                 PopStyleColor(3);
@@ -1157,30 +1167,84 @@ static void DrawContentArea(float winW, float winH) {
 
             need_save |= ToggleSwitch(O("Power & Spin Hack"), &persistent_bool[O("bPhysicsHack")]);
             if (persistent_bool[O("bPhysicsHack")]) {
-                Dummy(ImVec2(0, 6));
-                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Max Power (default 666)"));
-                Dummy(ImVec2(0, 4));
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
-                SetNextItemWidth(GetContentRegionAvail().x);
-                need_save |= SliderFloat(O("##maxpower"), &persistent_float[O("fMaxPower")], 100.0f, 5000.0f, "%.0f");
-                PopStyleColor(3);
-                PopStyleVar(2);
                 Dummy(ImVec2(0, 8));
-                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Max Spin (default 1.0)"));
+                TextColored(ImVec4(0.65f, 0.75f, 1.0f, 1.0f), O("Max Power (default 666)"));
                 Dummy(ImVec2(0, 4));
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
-                SetNextItemWidth(GetContentRegionAvail().x);
-                need_save |= SliderFloat(O("##maxspin"), &persistent_float[O("fMaxSpin")], 0.1f, 5.0f, "%.1fx");
-                PopStyleColor(3);
-                PopStyleVar(2);
+                {
+                    float& fPow = persistent_float[O("fMaxPower")];
+                    if (fPow < 100.0f) fPow = 666.0f;
+
+                    // Row: [-1] [slider] [+1]
+                    float btnW = 55.0f;
+                    float sliderW = GetContentRegionAvail().x - btnW * 2.0f - GetStyle().ItemSpacing.x * 2.0f;
+
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.10f, 0.16f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.40f, 0.85f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.10f, 0.30f, 0.70f, 1.0f));
+                    if (Button(O("-1##pw"), ImVec2(btnW, 38.0f))) { fPow -= 1.0f; if (fPow < 100.0f) fPow = 100.0f; need_save = true; }
+                    PopStyleColor(3);
+                    PopStyleVar();
+
+                    SameLine();
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                    PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
+                    PushStyleColor(ImGuiCol_FrameBg,        ImVec4(0.10f, 0.10f, 0.16f, 1.0f));
+                    PushStyleColor(ImGuiCol_SliderGrab,       ImVec4(0.12f, 0.55f, 1.0f, 1.0f));
+                    PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.65f, 1.0f, 1.0f));
+                    SetNextItemWidth(sliderW);
+                    need_save |= SliderFloat(O("##maxpower"), &fPow, 100.0f, 5000.0f, "%.0f");
+                    PopStyleColor(3);
+                    PopStyleVar(2);
+
+                    SameLine();
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.10f, 0.16f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.40f, 0.85f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.10f, 0.30f, 0.70f, 1.0f));
+                    if (Button(O("+1##pw"), ImVec2(btnW, 38.0f))) { fPow += 1.0f; if (fPow > 5000.0f) fPow = 5000.0f; need_save = true; }
+                    PopStyleColor(3);
+                    PopStyleVar();
+                }
+
+                Dummy(ImVec2(0, 10));
+                TextColored(ImVec4(0.65f, 0.75f, 1.0f, 1.0f), O("Max Spin (default 1.0)"));
+                Dummy(ImVec2(0, 4));
+                {
+                    float& fSpin = persistent_float[O("fMaxSpin")];
+                    if (fSpin < 0.1f) fSpin = 1.0f;
+
+                    float btnW = 55.0f;
+                    float sliderW = GetContentRegionAvail().x - btnW * 2.0f - GetStyle().ItemSpacing.x * 2.0f;
+
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.10f, 0.16f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.40f, 0.85f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.10f, 0.30f, 0.70f, 1.0f));
+                    if (Button(O("-1##sp"), ImVec2(btnW, 38.0f))) { fSpin -= 0.1f; if (fSpin < 0.1f) fSpin = 0.1f; need_save = true; }
+                    PopStyleColor(3);
+                    PopStyleVar();
+
+                    SameLine();
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                    PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
+                    PushStyleColor(ImGuiCol_FrameBg,        ImVec4(0.10f, 0.10f, 0.16f, 1.0f));
+                    PushStyleColor(ImGuiCol_SliderGrab,       ImVec4(0.12f, 0.55f, 1.0f, 1.0f));
+                    PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.65f, 1.0f, 1.0f));
+                    SetNextItemWidth(sliderW);
+                    need_save |= SliderFloat(O("##maxspin"), &fSpin, 0.1f, 5.0f, "%.1fx");
+                    PopStyleColor(3);
+                    PopStyleVar(2);
+
+                    SameLine();
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.10f, 0.16f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.40f, 0.85f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.10f, 0.30f, 0.70f, 1.0f));
+                    if (Button(O("+1##sp"), ImVec2(btnW, 38.0f))) { fSpin += 0.1f; if (fSpin > 5.0f) fSpin = 5.0f; need_save = true; }
+                    PopStyleColor(3);
+                    PopStyleVar();
+                }
                 Dummy(ImVec2(0, 6));
             }
 
@@ -1199,10 +1263,10 @@ static void DrawContentArea(float winW, float winH) {
                 float  gap   = 8.0f;
                 float  lineW = (avail - ts.x - gap * 2.0f) * 0.5f;
                 ImDrawList* dl2 = GetWindowDrawList();
-                dl2->AddLine(ImVec2(p.x,                      lineY), ImVec2(p.x + lineW,                      lineY), IM_COL32(60,60,75,160), 1.0f);
-                dl2->AddLine(ImVec2(p.x + lineW + gap + ts.x + gap, lineY), ImVec2(p.x + avail, lineY), IM_COL32(60,60,75,160), 1.0f);
+                dl2->AddLine(ImVec2(p.x,                      lineY), ImVec2(p.x + lineW,                      lineY), IM_COL32(40,90,200,120), 1.0f);
+                dl2->AddLine(ImVec2(p.x + lineW + gap + ts.x + gap, lineY), ImVec2(p.x + avail, lineY), IM_COL32(40,90,200,120), 1.0f);
                 SetCursorPosX(GetCursorPosX() + lineW + gap);
-                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), "%s", title);
+                TextColored(ImVec4(0.45f, 0.65f, 1.0f, 0.85f), "%s", title);
                 Dummy(ImVec2(0, 6));
             };
 
@@ -1269,12 +1333,12 @@ static void DrawContentArea(float winW, float winH) {
                 ImVec2 bp = GetCursorScreenPos();
                 ImDrawList* ud = GetWindowDrawList();
                 ud->AddRectFilled(bp, ImVec2(bp.x + avW, bp.y + 38.f),
-                                  IM_COL32(15, 30, 15, 180), 10.f);
+                                  IM_COL32(10, 20, 50, 200), 10.f);
                 ud->AddRect(bp, ImVec2(bp.x + avW, bp.y + 38.f),
-                            IM_COL32(0, 180, 80, 100), 10.f, 0, 1.0f);
+                            IM_COL32(30, 110, 255, 110), 10.f, 0, 1.2f);
                 Dummy(ImVec2(0, 8));
                 SetCursorPosX(GetCursorPosX() + 10.f);
-                TextColored(ImVec4(0.0f, 0.88f, 0.45f, 1.0f), O("Powered By @Kz.tutorial"));
+                TextColored(ImVec4(0.30f, 0.70f, 1.0f, 0.95f), O("Powered By @Kz.tutorial"));
                 Dummy(ImVec2(0, 4));
             }
             break;
@@ -1332,7 +1396,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
             SetNextWindowPos(ImVec2(g_menuPosX, g_menuPosY), ImGuiCond_Always);
 
             // Full-opacity solid background so the window is one seamless piece
-            PushStyleColor(ImGuiCol_WindowBg, IM_COL32(13, 13, 18, 255));
+            PushStyleColor(ImGuiCol_WindowBg, IM_COL32(10, 12, 22, 255));
             PushStyleVar(ImGuiStyleVar_WindowRounding, 22.0f);
             PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
             PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -1348,10 +1412,10 @@ INLINE void DrawMenu(ImGuiIO& io) {
 
                 // ── Outer subtle glow border ──────────────────────────────────
                 bdl->AddRect(bwp, ImVec2(bwp.x + winW, bwp.y + winH),
-                             IM_COL32(200, 30, 30, 80), 22.0f, 0, 1.8f);
+                             IM_COL32(30, 110, 255, 90), 22.0f, 0, 1.8f);
                 bdl->AddRect(ImVec2(bwp.x + 1, bwp.y + 1),
                              ImVec2(bwp.x + winW - 1, bwp.y + winH - 1),
-                             IM_COL32(255, 60, 60, 30), 22.0f, 0, 1.0f);
+                             IM_COL32(80, 160, 255, 35), 22.0f, 0, 1.0f);
 
                 DrawSidebar(winW);
                 DrawContentArea(winW, winH);
