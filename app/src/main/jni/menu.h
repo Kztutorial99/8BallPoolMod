@@ -359,26 +359,34 @@ INLINE void DrawESP(ImDrawList* draw) {
             if (persistent_bool[O("bComboFinder")]) ComboFinder::Find();
         }
 
-        // Always update prediction data every frame so enemy line & pockets
-        // are visible regardless of whose turn it is.
-        // During enemy turn, cap power to a realistic value so the line matches
-        // where enemy balls actually travel (not max-power phantom trajectory).
+        // Update prediction every frame.
+        // For enemy turn: use REAL (un-hacked) physics + actual shot angle/power
+        // so the line tracks enemy aim in realtime without physics-hack inflation.
         {
-            double shotPwr = sharedGameManager.mVisualCue().getShotPower();
             if (stateId != 4) {
-                // Enemy's turn — use actual power but clamp to realistic range
-                if (shotPwr > 450.0 || shotPwr < 20.0) shotPwr = 320.0;
-                double shotAng = sharedGameManager.mVisualCue().getShotAngle();
+                double shotAng  = sharedGameManager.mVisualCue().getShotAngle();
+                double shotPwr  = sharedGameManager.mVisualCue().getShotPower();
                 Vec2d  shotSpin = sharedGameManager.getShotSpin();
+                // If enemy hasn't set power yet, use 60% of real max as realistic guess
+                if (shotPwr < 5.0 || shotPwr > PhysicsHack::DEFAULT_MAX_POWER)
+                    shotPwr = PhysicsHack::DEFAULT_MAX_POWER * 0.6;
+                // Temporarily restore real physics so enemy trajectory isn't inflated
+                double savedMaxPwr = CUE_PROPERTIES_MAX_POWER;
+                double savedSpin   = CUE_PROPERTIES_SPIN;
+                CUE_PROPERTIES_MAX_POWER = PhysicsHack::DEFAULT_MAX_POWER;
+                CUE_PROPERTIES_SPIN      = PhysicsHack::DEFAULT_MAX_SPIN;
                 gPrediction->determineShotResult(false, shotAng, shotPwr, shotSpin);
+                CUE_PROPERTIES_MAX_POWER = savedMaxPwr;
+                CUE_PROPERTIES_SPIN      = savedSpin;
             } else {
                 gPrediction->determineShotResult(false);
             }
         }
 
-        // ── Enemy Line — orange trajectories for OPPONENT balls ─────────────
-        // Drawn BEFORE the early-return so it shows during enemy's turn too
-        if (persistent_bool[O("bESP_EnemyLine")]) {
+        // ── Enemy Line — realtime orange trajectories during enemy aim phase ──
+        // Only shown while enemy is aiming (not during ball-motion states).
+        bool enemyAiming = (stateId != 4 && stateId != 6 && stateId != 7 && stateId != 8);
+        if (persistent_bool[O("bESP_EnemyLine")] && enemyAiming) {
             bool is9Ball = sharedGameManager.is9BallGame();
             Ball::Classification enemyClass = Ball::Classification::ANY;
             if (!is9Ball) {
@@ -387,19 +395,29 @@ INLINE void DrawESP(ImDrawList* draw) {
                 else if (myclass == Ball::Classification::STRIPE)
                     enemyClass = Ball::Classification::SOLID;
             }
+            // Draw cue-ball trajectory too so player can see where it will go
+            {
+                auto& cue = gPrediction->guiData.balls[0];
+                if (cue.positions.size() >= 2) {
+                    for (int j = 1; j < (int)cue.positions.size(); j++) {
+                        auto sp0 = WorldToScreen(cue.positions[j-1]);
+                        auto sp1 = WorldToScreen(cue.positions[j]);
+                        draw->AddLine(ImVec2(sp0.x,sp0.y), ImVec2(sp1.x,sp1.y),
+                                      IM_COL32(255,255,255,90), 1.8f);
+                    }
+                }
+            }
             for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
                 auto& ball = gPrediction->guiData.balls[i];
                 if (!ball.originalOnTable) continue;
                 if (!is9Ball && ball.classification != enemyClass) continue;
                 if (ball.positions.size() < 2) continue;
-                // Draw smooth continuous trajectory through all waypoints (no breaks)
                 for (int j = 1; j < (int)ball.positions.size(); j++) {
                     auto sp0 = WorldToScreen(ball.positions[j - 1]);
                     auto sp1 = WorldToScreen(ball.positions[j]);
                     draw->AddLine(ImVec2(sp0.x, sp0.y), ImVec2(sp1.x, sp1.y),
-                                  IM_COL32(255, 130, 0, 200), 3.5f);
+                                  IM_COL32(255, 130, 0, 210), 3.5f);
                 }
-                // End marker circle at predicted final position
                 auto pp = WorldToScreen(ball.predictedPosition);
                 draw->AddCircle(ImVec2(pp.x, pp.y), 22.f,
                                 IM_COL32(255, 145, 0, 235), 0, 3.5f);
@@ -630,9 +648,14 @@ static void DrawCalculating(ImGuiIO& io) {
 //   angleStep = 0.25 rad → max ~25 physics-sim iterations total (was 125/frame).
 namespace NineBall {
 
-    inline bool  bCalculated = false; // true = aim angle already set for this turn
-    inline int   g_prevStateId = -1;  // detect turn transitions
-    inline float g_spinAngle   = 0.f; // thinking spinner animation angle
+    inline bool  bCalculated    = false;
+    inline int   g_prevStateId  = -1;
+    inline float g_spinAngle    = 0.f;
+    // Think animation: 0=idle, 1=showing animation, 2=done
+    inline int   g_thinkPhase   = 0;
+    inline float g_thinkTimer   = 0.f;   // seconds since animation started
+    inline float g_thinkElapsed = 0.f;   // display: how long DoAIM actually took
+    static constexpr float THINK_ANIM_DUR = 1.8f;
 
     static int findLowestBall() {
         for (int i = 1; i < gPrediction->guiData.ballsCount && i <= 9; i++) {
@@ -757,25 +780,57 @@ namespace NineBall {
         ApplyBestSpin(finalAngle, lowestIdx);
     }
 
-    // ── Visual button (play icon + thinking spinner) ──────────────────────────
-    // Shown whenever bNineBallOneShoot is ON in a 9-ball game.
-    // Positioned below the AutoPlay toggle button (or below the floating button
-    // if AutoPlay button is not visible).
+    // ── Think overlay — shown on screen while calculating ─────────────────────
+    static void DrawThinkOverlay(ImGuiIO& io) {
+        if (g_thinkPhase != 1) return;
+        SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.12f),
+                         ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        PushStyleColor(ImGuiCol_WindowBg, IM_COL32(12, 18, 35, 230));
+        PushStyleColor(ImGuiCol_Border,   IM_COL32(80, 140, 255, 180));
+        PushStyleVar(ImGuiStyleVar_WindowRounding,    20.0f);
+        PushStyleVar(ImGuiStyleVar_WindowBorderSize,  1.5f);
+        PushStyleVar(ImGuiStyleVar_WindowPadding,     ImVec2(22.f, 12.f));
+        if (Begin(O("##ThinkOverlay"), nullptr,
+                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs)) {
+            ImDrawList* d2 = GetWindowDrawList();
+            ImVec2 wp = GetWindowPos();
+            ImVec2 ws = GetWindowSize();
+            // Spinner dots
+            float cx = wp.x + ws.x * 0.5f, cy = wp.y + 12.f;
+            float spinR = 8.f;
+            for (int i = 0; i < 8; i++) {
+                float a = g_spinAngle + (float)i * (float)(M_PI * 2.0 / 8.0);
+                ImVec2 dot(cx + cosf(a) * spinR, cy + sinf(a) * spinR);
+                int al = 60 + (i * 200) / 8;
+                d2->AddCircleFilled(dot, 2.8f, IM_COL32(100, 180, 255, al));
+            }
+            SetCursorPosY(GetCursorPosY() + 18.f);
+            char buf[48];
+            snprintf(buf, sizeof(buf), O("Calculating 9-Ball... %.1fs"), g_thinkTimer);
+            SetWindowFontScale(0.95f);
+            TextColored(ImVec4(0.55f, 0.80f, 1.0f, 1.0f), "%s", buf);
+            SetWindowFontScale(1.0f);
+        }
+        End();
+        PopStyleVar(3);
+        PopStyleColor(2);
+    }
+
+    // ── Visual button ─────────────────────────────────────────────────────────
     static void DrawButton(ImGuiIO& io) {
-        const float bsz    = 80.f;
-        const float pad    = 6.0f;
-        const float winW   = bsz + pad * 2.f;
-        const float winH   = bsz + pad * 2.f;
-        const float fbnSz  = 120.f; // floating button window size
-        const float apWinH = 80.f + pad * 2.f; // autoplay toggle window height
+        const float bsz  = 84.f;
+        const float pad  = 5.0f;
+        const float winW = bsz + pad * 2.f;
+        const float winH = bsz + pad * 2.f;
+        const float fbnSz = 120.f;
         const float margin = 8.f;
 
-        // Stack below autoplay button when it's visible
-        float apOffset = 0.f;
         float posX = (g_btnX < 0.f) ? (io.DisplaySize.x - 20.f - winW) : g_btnX;
         float posY = (g_btnY < 0.f)
                      ? (io.DisplaySize.y - 20.f - winH)
-                     : (g_btnY + fbnSz + margin + apOffset);
+                     : (g_btnY + fbnSz + margin);
         posX = ImClamp(posX, 0.f, io.DisplaySize.x - winW);
         posY = ImClamp(posY, 0.f, io.DisplaySize.y - winH);
 
@@ -796,49 +851,88 @@ namespace NineBall {
             float   r      = bsz * 0.5f;
             ImDrawList* dl = GetWindowDrawList();
 
-            // Button press triggers DoAIM once — no auto-calculation
-            if (InvisibleButton(O("##NBHit"), ImVec2(bsz, bsz)) && !bCalculated) {
+            // ── Hit area ───────────────────────────────────────────────────
+            bool pressed = InvisibleButton(O("##NBHit"), ImVec2(bsz, bsz));
+            if (pressed && g_thinkPhase == 0) {
+                // Record start, run synchronous calculation, show animation
+                auto t0 = std::chrono::steady_clock::now();
                 DoAIM();
                 bCalculated = true;
+                auto t1 = std::chrono::steady_clock::now();
+                g_thinkElapsed = (float)std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+                g_thinkPhase = 1;
+                g_thinkTimer = 0.f;
             }
 
-            // Background circle
-            ImU32 bgCol = bCalculated
-                ? IM_COL32(10, 155, 60, 235)    // green = shot found
-                : IM_COL32(18, 18, 45, 235);     // dark = thinking
-            dl->AddCircleFilled(center, r, bgCol);
-
-            // Outer ring
-            ImU32 ringCol = bCalculated
-                ? IM_COL32(0, 220, 90, 220)
-                : IM_COL32(80, 100, 220, 160);
-            dl->AddCircle(center, r - 2.f, ringCol, 48, 2.5f);
-
-            // ── Thinking spinner (arc) ──────────────────────────────────────
-            if (!bCalculated) {
-                g_spinAngle += io.DeltaTime * 5.0f;
-                const int segs   = 12;
-                const float arcR = r - 10.f;
-                for (int i = 0; i < segs; i++) {
-                    float a0 = g_spinAngle + (float)i       / segs * (float)(M_PI * 1.6);
-                    float a1 = g_spinAngle + (float)(i + 1) / segs * (float)(M_PI * 1.6);
-                    int   al = (i * 230) / segs;
-                    dl->PathArcTo(center, arcR, a0, a1, 3);
-                    dl->PathStroke(IM_COL32(120, 180, 255, al), false, 3.0f);
-                }
-                // Small "9" in centre while thinking
-                const char* lbl = "9";
-                ImVec2 ts = CalcTextSize(lbl);
-                dl->AddText(ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),
-                            IM_COL32(200, 200, 255, 200), lbl);
+            // ── Colours by phase ──────────────────────────────────────────
+            ImU32 bgCol, ringCol;
+            if (g_thinkPhase == 0) {
+                bgCol   = IM_COL32(14, 18, 50, 235);
+                ringCol = IM_COL32(70, 110, 230, 180);
+            } else if (g_thinkPhase == 1) {
+                float pulse = 0.5f + 0.5f * sinf(g_thinkTimer * 6.0f);
+                bgCol   = IM_COL32(20, 30, 80, 235);
+                ringCol = IM_COL32((int)(60+pulse*80), (int)(120+pulse*80), 255, 220);
             } else {
-                // ── Shot found: play-triangle icon ─────────────────────────
-                float th = r * 0.38f, tw = r * 0.34f;
-                dl->AddTriangleFilled(
-                    ImVec2(center.x - tw * 0.6f, center.y - th),
-                    ImVec2(center.x - tw * 0.6f, center.y + th),
-                    ImVec2(center.x + tw * 1.1f, center.y),
-                    IM_COL32(255, 255, 255, 235));
+                bgCol   = IM_COL32(10, 140, 55, 240);
+                ringCol = IM_COL32(50, 220, 100, 230);
+            }
+
+            // Shadow + fill
+            dl->AddCircleFilled(center, r + 3.f, IM_COL32(0, 0, 0, 50));
+            dl->AddCircleFilled(center, r, bgCol);
+            dl->AddCircle(center, r - 2.f, ringCol, 56, 2.5f);
+
+            if (g_thinkPhase == 0) {
+                // ── Idle: billiard ball icon with "9" ─────────────────────
+                // Ball outline circle
+                dl->AddCircle(center, r * 0.55f, IM_COL32(220, 230, 255, 180), 32, 1.8f);
+                // Number "9" in centre
+                SetWindowFontScale(1.4f);
+                ImVec2 ts = CalcTextSize("9");
+                dl->AddText(GetFont(), GetFontSize() * 1.4f,
+                            ImVec2(center.x - ts.x * 0.5f * 1.4f, center.y - ts.y * 0.5f * 1.4f),
+                            IM_COL32(200, 215, 255, 230), "9");
+                SetWindowFontScale(1.0f);
+                // "THINK" label
+                ImVec2 lt = CalcTextSize(O("THINK"));
+                dl->AddText(ImVec2(center.x - lt.x * 0.5f, p.y + bsz - lt.y - 1.f),
+                            IM_COL32(120, 150, 255, 190), O("THINK"));
+
+            } else if (g_thinkPhase == 1) {
+                // ── Calculating: spinner arc ───────────────────────────────
+                g_spinAngle += io.DeltaTime * 6.0f;
+                const int segs = 14;
+                const float arcR = r - 9.f;
+                for (int i = 0; i < segs; i++) {
+                    float a0 = g_spinAngle + (float)i / segs * (float)(M_PI * 1.7);
+                    float a1 = g_spinAngle + (float)(i+1) / segs * (float)(M_PI * 1.7);
+                    dl->PathArcTo(center, arcR, a0, a1, 4);
+                    dl->PathStroke(IM_COL32(120, 190, 255, (i * 220) / segs), false, 3.2f);
+                }
+                // Timer text
+                char tbuf[12]; snprintf(tbuf, sizeof(tbuf), "%.1fs", g_thinkTimer);
+                ImVec2 ts2 = CalcTextSize(tbuf);
+                dl->AddText(ImVec2(center.x - ts2.x*0.5f, center.y - ts2.y*0.5f),
+                            IM_COL32(200, 220, 255, 230), tbuf);
+                ImVec2 lt2 = CalcTextSize(O("CALC"));
+                dl->AddText(ImVec2(center.x - lt2.x*0.5f, p.y + bsz - lt2.y - 1.f),
+                            IM_COL32(120, 180, 255, 190), O("CALC"));
+
+            } else {
+                // ── Done: checkmark ────────────────────────────────────────
+                float ck = r * 0.36f;
+                dl->AddLine(ImVec2(center.x - ck, center.y),
+                            ImVec2(center.x - ck*0.2f, center.y + ck*0.8f),
+                            IM_COL32(255,255,255,240), 3.5f);
+                dl->AddLine(ImVec2(center.x - ck*0.2f, center.y + ck*0.8f),
+                            ImVec2(center.x + ck, center.y - ck*0.6f),
+                            IM_COL32(255,255,255,240), 3.5f);
+                // Time label
+                char ebuf[20]; snprintf(ebuf, sizeof(ebuf), "%.0fms", g_thinkElapsed);
+                ImVec2 et = CalcTextSize(ebuf);
+                dl->AddText(ImVec2(center.x - et.x*0.5f, p.y + bsz - et.y - 1.f),
+                            IM_COL32(160, 255, 180, 200), ebuf);
             }
         }
         End();
@@ -846,9 +940,7 @@ namespace NineBall {
         PopStyleColor(2);
     }
 
-    // ── Main update — called from DrawMenu every frame ────────────────────────
-    // Button is always visible; user taps it to trigger aim calculation once.
-    // No automatic calculation — player controls when to calculate.
+    // ── Main update ───────────────────────────────────────────────────────────
     static void Update(ImDrawList* /*draw*/, ImGuiIO& io) {
         if (!persistent_bool[O("bNineBallOneShoot")]) return;
         if (!sharedGameManager || !sharedGameManager.is9BallGame()) return;
@@ -857,18 +949,29 @@ namespace NineBall {
         if (!sm) return;
         int stateId = sm.getCurrentStateId();
 
-        // Draw button every frame so user always sees it
-        // The button itself handles DoAIM on press (see DrawButton InvisibleButton)
+        // Advance think animation timer
+        if (g_thinkPhase == 1) {
+            g_thinkTimer += io.DeltaTime;
+            g_spinAngle  += io.DeltaTime * 6.0f;
+            if (g_thinkTimer >= THINK_ANIM_DUR)
+                g_thinkPhase = 2;
+        }
+
+        // Draw button + overlay every frame
         DrawButton(io);
+        DrawThinkOverlay(io);
 
         if (stateId != 4) {
-            // Not our turn — reset calculated flag so next turn starts fresh
-            if (g_prevStateId == 4) bCalculated = false;
+            // Not our turn — reset for next turn
+            if (g_prevStateId == 4) {
+                bCalculated  = false;
+                g_thinkPhase = 0;
+                g_thinkTimer = 0.f;
+            }
             g_prevStateId = stateId;
             return;
         }
         g_prevStateId = stateId;
-        // Aim is set ONLY when user taps the button — no auto-calculation here
     }
 
 } // namespace NineBall
@@ -1009,36 +1112,6 @@ static void DrawContentArea(float winW, float winH) {
         case 1: {
             Dummy(ImVec2(0, 10));
             need_save |= ToggleSwitch(O("9-Ball One Shoot"), &persistent_bool[O("bNineBallOneShoot")]);
-
-            Dummy(ImVec2(0, 20));
-
-            // ── Auto Aim info box ─────────────────────────────────────────────
-            {
-                ImDrawList* dl2 = GetWindowDrawList();
-                ImVec2 boxPos = GetCursorScreenPos();
-                float boxW = GetContentRegionAvail().x;
-                dl2->AddRectFilled(
-                    boxPos, ImVec2(boxPos.x + boxW, boxPos.y + 130.0f),
-                    IM_COL32(18, 28, 48, 200), 12.0f);
-                dl2->AddRect(
-                    boxPos, ImVec2(boxPos.x + boxW, boxPos.y + 130.0f),
-                    IM_COL32(60, 120, 220, 120), 12.0f, 0, 1.2f);
-                Dummy(ImVec2(0, 8));
-                SetCursorPosX(GetCursorPosX() + 12.0f);
-                TextColored(ImVec4(0.4f, 0.75f, 1.0f, 1.0f), O("Auto Aim"));
-                Dummy(ImVec2(0, 6));
-                SetCursorPosX(GetCursorPosX() + 12.0f);
-                PushTextWrapPos(GetCursorPosX() + boxW - 24.0f);
-                TextColored(ImVec4(0.70f, 0.70f, 0.78f, 1.0f),
-                    O("Tap the Auto Aim button on screen to calculate the best angle once. "
-                      "Power is always controlled manually."));
-                PopTextWrapPos();
-                Dummy(ImVec2(0, 10));
-            }
-
-            Dummy(ImVec2(0, 16));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("9-Ball: aims at lowest ball,"));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("combos 9-ball, applies best spin."));
 
             // ── Section header helper ──────────────────────────────────────
             auto DrawSecHdr = [&](const char* title) {
@@ -1190,14 +1263,19 @@ static void DrawContentArea(float winW, float winH) {
                     snprintf(expireBuf, sizeof(expireBuf), "%s", O("Expired"));
                 }
 
-                DrawInfoRow(O("Expire:       "), expireBuf);
-                Dummy(ImVec2(0, 6));
-                TextColored(ImVec4(0, 1.f, 0, 1.0f), O("Powered By @Kz.tutorial"));
+                DrawInfoRow(O("Expire:  "), expireBuf);
+                Dummy(ImVec2(0, 10));
+                float avW = GetContentRegionAvail().x;
+                ImVec2 bp = GetCursorScreenPos();
+                ImDrawList* ud = GetWindowDrawList();
+                ud->AddRectFilled(bp, ImVec2(bp.x + avW, bp.y + 38.f),
+                                  IM_COL32(15, 30, 15, 180), 10.f);
+                ud->AddRect(bp, ImVec2(bp.x + avW, bp.y + 38.f),
+                            IM_COL32(0, 180, 80, 100), 10.f, 0, 1.0f);
                 Dummy(ImVec2(0, 8));
-                PushTextWrapPos(GetContentRegionAvail().x + GetCursorPosX());
-                TextColored(ImVec4(1.f, 0.f, 0.f, 1.0f),
-                    O("Beware of Scammers. This is a FREE BETA version, if you bought this version it means you got scammed."));
-                PopTextWrapPos();
+                SetCursorPosX(GetCursorPosX() + 10.f);
+                TextColored(ImVec4(0.0f, 0.88f, 0.45f, 1.0f), O("Powered By @Kz.tutorial"));
+                Dummy(ImVec2(0, 4));
             }
             break;
         }
@@ -1226,8 +1304,9 @@ INLINE void DrawMenu(ImGuiIO& io) {
         // 9-Ball One Shoot: manual aim helper with button + thinking animation.
         NineBall::Update(nullptr, io);
 
-        // Draw the Auto Aim floating button (always visible in-game)
-        DrawAutoAimButton();
+        // Draw the Auto Aim button only when an aim feature is enabled
+        if (persistent_bool[O("bTargetedAim")] || persistent_bool[O("bRandomAim")])
+            DrawAutoAimButton();
 
         if (g_menu.isOpen) {
             g_menu.menuAlpha += (1.0f - g_menu.menuAlpha) * io.DeltaTime * 14.0f;
