@@ -16,8 +16,6 @@ using namespace std;
 #include "mod/keylogin.h"
 #include "oxorany/oxorany.h"
 #include "game/inc/AutoPlay.h"
-#include "mod/dumplib.h"
-
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
@@ -188,7 +186,6 @@ static bool ToggleSwitch(const char* label, bool* v) {
     return pressed;
 }
 
-// File-scope so DrawToggleButton cancel can also reset countdown
 static bool g_aqCounting = false;
 static std::chrono::steady_clock::time_point g_aqLastCall;
 static std::chrono::steady_clock::time_point g_aqCountdownStart;
@@ -237,44 +234,57 @@ INLINE void DrawAutoQueue() {
     if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
         auto now = std::chrono::steady_clock::now();
 
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - g_aqLastCall).count() > 500)
-            g_aqCounting = false;
-        g_aqLastCall = now;
-
+        // Start countdown only once per activation
         if (!g_aqCounting) {
             g_aqCounting = true;
             g_aqCountdownStart = now;
         }
+        g_aqLastCall = now;
 
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - g_aqCountdownStart).count();
         int remaining_ms = 8000 - (int)elapsed;
 
-      // if (remaining_ms <= 0) {
-           // if (sharedMenuManager.getMenuStateId() == 13) PopMenuState(13);
-            //StartLastMatch();
-           // g_aqCounting = false;
-          //  return;
-       // }
+        // When countdown reaches zero, simulate a tap on the Play/Rematch button
+        if (remaining_ms <= 0) {
+            // Tap at the typical position of the "Play Again" / "Rematch" button
+            // in 8 Ball Pool (center-bottom of the screen ~72% down)
+            static auto lastTapTime = std::chrono::steady_clock::now() - std::chrono::seconds(10);
+            auto sinceLastTap = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTapTime).count();
+            if (sinceLastTap > 2000 && !buttonClicker.Active) {
+                buttonClicker.Click(ImVec2(Width * 0.5f, Height * 0.72f), 0.18f);
+                lastTapTime = now;
+            }
+            // Reset countdown to try again after a delay
+            g_aqCounting = false;
+            return;
+        }
 
         std::string count_str = std::to_string((remaining_ms / 1000) + 1);
 
-        // Minimal auto-sized window, transparent bg — we draw our own rounded rect
         SetNextWindowPos(ImVec2(Width * 0.5f, Height * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1.f));
-        PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 20.0f));
-        PushStyleVar(ImGuiStyleVar_WindowRounding, 24.0f);
+        PushStyleColor(ImGuiCol_WindowBg, IM_COL32(16, 18, 28, 240));
+        PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(40.0f, 24.0f));
+        PushStyleVar(ImGuiStyleVar_WindowRounding, 28.0f);
 
         if (Begin(O("##AutoQueueCD"), nullptr,
                   ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                   ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings |
                   ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImDrawList* dl  = GetWindowDrawList();
-            ImVec2      wp  = GetWindowPos();
-            ImVec2      ws  = GetWindowSize();
-            dl->AddRectFilled(wp, ImVec2(wp.x + ws.x, wp.y + ws.y), IM_COL32(20, 20, 28, 0), 24.0f);
+            ImDrawList* dl = GetWindowDrawList();
+            ImVec2      wp = GetWindowPos();
+            ImVec2      ws = GetWindowSize();
+            dl->AddRect(wp, ImVec2(wp.x + ws.x, wp.y + ws.y), IM_COL32(220, 40, 40, 120), 28.0f, 0, 1.5f);
 
-            SetWindowFontScale(3.5f);
-            TextColored(ImVec4(1.f, 0.f, 0.f, 1.0f), "%s", count_str.c_str());
+            SetWindowFontScale(1.0f);
+            ImVec2 lblSz = CalcTextSize(O("Auto Queue"));
+            SetCursorPosX((ws.x - lblSz.x - GetStyle().WindowPadding.x * 2) * 0.0f);
+            TextColored(ImVec4(0.8f, 0.8f, 0.9f, 1.0f), O("Auto Queue"));
+            Dummy(ImVec2(0, 6));
+
+            SetWindowFontScale(3.8f);
+            ImVec2 numSz = CalcTextSize(count_str.c_str());
+            SetCursorPosX((ws.x - numSz.x - GetStyle().WindowPadding.x * 2) * 0.5f + GetStyle().WindowPadding.x);
+            TextColored(ImVec4(1.f, 0.18f, 0.18f, 1.0f), "%s", count_str.c_str());
             SetWindowFontScale(1.0f);
         }
         End();
@@ -285,7 +295,7 @@ INLINE void DrawAutoQueue() {
 
 #include "mod/ButtonClicker.h"
 
-static void DrawToggleButton(bool cancelMode); // forward declaration — defined after DrawFloatingButton
+static void DrawAutoAimButton(); // forward declaration
 
 INLINE void DrawESP(ImDrawList* draw) {
     if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
@@ -310,10 +320,10 @@ INLINE void DrawESP(ImDrawList* draw) {
         MainStateManager mainStateManager = sharedMainManager.mStateManager;
         if (!mainStateManager) return;
         if (!mainStateManager.isInGame()) {
-        if (persistent_bool[O("bAutoQueue")]) {
-            if (!sharedMenuManager.isInQueue()) DrawAutoQueue();
-            DrawToggleButton(true);  // acts as cancel button for autoqueue
-        } return;
+            if (persistent_bool[O("bAutoQueue")]) {
+                if (!sharedMenuManager.isInQueue()) DrawAutoQueue();
+            }
+            return;
         }
 
         auto visualCue = sharedGameManager.mVisualCue();
@@ -338,13 +348,40 @@ INLINE void DrawESP(ImDrawList* draw) {
         GameStateManager gameStateManager = sharedGameManager.mStateManager;
         if (!gameStateManager) return;
 
-        if (persistent_bool[O("bAutoPlay")]) {
-            DrawToggleButton(false);
-            AutoPlay::Update();
+        auto stateId = gameStateManager.getCurrentStateId();
+
+        // Always update prediction data every frame so enemy line & pockets
+        // are visible regardless of whose turn it is
+        gPrediction->determineShotResult(false);
+
+        // ── Enemy Line — orange trajectories for OPPONENT balls ─────────────
+        // Drawn BEFORE the early-return so it shows during enemy's turn too
+        if (persistent_bool[O("bESP_EnemyLine")]) {
+            bool is9Ball = sharedGameManager.is9BallGame();
+            Ball::Classification enemyClass = Ball::Classification::ANY;
+            if (!is9Ball) {
+                if (myclass == Ball::Classification::SOLID)
+                    enemyClass = Ball::Classification::STRIPE;
+                else if (myclass == Ball::Classification::STRIPE)
+                    enemyClass = Ball::Classification::SOLID;
+            }
+            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+                auto& ball = gPrediction->guiData.balls[i];
+                if (!ball.originalOnTable) continue;
+                if (!is9Ball && ball.classification != enemyClass) continue;
+                if (ball.initialPosition == ball.predictedPosition) continue;
+                auto ip = WorldToScreen(ball.initialPosition);
+                auto pp = WorldToScreen(ball.predictedPosition);
+                draw->AddLine(ImVec2(ip.x, ip.y), ImVec2(pp.x, pp.y),
+                              IM_COL32(255, 130, 0, 200), 3.5f);
+                draw->AddCircle(ImVec2(pp.x, pp.y), 22.f,
+                                IM_COL32(255, 145, 0, 235), 0, 3.5f);
+                draw->AddCircleFilled(ImVec2(pp.x, pp.y), 8.f,
+                                     IM_COL32(255, 100, 0, 245));
+            }
         }
 
-        auto stateId = gameStateManager.getCurrentStateId();
-        if (stateId == 4) gPrediction->determineShotResult(false);
+        // Skip prediction drawing during ball-motion states
         if (stateId == 6 || stateId == 7 || stateId == 8) return;
 
         if (persistent_bool[O("bESP_DrawPocketsShotState")]) {
@@ -364,7 +401,7 @@ INLINE void DrawESP(ImDrawList* draw) {
                     ImVec2 lastPos{};
                     float lineThick = (float)persistent_int[O("iLineThickness")];
                     if (lineThick < 1.f) lineThick = 1.f;
-                    for (int j = 1; j < ball.positions.size(); j++) {
+                    for (int j = 1; j < (int)ball.positions.size(); j++) {
                         auto point = WorldToScreen(ball.positions[j]);
                         if (lastPos.x || lastPos.y) draw->AddLine(lastPos, point, colors[i], lineThick);
                         lastPos = point;
@@ -385,34 +422,6 @@ INLINE void DrawESP(ImDrawList* draw) {
                 }
             }
         }
-
-        // ── Enemy Line — orange trajectories for OPPONENT balls only ────────
-        if (persistent_bool[O("bESP_EnemyLine")]) {
-            bool is9Ball = sharedGameManager.is9BallGame();
-            // 8-ball: show only the opposing classification; 9-ball: show all numbered balls
-            Ball::Classification enemyClass = Ball::Classification::ANY;
-            if (!is9Ball) {
-                if (myclass == Ball::Classification::SOLID)
-                    enemyClass = Ball::Classification::STRIPE;
-                else if (myclass == Ball::Classification::STRIPE)
-                    enemyClass = Ball::Classification::SOLID;
-            }
-            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
-                auto& ball = gPrediction->guiData.balls[i];
-                if (!ball.originalOnTable) continue;
-                // In 8-ball mode filter to opponent class only
-                if (!is9Ball && ball.classification != enemyClass) continue;
-                if (ball.initialPosition == ball.predictedPosition) continue;
-                auto ip = WorldToScreen(ball.initialPosition);
-                auto pp = WorldToScreen(ball.predictedPosition);
-                draw->AddLine(ImVec2(ip.x, ip.y), ImVec2(pp.x, pp.y),
-                              IM_COL32(255, 130, 0, 175), 3.0f);
-                draw->AddCircle(ImVec2(pp.x, pp.y), 22.f,
-                                IM_COL32(255, 145, 0, 235), 0, 3.5f);
-                draw->AddCircleFilled(ImVec2(pp.x, pp.y), 8.f,
-                                     IM_COL32(255, 100, 0, 245));
-            }
-        }
     }
 }
 
@@ -429,7 +438,7 @@ static void DrawSidebar(float sidebarW) {
     float closeSize = 35.0f;
     float closeBtnW = 70.0f;
     float tabsW     = sidebarW - closeBtnW;
-    float btnW      = tabsW / 5.0f;
+    float btnW      = tabsW / 4.0f;
     float marginB   = 12.0f;
 
     // Split channels: 0 = background (drawn last, appears behind), 1 = buttons (drawn first)
@@ -446,26 +455,37 @@ static void DrawSidebar(float sidebarW) {
     if (SidebarButton(O("Queue"), q_icon_tex,    g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
     SameLine(0, 0);
     if (SidebarButton(O("User"),  user_icon_tex, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
-    SameLine(0, 0);
-    if (SidebarButton(O("Dump"),  user_icon_tex, g_menu.currentTab == 4, btnW)) g_menu.currentTab = 4;
     EndGroup();
 
     // Measure actual rendered height — this is the true wrap_content
     float sidebarH = GetItemRectMax().y - wp.y;
 
     // Now draw background on channel 0 (behind the buttons)
+    // Use same bg color as main window — top area only, with rounded top corners
     dl->ChannelsSetCurrent(0);
-    dl->AddRectFilled(wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH), IM_COL32(21, 21, 21, 255), 30.0f);
+    dl->AddRectFilled(
+        wp,
+        ImVec2(wp.x + sidebarW, wp.y + sidebarH),
+        IM_COL32(22, 22, 30, 255),
+        22.0f,
+        ImDrawFlags_RoundCornersTop
+    );
+    // Horizontal separator line between tab bar and content
+    dl->AddLine(
+        ImVec2(wp.x + 12.f, wp.y + sidebarH - 1.f),
+        ImVec2(wp.x + sidebarW - 12.f, wp.y + sidebarH - 1.f),
+        IM_COL32(200, 30, 30, 60), 1.0f
+    );
     dl->ChannelsMerge();
 
-    // Vertical separator between Queue and close strip
+    // Vertical separator between tabs and close strip
     float sepX       = wp.x + sidebarW - closeBtnW;
     float sepCenterY = wp.y + sidebarH * 0.5f;
     float sepHalfH   = sidebarH * 0.28f;
     dl->AddLine(
         ImVec2(sepX, sepCenterY - sepHalfH),
         ImVec2(sepX, sepCenterY + sepHalfH),
-        IM_COL32(60, 60, 75, 200), 1.5f
+        IM_COL32(60, 60, 75, 180), 1.5f
     );
 
     // Close (X) button — truly centered in the measured sidebarH
@@ -645,6 +665,55 @@ namespace NineBall {
         }
     }
 
+    // Score a result: more balls potted = higher score; no scratch/foul is required
+    static int scoreResult(int lowestIdx) {
+        auto& cue = gPrediction->guiData.balls[0];
+        if (!cue.onTable) return -1; // scratch
+        if (!gPrediction->guiData.collision.firstHitBall) return -1;
+        if (gPrediction->guiData.collision.firstHitBall->index != lowestIdx) return -1;
+        int score = 0;
+        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+            auto& b = gPrediction->guiData.balls[i];
+            if (b.originalOnTable && !b.onTable) score++;
+        }
+        return score;
+    }
+
+    // Try multiple spin values and apply the one that gives the best outcome.
+    // Spin candidates: (x,y) where x=left/right, y=top/bottom in [-1,1].
+    static void ApplyBestSpin(double bestAngle, int lowestIdx) {
+        static const Vec2d spinCandidates[] = {
+            {0.0,   0.0},   // no spin
+            {0.0,   0.6},   // top
+            {0.0,  -0.6},   // bottom
+            {0.5,   0.0},   // right
+            {-0.5,  0.0},   // left
+            {0.4,   0.4},   // top-right
+            {-0.4,  0.4},   // top-left
+            {0.4,  -0.4},   // bottom-right
+            {-0.4, -0.4},   // bottom-left
+            {0.0,   1.0},   // max top
+            {0.0,  -1.0},   // max bottom
+        };
+        int bestScore = -1;
+        Vec2d bestSpin = {0.0, 0.0};
+
+        for (auto& spin : spinCandidates) {
+            double pwr = sharedGameManager.mVisualCue().getShotPower();
+            gPrediction->determineShotResult(true, bestAngle, pwr, spin);
+            int s = scoreResult(lowestIdx);
+            if (s > bestScore) {
+                bestScore = s;
+                bestSpin  = spin;
+            }
+        }
+
+        // Apply best spin to the game
+        if (bestScore > 0) {
+            sharedGameManager.mVisualEnglishControl().mEnglish(bestSpin);
+        }
+    }
+
     // Called ONCE per turn — not every frame
     static void DoAIM() {
         if (!sharedGameManager.is9BallGame()) return;
@@ -656,6 +725,11 @@ namespace NineBall {
         bool combo = false;
         if (lowestIdx < 9) combo = AIM_Combo(lowestIdx);
         if (!combo) AIM_Standard(lowestIdx);
+
+        // After angle is set, find and apply the best spin
+        double finalAngle = NumberUtils::normalizeDoublePrecision(
+            sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+        ApplyBestSpin(finalAngle, lowestIdx);
     }
 
     // ── Visual button (play icon + thinking spinner) ──────────────────────────
@@ -672,7 +746,7 @@ namespace NineBall {
         const float margin = 8.f;
 
         // Stack below autoplay button when it's visible
-        float apOffset = persistent_bool[O("bAutoPlay")] ? (apWinH + margin) : 0.f;
+        float apOffset = 0.f;
         float posX = (g_btnX < 0.f) ? (io.DisplaySize.x - 20.f - winW) : g_btnX;
         float posY = (g_btnY < 0.f)
                      ? (io.DisplaySize.y - 20.f - winH)
@@ -774,38 +848,26 @@ namespace NineBall {
 
 } // namespace NineBall
 
-// ── AutoPlay::Update() ────────────────────────────────────────────────────────
+// ── AutoAim one-shot trigger ──────────────────────────────────────────────────
+// bAutoPlaying is reused as a one-shot flag:
+//   true  → run AIM() once on the next frame, then reset to false
 namespace AutoPlay {
-    static ImVec4 getPowerBarRect() {
-        float hs = static_cast<float>(Height) / static_cast<float>(REF_HEIGHT);
-        float ox = (static_cast<float>(Width) - hs * static_cast<float>(REF_WIDTH)) * 0.5f;
-        float cx = ox + hs * 1120.0f;
-        float bw = hs * 44.0f;
-        float yt = hs * 162.0f;
-        float yb = hs * 572.0f;
-        return ImVec4(cx - bw * 0.5f, yt, bw, yb - yt);
-    }
-
     static void Update() {
         if (!bAutoPlaying) return;
 
-        // Tick the drag slider every single frame so the touch events fire correctly
-        powerSlider.Update();
-
-        // If a shot is already in progress, wait for it to complete
-        if (powerSlider.Active) return;
-
-        // Need a valid game state
         auto stateManager = sharedGameManager.mStateManager();
         if (!stateManager) return;
         int stateId = stateManager.getCurrentStateId();
 
-        // Only act when it is our turn (stateId 4)
-        if (stateId != 4) return;
+        // Only aim when it is our turn (stateId 4)
+        if (stateId != 4) {
+            bAutoPlaying = false;
+            return;
+        }
 
-        // Aim and shoot — standard AutoPlay (8-ball and 9-ball)
+        // Run AIM() exactly once, then deactivate — user shoots manually
         AutoAim::AIM();
-        powerSlider.SimulateDrag(getPowerBarRect(), SHOT_POWER, DRAG_TIME, HOLD_TIME);
+        bAutoPlaying = false;
     }
 } // namespace AutoPlay
 
@@ -816,23 +878,16 @@ static void DrawContentArea(float winW, float winH) {
     ImDrawList* dl  = GetWindowDrawList();
     ImVec2      wp  = GetWindowPos();
 
-    // startY este punctul unde se termină bara de butoane (Sidebar)
+    // startY is where the tab bar ends — content draws below it
     float startY   = GetCursorPosY();
     float contentW = winW;
-
-    // Desenăm fundalul zonei de conținut sub sidebar
-    dl->AddRectFilled(
-        ImVec2(wp.x, wp.y + startY),
-        ImVec2(wp.x + contentW, wp.y + winH),
-        IM_COL32(21, 21, 21, 255), 20.0f
-    );
+    // No separate background needed — the main window already has a solid bg.
     
     const char* tabTitles[] = { 
     O("Draw Settings"), 
-    O("Auto Play"), 
+    O("Auto Aim"), 
     O("Auto Queue"), 
     O("User"),
-    O("Dump Lib")
 };
 
     // --- CENTRARE TITLU TAB ---
@@ -925,16 +980,37 @@ static void DrawContentArea(float winW, float winH) {
         
         case 1: {
             Dummy(ImVec2(0, 10));
-            need_save |= ToggleSwitch(O("Enable AutoPlay"), &persistent_bool[O("bAutoPlay")]);
-
-            Dummy(ImVec2(0, 14));
             need_save |= ToggleSwitch(O("9-Ball One Shoot"), &persistent_bool[O("bNineBallOneShoot")]);
 
+            Dummy(ImVec2(0, 20));
+
+            // ── Auto Aim info box ─────────────────────────────────────────────
+            {
+                ImDrawList* dl2 = GetWindowDrawList();
+                ImVec2 boxPos = GetCursorScreenPos();
+                float boxW = GetContentRegionAvail().x;
+                dl2->AddRectFilled(
+                    boxPos, ImVec2(boxPos.x + boxW, boxPos.y + 130.0f),
+                    IM_COL32(18, 28, 48, 200), 12.0f);
+                dl2->AddRect(
+                    boxPos, ImVec2(boxPos.x + boxW, boxPos.y + 130.0f),
+                    IM_COL32(60, 120, 220, 120), 12.0f, 0, 1.2f);
+                Dummy(ImVec2(0, 8));
+                SetCursorPosX(GetCursorPosX() + 12.0f);
+                TextColored(ImVec4(0.4f, 0.75f, 1.0f, 1.0f), O("Auto Aim"));
+                Dummy(ImVec2(0, 6));
+                SetCursorPosX(GetCursorPosX() + 12.0f);
+                PushTextWrapPos(GetCursorPosX() + boxW - 24.0f);
+                TextColored(ImVec4(0.70f, 0.70f, 0.78f, 1.0f),
+                    O("Tap the Auto Aim button on screen to calculate the best angle once. "
+                      "Power is always controlled manually."));
+                PopTextWrapPos();
+                Dummy(ImVec2(0, 10));
+            }
+
             Dummy(ImVec2(0, 16));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("AutoPlay: auto aim & shoot"));
-            Dummy(ImVec2(0, 6));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("9-Ball One Shoot: hit lowest"));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("ball first, combo 9-ball win"));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("9-Ball: aims at lowest ball,"));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("combos 9-ball, applies best spin."));
             break;
         }
         
@@ -1131,10 +1207,6 @@ static void DrawContentArea(float winW, float winH) {
             }
             break;
         }
-        case 4: {
-            DumpLib::DrawUI();
-            break;
-        }
     }
     
     if (need_save) save_persistence();
@@ -1151,9 +1223,17 @@ INLINE void DrawMenu(ImGuiIO& io) {
             jump_buffer_active = 0;
         }
 
+        // Tick ButtonClicker every frame (needed for AutoQueue tap)
+        buttonClicker.Update();
+
+        // One-shot Auto Aim: runs AIM() once when activated, then stops
+        AutoPlay::Update();
+
         // 9-Ball One Shoot: manual aim helper with button + thinking animation.
-        // Called here (after NineBall namespace is defined) to avoid forward-decl issues.
         NineBall::Update(nullptr, io);
+
+        // Draw the Auto Aim floating button (always visible in-game)
+        DrawAutoAimButton();
 
         if (g_menu.isOpen) {
             g_menu.menuAlpha += (1.0f - g_menu.menuAlpha) * io.DeltaTime * 14.0f;
@@ -1178,31 +1258,32 @@ INLINE void DrawMenu(ImGuiIO& io) {
             SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
             SetNextWindowPos(ImVec2(g_menuPosX, g_menuPosY), ImGuiCond_Always);
 
-            PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.13f, 0.f));
-            PushStyleVar(ImGuiStyleVar_WindowRounding, 20.0f);
+            // Full-opacity solid background so the window is one seamless piece
+            PushStyleColor(ImGuiCol_WindowBg, IM_COL32(13, 13, 18, 255));
+            PushStyleVar(ImGuiStyleVar_WindowRounding, 22.0f);
             PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
             PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
             PushStyleVar(ImGuiStyleVar_Alpha, g_menu.menuAlpha);
 
-            // NoMove kept — we handle dragging manually so we can clamp
             ImGuiWindowFlags winFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar |
                                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 
             if (Begin(O("##MainMenu"), &g_menu.isOpen, winFlags)) {
-                // ── Draw border glow ──────────────────────────────────────────
                 ImDrawList* bdl = GetWindowDrawList();
                 ImVec2      bwp = GetWindowPos();
+
+                // ── Outer subtle glow border ──────────────────────────────────
                 bdl->AddRect(bwp, ImVec2(bwp.x + winW, bwp.y + winH),
-                             IM_COL32(200, 30, 30, 60), 20.0f, 0, 1.5f);
+                             IM_COL32(200, 30, 30, 80), 22.0f, 0, 1.8f);
                 bdl->AddRect(ImVec2(bwp.x + 1, bwp.y + 1),
                              ImVec2(bwp.x + winW - 1, bwp.y + winH - 1),
-                             IM_COL32(255, 60, 60, 25), 20.0f, 0, 1.0f);
+                             IM_COL32(255, 60, 60, 30), 22.0f, 0, 1.0f);
 
                 DrawSidebar(winW);
                 DrawContentArea(winW, winH);
 
-                // ── Drag: any area of the window not captured by a widget ────
+                // ── Drag anywhere on the window ───────────────────────────────
                 if (IsWindowHovered(ImGuiHoveredFlags_AnyWindow) &&
                     IsMouseDragging(ImGuiMouseButton_Left, 4.0f) &&
                     !IsAnyItemActive()) {
@@ -1221,104 +1302,86 @@ INLINE void DrawMenu(ImGuiIO& io) {
     }
 }
 
-// Moved from AutoPlay namespace — plays/pauses autoplay (cancelMode=false)
-// or cancels autoqueue (cancelMode=true)
-static void DrawToggleButton(bool cancelMode) {
+// ── Auto Aim Button ────────────────────────────────────────────────────────────
+// Single-press button: when tapped, calculates the best aim angle once and stops.
+// Power is always controlled manually by the player.
+// The button shows a crosshair/target icon normally and a brief flash when activated.
+static float g_aimFlashTimer = 0.0f;
+
+static void DrawAutoAimButton() {
     ImGuiIO& io = GetIO();
 
-    float button_size  = 80.f;
-    float winPad       = 6.0f;
-    float windowWidth  = button_size + winPad * 2.0f;
-    float windowHeight = button_size + winPad * 2.0f;
-    float margin       = 8.0f;
+    const float bsz    = 80.f;
+    const float pad    = 6.0f;
+    const float winW   = bsz + pad * 2.f;
+    const float winH   = bsz + pad * 2.f;
+    const float fbnSz  = 120.f;
+    const float margin = 10.f;
 
-    // Position the AutoPlay/Cancel button just below the floating button
-    // g_btnX/g_btnY tracks the floating button position
-    float floatBtnSize = 140.0f; // floating button window size
-    float posX = (g_btnX < 0.0f) ? (io.DisplaySize.x - 20.0f - windowWidth) : g_btnX;
-    float posY = (g_btnY < 0.0f) ? (io.DisplaySize.y - 20.0f - windowHeight)
-                                  : (g_btnY + floatBtnSize + margin);
+    float posX = (g_btnX < 0.f) ? (io.DisplaySize.x - 20.f - winW) : g_btnX;
+    float posY = (g_btnY < 0.f)
+                 ? (io.DisplaySize.y - 20.f - winH)
+                 : (g_btnY + fbnSz + margin);
 
-    // Clamp so it never goes off screen
-    posX = ImClamp(posX, 0.0f, io.DisplaySize.x - windowWidth);
-    posY = ImClamp(posY, 0.0f, io.DisplaySize.y - windowHeight);
+    posX = ImClamp(posX, 0.f, io.DisplaySize.x - winW);
+    posY = ImClamp(posY, 0.f, io.DisplaySize.y - winH);
 
-    SetNextWindowSize(ImVec2(windowWidth, windowHeight), ImGuiCond_Always);
+    SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
     SetNextWindowPos(ImVec2(posX, posY), ImGuiCond_Always);
-
     PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 0));
     PushStyleColor(ImGuiCol_Border,   IM_COL32(0, 0, 0, 0));
-    PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(winPad, winPad));
-    PushStyleVar(ImGuiStyleVar_WindowRounding, 99.0f);
+    PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(pad, pad));
+    PushStyleVar(ImGuiStyleVar_WindowRounding, 99.f);
 
-    if (Begin(O("##ToggleBtn"), nullptr,
+    if (Begin(O("##AutoAimBtn"), nullptr,
               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove)) {
+              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings |
+              ImGuiWindowFlags_NoMove)) {
 
-        ImVec2 pos    = GetCursorScreenPos();
-        ImVec2 size(button_size, button_size);
-        ImVec2 center(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
-        float  r      = size.x * 0.5f;
-
-        bool clicked = InvisibleButton(O("##TglBtnHit"), size);
-        bool hovered = IsItemHovered();
-
+        ImVec2  p      = GetCursorScreenPos();
+        ImVec2  center(p.x + bsz * 0.5f, p.y + bsz * 0.5f);
+        float   r      = bsz * 0.5f;
         ImDrawList* dl = GetWindowDrawList();
 
-        // Determine current state for visual
-        bool isOn = cancelMode ? true : AutoPlay::bAutoPlaying;
-        int  stateId = 0;
-        if (!cancelMode && sharedGameManager && sharedGameManager.mStateManager()) {
-            stateId = sharedGameManager.mStateManager().getCurrentStateId();
-        }
-        bool myTurn = (!cancelMode && stateId == 4);
+        bool clicked = InvisibleButton(O("##AAHit"), ImVec2(bsz, bsz));
+        bool hovered = IsItemHovered();
 
-        // Outer circle background
-        ImU32 bgCol;
-        if (cancelMode)      bgCol = IM_COL32(180, 40, 40, 220);
-        else if (!isOn)      bgCol = IM_COL32(40, 40, 45, 200);
-        else if (myTurn)     bgCol = IM_COL32(0, 180, 60, 230);
-        else                 bgCol = IM_COL32(220, 30, 30, 220);
+        // Tick flash animation
+        if (g_aimFlashTimer > 0.f) g_aimFlashTimer -= io.DeltaTime;
 
-        ImU32 ringCol = hovered ? IM_COL32(255,255,255,160) : IM_COL32(255,255,255,60);
+        // Background
+        bool flashing = g_aimFlashTimer > 0.f;
+        ImU32 bgCol = flashing
+            ? IM_COL32(0, 180, 80, 240)
+            : (hovered ? IM_COL32(30, 50, 90, 235) : IM_COL32(14, 20, 40, 228));
         dl->AddCircleFilled(center, r, bgCol);
-        dl->AddCircle(center, r - 2.f, ringCol, 48, 2.f);
 
-        // Icon inside: play triangle, stop bars, or X
-        if (cancelMode) {
-            // X symbol for cancel
-            float xh = r * 0.35f;
-            ImU32 xc = IM_COL32(255,255,255,240);
-            dl->AddLine(ImVec2(center.x-xh, center.y-xh), ImVec2(center.x+xh, center.y+xh), xc, 3.5f);
-            dl->AddLine(ImVec2(center.x+xh, center.y-xh), ImVec2(center.x-xh, center.y+xh), xc, 3.5f);
-        } else if (!isOn) {
-            // Play triangle (pointing right)
-            float th = r * 0.38f;
-            float tw = r * 0.34f;
-            ImVec2 p1(center.x - tw * 0.6f, center.y - th);
-            ImVec2 p2(center.x - tw * 0.6f, center.y + th);
-            ImVec2 p3(center.x + tw * 1.1f, center.y);
-            dl->AddTriangleFilled(p1, p2, p3, IM_COL32(255,255,255,230));
-        } else {
-            // Stop/pause bars when playing
-            float bh = r * 0.38f;
-            float bw = r * 0.22f;
-            float gap = r * 0.15f;
-            ImU32 ic = IM_COL32(255,255,255,230);
-            dl->AddRectFilled(ImVec2(center.x - gap - bw, center.y - bh),
-                              ImVec2(center.x - gap,       center.y + bh), ic, 3.f);
-            dl->AddRectFilled(ImVec2(center.x + gap,       center.y - bh),
-                              ImVec2(center.x + gap + bw,  center.y + bh), ic, 3.f);
-        }
+        // Outer ring
+        ImU32 ringCol = flashing
+            ? IM_COL32(80, 255, 140, 220)
+            : IM_COL32(60, 130, 255, hovered ? 200u : 120u);
+        dl->AddCircle(center, r - 2.f, ringCol, 48, 2.5f);
+
+        // ── Crosshair / target icon ───────────────────────────────────────
+        float cr = r * 0.46f;
+        ImU32 ic = IM_COL32(255, 255, 255, flashing ? 255u : 210u);
+        dl->AddCircle(center, cr, ic, 32, 2.0f);
+        dl->AddLine(ImVec2(center.x - r * 0.72f, center.y), ImVec2(center.x - cr - 2.f, center.y), ic, 2.0f);
+        dl->AddLine(ImVec2(center.x + cr + 2.f, center.y),  ImVec2(center.x + r * 0.72f, center.y), ic, 2.0f);
+        dl->AddLine(ImVec2(center.x, center.y - r * 0.72f), ImVec2(center.x, center.y - cr - 2.f), ic, 2.0f);
+        dl->AddLine(ImVec2(center.x, center.y + cr + 2.f),  ImVec2(center.x, center.y + r * 0.72f), ic, 2.0f);
+        dl->AddCircleFilled(center, 3.5f, ic);
+
+        // "AIM" label below circle
+        const char* lbl = flashing ? O("DONE") : O("AIM");
+        ImVec2 ts = CalcTextSize(lbl);
+        dl->AddText(ImVec2(center.x - ts.x * 0.5f, p.y + bsz - ts.y - 2.f),
+                    flashing ? IM_COL32(180, 255, 200, 240) : IM_COL32(160, 200, 255, 200), lbl);
 
         if (clicked) {
-            if (cancelMode) {
-                persistent_bool[O("bAutoQueue")] = false;
-                g_aqCounting = false;
-            } else {
-                AutoPlay::bAutoPlaying = !AutoPlay::bAutoPlaying;
-                if (AutoPlay::bAutoPlaying) AutoPlay::ClearState();
-            }
+            // Trigger one-shot aim
+            AutoPlay::bAutoPlaying = true;
+            g_aimFlashTimer = 0.5f;
         }
     }
     End();
