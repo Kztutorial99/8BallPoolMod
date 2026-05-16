@@ -22,10 +22,42 @@ namespace AutoAim {
 
     void setAimAngle(double angle) {
         lastSetAngle = angle;
+        // Stealth mode: add small random noise so aiming looks human
+        if (persistent_bool[O("bStealth")]) {
+            double range = (double)persistent_float[O("fStealthNoise")] * M_PI / 180.0;
+            double noise = (((double)rand() / (double)RAND_MAX) * 2.0 - 1.0) * range;
+            angle += noise;
+            angle = normalizeAngle(angle);
+        }
         sharedGameManager.mVisualCue().mVisualGuide().mAimAngle(angle);
     }
 
+    // Targeted ball aim — scan for the angle that pots ball at index targetIdx
+    void AIM_Targeted(int targetIdx, double angleStep = 0.1) {
+        if (targetIdx < 1 || targetIdx >= gPrediction->guiData.ballsCount) return;
+        double startingAngle = NumberUtils::normalizeDoublePrecision(
+            sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+        for (double a = NumberUtils::normalizeDoublePrecision(normalizeAngle(startingAngle + angleStep));
+             a != startingAngle;
+             a = NumberUtils::normalizeDoublePrecision(normalizeAngle(a + angleStep))) {
+            gPrediction->determineShotResult(true, a);
+            auto& cue = gPrediction->guiData.balls[0];
+            if (!cue.onTable) continue; // no scratch
+            auto& tgt = gPrediction->guiData.balls[targetIdx];
+            if (tgt.originalOnTable && !tgt.onTable) {
+                setAimAngle(a);
+                return;
+            }
+        }
+    }
+
     void AIM(double angleStep = 0.1f) {
+        // Targeted ball aim — delegate to AIM_Targeted when enabled
+        if (persistent_bool[O("bTargetedAim")]) {
+            int idx = persistent_int[O("iTargetBall")];
+            if (idx >= 1) { AIM_Targeted(idx, angleStep); return; }
+        }
+
         auto startingAngle = NumberUtils::normalizeDoublePrecision(sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
 
         // Use the actual player classification from the game — never guess

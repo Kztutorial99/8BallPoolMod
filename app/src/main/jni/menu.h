@@ -16,6 +16,9 @@ using namespace std;
 #include "mod/keylogin.h"
 #include "oxorany/oxorany.h"
 #include "game/inc/AutoPlay.h"
+#include "mod/PhysicsHack.h"
+#include "mod/SafetyCombo.h"
+#include "mod/SessionStats.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
