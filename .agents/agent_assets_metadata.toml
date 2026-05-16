@@ -18,3 +18,9 @@ id = "uuJzShFl6iYYnoCFfFE9c"
 uri = "file://library_arm64.tar.gz"
 type = "unspecified"
 title = "library.so (arm64-v8a) — FluxEngine8BP"
+
+[[outputs]]
+id = "nAsPwoLYDp6gcMjG42qBf"
+uri = "file://FluxEngine8BP_debug.tar.gz"
+type = "unspecified"
+title = "FluxEngine8BP — app-debug.apk (arm64-v8a)"

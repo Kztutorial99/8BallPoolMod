@@ -35,13 +35,6 @@ android {
         }
     }
 
-    externalNativeBuild {
-        ndkBuild {
-            path file('src/main/jni/Android.mk')
-        }
-    }
-
-    ndkVersion '22.1.7171670'
 }
 
 dependencies {
