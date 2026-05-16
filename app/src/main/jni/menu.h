@@ -16,6 +16,7 @@ using namespace std;
 #include "mod/keylogin.h"
 #include "oxorany/oxorany.h"
 #include "game/inc/AutoPlay.h"
+#include "mod/dumplib.h"
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -428,7 +429,7 @@ static void DrawSidebar(float sidebarW) {
     float closeSize = 35.0f;
     float closeBtnW = 70.0f;
     float tabsW     = sidebarW - closeBtnW;
-    float btnW      = tabsW / 4.0f;
+    float btnW      = tabsW / 5.0f;
     float marginB   = 12.0f;
 
     // Split channels: 0 = background (drawn last, appears behind), 1 = buttons (drawn first)
@@ -445,6 +446,8 @@ static void DrawSidebar(float sidebarW) {
     if (SidebarButton(O("Queue"), q_icon_tex,    g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
     SameLine(0, 0);
     if (SidebarButton(O("User"),  user_icon_tex, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
+    SameLine(0, 0);
+    if (SidebarButton(O("Dump"),  user_icon_tex, g_menu.currentTab == 4, btnW)) g_menu.currentTab = 4;
     EndGroup();
 
     // Measure actual rendered height — this is the true wrap_content
@@ -828,7 +831,8 @@ static void DrawContentArea(float winW, float winH) {
     O("Draw Settings"), 
     O("Auto Play"), 
     O("Auto Queue"), 
-    O("User") 
+    O("User"),
+    O("Dump Lib")
 };
 
     // --- CENTRARE TITLU TAB ---
@@ -1125,6 +1129,10 @@ static void DrawContentArea(float winW, float winH) {
                     O("Beware of Scammers. This is a FREE BETA version, if you bought this version it means you got scammed."));
                 PopTextWrapPos();
             }
+            break;
+        }
+        case 4: {
+            DumpLib::DrawUI();
             break;
         }
     }
