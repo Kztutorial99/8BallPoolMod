@@ -189,6 +189,8 @@ static bool ToggleSwitch(const char* label, bool* v) {
     return pressed;
 }
 
+#include "mod/ButtonClicker.h"
+
 static bool g_aqCounting = false;
 static std::chrono::steady_clock::time_point g_aqLastCall;
 static std::chrono::steady_clock::time_point g_aqCountdownStart;
@@ -295,8 +297,6 @@ INLINE void DrawAutoQueue() {
         PopStyleColor();
     }
 }
-
-#include "mod/ButtonClicker.h"
 
 static void DrawAutoAimButton(); // forward declaration
 

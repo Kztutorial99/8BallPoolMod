@@ -59,9 +59,7 @@ namespace PhysicsHack {
         if (persistent_bool["bTableSpeedHack"] && sharedGameManager) {
             Table table = sharedGameManager.mTable;
             if (table) {
-                auto tableProperties = table.mTableProperties();
-                if (tableProperties) {
-                    FrictionProperties& fp = tableProperties._frictionProperties();
+                FrictionProperties& fp = table._frictionProperties();
                     double mul = (double)persistent_float["fTableFriction"];
                     if (mul < 0.05) mul = 0.05;
                     if (mul > 5.0)  mul = 5.0;
@@ -70,7 +68,6 @@ namespace PhysicsHack {
                     fp._coefficientOfSlidingFriction  = DEFAULT_SLIDING_FRICTION  * mul;
                     fp._velocityReductionRollingFactor = DEFAULT_VEL_REDUCTION_ROLLING / mul;
                     fp._deltaSpinFactor               = DEFAULT_DELTA_SPIN        * mul;
-                }
             }
         }
     }
