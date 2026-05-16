@@ -13,9 +13,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 static inline double sc_normalizeAngle(double angle) {
-    const double full = 360.0 / (180.0 / M_PI);
-    if (angle >= full) angle = fmod(angle, full);
-    else if (angle < 0) angle = full - fmod(-angle, full);
+    const double full = 2.0 * M_PI;
+    angle = fmod(angle, full);
+    if (angle < 0.0) angle += full;
     return angle;
 }
 
@@ -24,10 +24,14 @@ static inline void sc_setAimAngle(double angle) {
 }
 
 // ── Safety Finder ─────────────────────────────────────────────────────────────
+// Scans all angles to find the shot where the cue ball lands FURTHEST from
+// enemy balls after the shot, without potting any of our own balls.
 namespace SafetyFinder {
 
     static void Find(double step = 0.15) {
         if (!sharedGameManager) return;
+        if (!gPrediction) return;
+
         Ball::Classification myclass = sharedGameManager.getPlayerClassification();
         if (myclass != Ball::Classification::SOLID &&
             myclass != Ball::Classification::STRIPE) return;
@@ -37,13 +41,16 @@ namespace SafetyFinder {
             ? Ball::Classification::STRIPE : Ball::Classification::SOLID;
 
         double best_dist  = -1.0;
-        double best_angle = NumberUtils::normalizeDoublePrecision(
+        double base = NumberUtils::normalizeDoublePrecision(
             sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
-        double base = best_angle;
+        double best_angle = base;
 
-        for (double a = NumberUtils::normalizeDoublePrecision(sc_normalizeAngle(base + step));
-             a != base;
-             a = NumberUtils::normalizeDoublePrecision(sc_normalizeAngle(a + step))) {
+        // FIX: Use count-based loop instead of float equality comparison.
+        // a != base was an infinite loop due to floating-point accumulation.
+        const int maxIter = (int)((2.0 * M_PI) / fabs(step)) + 2;
+        for (int iter = 0; iter < maxIter; iter++) {
+            double a = NumberUtils::normalizeDoublePrecision(
+                sc_normalizeAngle(base + step * (double)(iter + 1)));
 
             gPrediction->determineShotResult(true, a);
             auto& cue = gPrediction->guiData.balls[0];
@@ -74,10 +81,12 @@ namespace SafetyFinder {
 } // namespace SafetyFinder
 
 // ── Combo Finder ──────────────────────────────────────────────────────────────
+// Scans all angles to find the shot that pots the most balls of our class.
 namespace ComboFinder {
 
     static void Find(double step = 0.05) {
         if (!sharedGameManager) return;
+        if (!gPrediction) return;
         if (sharedGameManager.is9BallGame()) return;
 
         Ball::Classification myclass = sharedGameManager.getPlayerClassification();
@@ -92,17 +101,20 @@ namespace ComboFinder {
         Ball::Classification target = only8B ? Ball::Classification::EIGHT_BALL : myclass;
 
         int    best_score = -1;
-        double best_angle = NumberUtils::normalizeDoublePrecision(
+        double base = NumberUtils::normalizeDoublePrecision(
             sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
-        double base = best_angle;
+        double best_angle = base;
 
-        for (double a = NumberUtils::normalizeDoublePrecision(sc_normalizeAngle(base + step));
-             a != base;
-             a = NumberUtils::normalizeDoublePrecision(sc_normalizeAngle(a + step))) {
+        // FIX: Use count-based loop instead of float equality comparison.
+        // a != base was an infinite loop due to floating-point accumulation.
+        const int maxIter = (int)((2.0 * M_PI) / fabs(step)) + 2;
+        for (int iter = 0; iter < maxIter; iter++) {
+            double a = NumberUtils::normalizeDoublePrecision(
+                sc_normalizeAngle(base + step * (double)(iter + 1)));
 
             gPrediction->determineShotResult(true, a);
-            auto& cue  = gPrediction->guiData.balls[0];
-            auto& b8   = gPrediction->guiData.balls[8];
+            auto& cue = gPrediction->guiData.balls[0];
+            auto& b8  = gPrediction->guiData.balls[8];
             if (!cue.onTable) continue;
             if (!gPrediction->guiData.collision.firstHitBall) continue;
             if (gPrediction->guiData.collision.firstHitBall->classification != target) continue;
@@ -121,6 +133,7 @@ namespace ComboFinder {
 } // namespace ComboFinder
 
 // ── Heatmap ESP ───────────────────────────────────────────────────────────────
+// Computes scoring dots around cue ball once per player turn.
 namespace HeatmapESP {
 
     struct HeatEntry { double angle; int potCount; };
@@ -142,6 +155,7 @@ namespace HeatmapESP {
         g_dirty = false;
 
         if (!sharedGameManager) return;
+        if (!gPrediction) return;
 
         Ball::Classification myclass = sharedGameManager.getPlayerClassification();
         bool is9 = sharedGameManager.is9BallGame();
@@ -156,10 +170,11 @@ namespace HeatmapESP {
         }
 
         constexpr double STEP  = 5.0 * M_PI / 180.0;
-        constexpr double MAX_A = 2.0 * M_PI;
+        const int totalSteps = (int)(2.0 * M_PI / STEP) + 1;
 
-        for (double a = 0.0; a < MAX_A && g_count < MAX_E; a += STEP) {
-            double na = NumberUtils::normalizeDoublePrecision(a);
+        for (int i = 0; i < totalSteps && g_count < MAX_E; i++) {
+            double a  = (double)i * STEP;
+            double na = NumberUtils::normalizeDoublePrecision(sc_normalizeAngle(a));
             gPrediction->determineShotResult(true, na);
             auto& cue = gPrediction->guiData.balls[0];
             if (!cue.onTable) continue;
@@ -171,14 +186,14 @@ namespace HeatmapESP {
                 b8.originalOnTable && !b8.onTable) continue;
 
             int pots = 0;
-            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
-                auto& b = gPrediction->guiData.balls[i];
+            for (int j = 1; j < gPrediction->guiData.ballsCount; j++) {
+                auto& b = gPrediction->guiData.balls[j];
                 if (b.originalOnTable && !b.onTable) pots++;
             }
             if (pots > 0) g_entries[g_count++] = { na, pots };
         }
 
-        // Restore default angle scan state
+        // Restore prediction to current game angle/power
         gPrediction->determineShotResult(false);
     }
 

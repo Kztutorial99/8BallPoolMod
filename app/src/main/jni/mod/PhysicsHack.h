@@ -12,7 +12,7 @@
 // Features:
 //   1. Max Power Modifier  — CUE_PROPERTIES_MAX_POWER (libmain+0x4e49410)
 //   2. Max Spin Multiplier — CUE_PROPERTIES_SPIN      (libmain+0x4e49418)
-//   3. Table Friction Hack — table._frictionProperties()._coefficientOfRollingFriction
+//   3. Table Friction Hack — table._frictionProperties()
 //
 // Call PhysicsHack::Apply() once per frame from DrawESP.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,12 +20,12 @@
 namespace PhysicsHack {
 
     // Default physics constants (game's original values)
-    static constexpr double DEFAULT_MAX_POWER = 666.0;
-    static constexpr double DEFAULT_MAX_SPIN  = 1.0;
-    static constexpr double DEFAULT_ROLLING_FRICTION = 0.0111;
-    static constexpr double DEFAULT_SLIDING_FRICTION = 0.20;
+    static constexpr double DEFAULT_MAX_POWER            = 666.0;
+    static constexpr double DEFAULT_MAX_SPIN             = 1.0;
+    static constexpr double DEFAULT_ROLLING_FRICTION     = 0.0111;
+    static constexpr double DEFAULT_SLIDING_FRICTION     = 0.20;
     static constexpr double DEFAULT_VEL_REDUCTION_ROLLING = 10.878;
-    static constexpr double DEFAULT_DELTA_SPIN = 9.8;
+    static constexpr double DEFAULT_DELTA_SPIN           = 9.8;
 
     static bool g_vipPatched = false;
 
@@ -49,6 +49,7 @@ namespace PhysicsHack {
             if (targetSpin > 5.0) targetSpin = 5.0;
             CUE_PROPERTIES_SPIN = targetSpin;
         } else {
+            // Restore defaults when disabled
             CUE_PROPERTIES_MAX_POWER = DEFAULT_MAX_POWER;
             CUE_PROPERTIES_SPIN      = DEFAULT_MAX_SPIN;
         }
@@ -60,14 +61,14 @@ namespace PhysicsHack {
             Table table = sharedGameManager.mTable;
             if (table) {
                 FrictionProperties& fp = table._frictionProperties();
-                    double mul = (double)persistent_float["fTableFriction"];
-                    if (mul < 0.05) mul = 0.05;
-                    if (mul > 5.0)  mul = 5.0;
+                double mul = (double)persistent_float["fTableFriction"];
+                if (mul < 0.05) mul = 0.05;
+                if (mul > 5.0)  mul = 5.0;
 
-                    fp._coefficientOfRollingFriction  = DEFAULT_ROLLING_FRICTION  * mul;
-                    fp._coefficientOfSlidingFriction  = DEFAULT_SLIDING_FRICTION  * mul;
-                    fp._velocityReductionRollingFactor = DEFAULT_VEL_REDUCTION_ROLLING / mul;
-                    fp._deltaSpinFactor               = DEFAULT_DELTA_SPIN        * mul;
+                fp._coefficientOfRollingFriction   = DEFAULT_ROLLING_FRICTION      * mul;
+                fp._coefficientOfSlidingFriction   = DEFAULT_SLIDING_FRICTION      * mul;
+                fp._velocityReductionRollingFactor = DEFAULT_VEL_REDUCTION_ROLLING / mul;
+                fp._deltaSpinFactor                = DEFAULT_DELTA_SPIN            * mul;
             }
         }
     }

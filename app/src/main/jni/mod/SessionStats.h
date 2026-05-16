@@ -6,7 +6,7 @@
 // ── SessionStats ──────────────────────────────────────────────────────────────
 // Tracks in-session statistics by monitoring game state transitions.
 // Call SessionStats::Update(stateId) once per frame from DrawESP.
-// Call SessionStats::Draw() from DrawMenu to show the HUD overlay.
+// Call SessionStats::DrawHUD() from DrawMenu to show the HUD overlay.
 // ─────────────────────────────────────────────────────────────────────────────
 namespace SessionStats {
 
@@ -20,7 +20,9 @@ namespace SessionStats {
     static int g_fouls   = 0;
 
     // Count balls currently on table for our classification
+    // Uses prediction guiData.balls[].originalOnTable = state at start of prediction
     static int CountMyBalls(Ball::Classification myclass) {
+        if (!gPrediction) return 0;
         int n = 0;
         for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
             auto& b = gPrediction->guiData.balls[i];
@@ -31,6 +33,7 @@ namespace SessionStats {
 
     static void Update(int stateId) {
         if (!sharedGameManager) { g_prevStateId = stateId; return; }
+        if (!gPrediction)        { g_prevStateId = stateId; return; }
 
         Ball::Classification myclass = sharedGameManager.getPlayerClassification();
         bool validClass = (myclass == Ball::Classification::SOLID ||
@@ -52,8 +55,8 @@ namespace SessionStats {
             g_prevBallCount = -1;
         }
 
-        // ── Detect game start (state 4 appearing after idle/menu) ──────────
-        if (g_prevStateId <= 2 && stateId == 4) {
+        // ── Detect game start: first time we enter state 4 from non-game ──
+        if ((g_prevStateId < 0 || g_prevStateId <= 2) && stateId == 4) {
             g_games++;
         }
 
