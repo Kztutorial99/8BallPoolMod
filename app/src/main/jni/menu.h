@@ -305,6 +305,7 @@ INLINE void DrawESP(ImDrawList* draw) {
         if (!sharedGameManager) return;
 
         UpdateScreenTable();
+        PhysicsHack::Apply();
 
         sharedDirector = F(ptr, libmain + O(0x4f06288));
         if (!sharedDirector) return;
@@ -353,6 +354,22 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         auto stateId = gameStateManager.getCurrentStateId();
 
+        // ── Per-frame stat tracking & heatmap computation ─────────────────
+        SessionStats::Update(stateId);
+        HeatmapESP::Compute(stateId);
+
+        // ── One-shot aim helpers: fire once when player's turn starts ─────
+        static int sc_prevStateId = -1;
+        bool sc_turnStart = (sc_prevStateId != 4 && stateId == 4);
+        sc_prevStateId = stateId;
+        if (sc_turnStart) {
+            if (persistent_bool[O("bDefensiveFinder")]) SafetyFinder::Find();
+            if (persistent_bool[O("bComboFinder")])    ComboFinder::Find();
+        }
+
+        // ── VIP Unlock: patch once when enabled ───────────────────────────
+        if (persistent_bool[O("bVIPUnlock")]) PhysicsHack::PatchVIP();
+
         // Always update prediction data every frame so enemy line & pockets
         // are visible regardless of whose turn it is
         gPrediction->determineShotResult(false);
@@ -386,6 +403,12 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         // Skip prediction drawing during ball-motion states
         if (stateId == 6 || stateId == 7 || stateId == 8) return;
+
+        // ── Heatmap ESP — scoring dots around cue ball ────────────────────
+        if (persistent_bool[O("bESP_Heatmap")] && gPrediction->guiData.ballsCount > 0) {
+            auto cueSP = WorldToScreen(gPrediction->guiData.balls[0].initialPosition);
+            HeatmapESP::Draw(draw, ImVec2(cueSP.x, cueSP.y));
+        }
 
         if (persistent_bool[O("bESP_DrawPocketsShotState")]) {
             for (int i = 0; i < 6; i++) {
@@ -931,6 +954,15 @@ static void DrawContentArea(float winW, float winH) {
             need_save |= ToggleSwitch(O("Draw Lines"), &persistent_bool[O("bESP_DrawPredictionLine")]);
             need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
             need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
+            need_save |= ToggleSwitch(O("Pocket Circles"), &persistent_bool[O("bESP_DrawPockets")]);
+            need_save |= ToggleSwitch(O("Ghost Ball"), &persistent_bool[O("bESP_GhostBall")]);
+            need_save |= ToggleSwitch(O("Anti Foul"), &persistent_bool[O("bESP_AntiFoul")]);
+            need_save |= ToggleSwitch(O("Ball Count"), &persistent_bool[O("bESP_BallCount")]);
+            need_save |= ToggleSwitch(O("Full Trajectory"), &persistent_bool[O("bESP_FullTrajectory")]);
+            need_save |= ToggleSwitch(O("Heatmap ESP"), &persistent_bool[O("bESP_Heatmap")]);
+            need_save |= ToggleSwitch(O("Table Outline"), &persistent_bool[O("bESP_TableOutline")]);
+            need_save |= ToggleSwitch(O("Velocity ESP"), &persistent_bool[O("bESP_VelocityESP")]);
+            need_save |= ToggleSwitch(O("Session Stats"), &persistent_bool[O("bSessionStats")]);
 
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
@@ -1014,6 +1046,128 @@ static void DrawContentArea(float winW, float winH) {
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("9-Ball: aims at lowest ball,"));
             TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("combos 9-ball, applies best spin."));
+
+            // ── Section header helper ──────────────────────────────────────
+            auto DrawSecHdr = [&](const char* title) {
+                Dummy(ImVec2(0, 14));
+                float av  = GetContentRegionAvail().x;
+                ImVec2 p  = GetCursorScreenPos();
+                ImVec2 ts = CalcTextSize(title);
+                float lw  = (av - ts.x - 16.0f) * 0.5f;
+                float ly  = p.y + GImGui->FontSize * 0.5f;
+                ImDrawList* d2 = GetWindowDrawList();
+                d2->AddLine(ImVec2(p.x, ly),          ImVec2(p.x + lw, ly),         IM_COL32(60,60,75,160), 1.0f);
+                d2->AddLine(ImVec2(p.x + lw+8+ts.x+8, ly), ImVec2(p.x + av, ly),   IM_COL32(60,60,75,160), 1.0f);
+                SetCursorPosX(GetCursorPosX() + lw + 8.0f);
+                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), "%s", title);
+                Dummy(ImVec2(0, 4));
+            };
+
+            // ── Aim Options ───────────────────────────────────────────────
+            DrawSecHdr(O("Aim Options"));
+
+            need_save |= ToggleSwitch(O("Stealth Mode"), &persistent_bool[O("bStealth")]);
+            if (persistent_bool[O("bStealth")]) {
+                Dummy(ImVec2(0, 6));
+                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Noise (degrees)"));
+                Dummy(ImVec2(0, 4));
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
+                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                SetNextItemWidth(GetContentRegionAvail().x);
+                need_save |= SliderFloat(O("##stealthnoise"), &persistent_float[O("fStealthNoise")], 0.5f, 15.0f, "%.1f deg");
+                PopStyleColor(3);
+                PopStyleVar(2);
+                Dummy(ImVec2(0, 6));
+            }
+
+            need_save |= ToggleSwitch(O("Targeted Aim"), &persistent_bool[O("bTargetedAim")]);
+            if (persistent_bool[O("bTargetedAim")]) {
+                Dummy(ImVec2(0, 6));
+                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Target Ball (1-9)"));
+                Dummy(ImVec2(0, 4));
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
+                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                SetNextItemWidth(GetContentRegionAvail().x);
+                need_save |= SliderInt(O("##targetball"), &persistent_int[O("iTargetBall")], 1, 9, "Ball %d");
+                PopStyleColor(3);
+                PopStyleVar(2);
+                Dummy(ImVec2(0, 6));
+            }
+
+            need_save |= ToggleSwitch(O("Precise Power"), &persistent_bool[O("bPrecisePower")]);
+            need_save |= ToggleSwitch(O("Safety Finder"), &persistent_bool[O("bDefensiveFinder")]);
+            need_save |= ToggleSwitch(O("Combo Finder"), &persistent_bool[O("bComboFinder")]);
+
+            Dummy(ImVec2(0, 8));
+            TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Power Bar Position"));
+            Dummy(ImVec2(0, 4));
+            PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+            PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(15, 10));
+            PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
+            PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.16f, 0.16f, 0.20f, 1.0f));
+            SetNextItemWidth(GetContentRegionAvail().x);
+            need_save |= Combo(O("##powerbar"), &persistent_int[O("iPowerBarPreset")], O("Left\0Right (Default)\0Bottom\0"));
+            PopStyleColor(2);
+            PopStyleVar(2);
+
+            // ── Physics ───────────────────────────────────────────────────
+            DrawSecHdr(O("Physics"));
+
+            need_save |= ToggleSwitch(O("Power & Spin Hack"), &persistent_bool[O("bPhysicsHack")]);
+            if (persistent_bool[O("bPhysicsHack")]) {
+                Dummy(ImVec2(0, 6));
+                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Max Power (default 666)"));
+                Dummy(ImVec2(0, 4));
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
+                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                SetNextItemWidth(GetContentRegionAvail().x);
+                need_save |= SliderFloat(O("##maxpower"), &persistent_float[O("fMaxPower")], 100.0f, 5000.0f, "%.0f");
+                PopStyleColor(3);
+                PopStyleVar(2);
+                Dummy(ImVec2(0, 8));
+                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Max Spin (default 1.0)"));
+                Dummy(ImVec2(0, 4));
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
+                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                SetNextItemWidth(GetContentRegionAvail().x);
+                need_save |= SliderFloat(O("##maxspin"), &persistent_float[O("fMaxSpin")], 0.1f, 5.0f, "%.1fx");
+                PopStyleColor(3);
+                PopStyleVar(2);
+                Dummy(ImVec2(0, 6));
+            }
+
+            need_save |= ToggleSwitch(O("Table Speed Hack"), &persistent_bool[O("bTableSpeedHack")]);
+            if (persistent_bool[O("bTableSpeedHack")]) {
+                Dummy(ImVec2(0, 6));
+                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Friction Multiplier"));
+                TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("<1 = faster, >1 = slower"));
+                Dummy(ImVec2(0, 4));
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
+                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                SetNextItemWidth(GetContentRegionAvail().x);
+                need_save |= SliderFloat(O("##tablefriction"), &persistent_float[O("fTableFriction")], 0.05f, 5.0f, "%.2fx");
+                PopStyleColor(3);
+                PopStyleVar(2);
+                Dummy(ImVec2(0, 6));
+            }
+
+            need_save |= ToggleSwitch(O("VIP Unlock"), &persistent_bool[O("bVIPUnlock")]);
+
             break;
         }
         
@@ -1228,6 +1382,9 @@ INLINE void DrawMenu(ImGuiIO& io) {
 
         // Tick ButtonClicker every frame (needed for AutoQueue tap)
         buttonClicker.Update();
+
+        // Session Stats HUD overlay
+        SessionStats::DrawHUD();
 
         // One-shot Auto Aim: runs AIM() once when activated, then stops
         AutoPlay::Update();
