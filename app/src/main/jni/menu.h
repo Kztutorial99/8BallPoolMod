@@ -503,55 +503,59 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
 
     float t = (float)GetTime();
 
-    // ── Warna mode ────────────────────────────────────────────────────────
+    // ── Mode name & color (plain literals — NEVER O() untuk pointer yang disimpan) ──
     ImVec4 modeColor = ImVec4(0.50f, 0.70f, 1.0f, 1.0f);
-    const char* modeName = O("AIM");
+    char modeName[8] = "AIM";
     switch (g_aimMode) {
-        case AimMode::EIGHTBALL_PREDICT: modeName = O("8BP"); modeColor = ImVec4(0.25f, 0.60f, 1.0f, 1.0f); break;
-        case AimMode::EIGHTBALL_BREAK:   modeName = O("8BK"); modeColor = ImVec4(1.0f,  0.50f, 0.10f, 1.0f); break;
-        case AimMode::EIGHTBALL_8LOCK:   modeName = O("LK8"); modeColor = ImVec4(0.90f, 0.20f, 0.90f, 1.0f); break;
-        case AimMode::NINEBALL_PREDICT:  modeName = O("9BP"); modeColor = ImVec4(0.15f, 0.85f, 0.55f, 1.0f); break;
-        case AimMode::NINEBALL_BREAK:    modeName = O("9GW"); modeColor = ImVec4(1.0f,  0.82f, 0.05f, 1.0f); break;
+        case AimMode::EIGHTBALL_PREDICT: strcpy(modeName,"8BP"); modeColor=ImVec4(0.25f,0.60f,1.0f,1.0f); break;
+        case AimMode::EIGHTBALL_BREAK:   strcpy(modeName,"8BK"); modeColor=ImVec4(1.0f, 0.50f,0.10f,1.0f); break;
+        case AimMode::EIGHTBALL_8LOCK:   strcpy(modeName,"LK8"); modeColor=ImVec4(0.90f,0.20f,0.90f,1.0f); break;
+        case AimMode::NINEBALL_PREDICT:  strcpy(modeName,"9BP"); modeColor=ImVec4(0.15f,0.85f,0.55f,1.0f); break;
+        case AimMode::NINEBALL_BREAK:    strcpy(modeName,"9GW"); modeColor=ImVec4(1.0f, 0.82f,0.05f,1.0f); break;
         default: break;
     }
 
-    // ── Baris 1: [MODE] · STATUS ──────────────────────────────────────────
+    // ── Baris 1: [MODE] STATUS ───────────────────────────────────────────
     char row1[64];
-    const char* status = isAnalyzing ? O("ANALYZING...") : O("AIMED");
-    snprintf(row1, sizeof(row1), O("[%s] %s"), modeName, status);
+    if (isAnalyzing)
+        snprintf(row1, sizeof(row1), "[%s] ANALYZING...", modeName);
+    else
+        snprintf(row1, sizeof(row1), "[%s] AIMED", modeName);
 
     ImVec4 statusColor = isAnalyzing
         ? ImVec4(1.0f, 0.78f, 0.0f, 1.0f)
         : ImVec4(0.15f, 1.0f, 0.42f, 1.0f);
-    float statusAlpha = isAnalyzing ? (0.55f + 0.45f * sinf(t * 8.0f)) : (0.80f + 0.20f * sinf(t * 2.5f));
+    float statusAlpha = isAnalyzing
+        ? (0.55f + 0.45f * sinf(t * 8.0f))
+        : (0.80f + 0.20f * sinf(t * 2.5f));
 
-    // ── Baris 2: info singkat ─────────────────────────────────────────────
+    // ── Baris 2: info singkat (plain snprintf, no O() format) ─────────────
     char row2[64] = "";
     switch (g_aimMode) {
         case AimMode::EIGHTBALL_PREDICT:
             if (isAimed && !AimLockTarget::lastHadShot)
-                snprintf(row2, sizeof(row2), O("No shot"));
+                snprintf(row2, sizeof(row2), "No shot");
             else if (AimLockTarget::lastTargetBall >= 0)
-                snprintf(row2, sizeof(row2), O("Ball %d  Pkt %d"),
+                snprintf(row2, sizeof(row2), "Ball %d  Pkt %d",
                     AimLockTarget::lastTargetBall, AimLockTarget::lastTargetPocket);
             break;
         case AimMode::EIGHTBALL_BREAK:
             if (AimBreak::lastBestCount > 0)
-                snprintf(row2, sizeof(row2), O("%d balls"), AimBreak::lastBestCount);
+                snprintf(row2, sizeof(row2), "%d balls", AimBreak::lastBestCount);
             break;
         case AimMode::EIGHTBALL_8LOCK:
             if (isAimed && !AimLock8Ball::lastHadShot)
-                snprintf(row2, sizeof(row2), O("No shot"));
+                snprintf(row2, sizeof(row2), "No shot");
             else if (AimLock8Ball::lastTargetPocket >= 0)
-                snprintf(row2, sizeof(row2), O("Ball 8  Pkt %d"), AimLock8Ball::lastTargetPocket);
+                snprintf(row2, sizeof(row2), "Ball 8  Pkt %d", AimLock8Ball::lastTargetPocket);
             break;
         case AimMode::NINEBALL_PREDICT:
             if (Aim9Ball::lastTargetBall >= 0)
-                snprintf(row2, sizeof(row2), O("Ball %d"), Aim9Ball::lastTargetBall);
+                snprintf(row2, sizeof(row2), "Ball %d", Aim9Ball::lastTargetBall);
             break;
         case AimMode::NINEBALL_BREAK:
             if (Aim9BallBreak::lastBestCount > 0)
-                snprintf(row2, sizeof(row2), O("%d balls"), Aim9BallBreak::lastBestCount);
+                snprintf(row2, sizeof(row2), "%d balls", Aim9BallBreak::lastBestCount);
             break;
         default: break;
     }
@@ -562,21 +566,17 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
     float       x   = 22.0f;
     float       y   = 28.0f;
 
-    // Dot animasi kecil
     float dotAlpha = isAnalyzing ? (0.5f + 0.5f * sinf(t * 7.0f)) : 0.6f;
     float dotR     = isAnalyzing ? 4.0f : 3.0f;
     fg->AddCircleFilled(ImVec2(x + 5.0f, y + fs * 0.55f), dotR,
         ImColor(modeColor.x, modeColor.y, modeColor.z, dotAlpha));
 
-    // Baris 1
     float pulse1 = 0.75f + 0.25f * sinf(t * 3.0f);
-    // Shadow
     fg->AddText(ImVec2(x + 15.0f + 1, y + 1), IM_COL32(0, 0, 0, 100), row1);
     fg->AddText(ImVec2(x + 15.0f, y),
         ImColor(statusColor.x, statusColor.y, statusColor.z, statusAlpha * pulse1), row1);
     y += fs + 5.0f;
 
-    // Baris 2 (hanya jika ada info)
     if (row2[0] != '\0') {
         float glow = 0.70f + 0.30f * sinf(t * 4.5f);
         fg->AddText(ImVec2(x + 15.0f + 1, y + 1), IM_COL32(0, 0, 0, 80), row2);
@@ -590,16 +590,16 @@ static void DrawWinCenterBanner(ImGuiIO& io) {
     if (!AutoAim::bAimed.load()) return;
 
     bool hasWin = false;
-    const char* winMsg = "";
+    char winMsg[32] = "";                            // plain buffer — NEVER O() pointer
     ImVec4 winColor = ImVec4(0.10f, 1.0f, 0.45f, 1.0f);
 
     if (g_aimMode == AimMode::NINEBALL_BREAK && Aim9BallBreak::lastWasWin9) {
         hasWin = true;
-        winMsg = O("WIN 9 FOUND!");
+        strcpy(winMsg, "WIN 9 FOUND!");
         winColor = ImVec4(1.0f, 0.85f, 0.0f, 1.0f);
     } else if (g_aimMode == AimMode::NINEBALL_PREDICT && Aim9Ball::lastWasCombo) {
         hasWin = true;
-        winMsg = O("COMBO WIN!");
+        strcpy(winMsg, "COMBO WIN!");
         winColor = ImVec4(0.10f, 1.0f, 0.55f, 1.0f);
     }
     if (!hasWin) return;
@@ -1034,6 +1034,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
         AutoAim::Update();
 
         g_espStateReady = false;
+        g_espIsInGame   = false;    // reset tiap frame — DrawESP akan set true jika memang in-game
 
         if (is_segv_handler_active()) {
             jump_buffer_active = 1;
@@ -1436,19 +1437,16 @@ DEFINES(EGLBoolean, Draw, EGLDisplay dpy, EGLSurface surface) {
         float gA  = 0.75f + 0.25f * sinf(t2 * 2.8f);
         ImVec2 cp = ImGui::GetCursorScreenPos();
         ImDrawList* fgDl = ImGui::GetWindowDrawList();
-        const char* lbl  = O("@LYN4XP");
+        const char lbl[] = "@LYN4XP";          // plain literal — no O() dangling ptr
         ImVec2 ts2 = ImGui::CalcTextSize(lbl);
-        // Subtle dark pill bg
         fgDl->AddRectFilled(
             ImVec2(cp.x - 8, cp.y - 3),
             ImVec2(cp.x + ts2.x + 8, cp.y + ts2.y + 3),
             IM_COL32(3, 18, 10, 180), 8.0f);
-        // Green border pulse
         fgDl->AddRect(
             ImVec2(cp.x - 8, cp.y - 3),
             ImVec2(cp.x + ts2.x + 8, cp.y + ts2.y + 3),
             ImColor(0.05f, 0.92f, 0.42f, gA * 0.70f), 8.0f, 0, 1.2f);
-        // Shadow
         fgDl->AddText(ImVec2(cp.x + 1, cp.y + 1), IM_COL32(0, 40, 15, 120), lbl);
         ImGui::TextColored(ImVec4(0.06f, 0.95f + 0.05f * sinf(t2 * 4.0f), 0.42f, gA), "%s", lbl);
     }
