@@ -705,6 +705,42 @@ static void DrawContentArea(float winW, float winH) {
                 need_save |= SliderInt("##betpercent", &persistent_int["iAutoQueue_BetPercent"], 1, 100, "%d%%");
                 PopStyleColor(3);
                 PopStyleVar(2);
+
+                // ── Smart mode live preview ────────────────────────────────
+                Dummy(ImVec2(0, 14));
+
+                int64_t coins     = AutoQueue::GetCoins();
+                int     betPct    = persistent_int["iAutoQueue_BetPercent"];
+                if (betPct < 1) betPct = 20;
+                int64_t targetBet = coins * betPct / 100;
+                int     smartIdx  = AutoQueue::PickSmartTable(coins, betPct);
+
+                // Coin balance row
+                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), O("Balance:"));
+                SameLine();
+                if (coins > 0) {
+                    TextColored(ImVec4(0.95f, 0.85f, 0.30f, 1.0f), "%s",
+                        AutoQueue::FormatCoins(coins).c_str());
+                } else {
+                    TextColored(ImVec4(0.6f, 0.3f, 0.3f, 1.0f), O("Not in game"));
+                }
+
+                Dummy(ImVec2(0, 4));
+
+                // Target bet row
+                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), O("Target Bet:"));
+                SameLine();
+                TextColored(ImVec4(0.85f, 0.85f, 0.90f, 1.0f), "%s",
+                    AutoQueue::FormatCoins(targetBet).c_str());
+
+                Dummy(ImVec2(0, 4));
+
+                // Recommended table row
+                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), O("Recommended:"));
+                SameLine();
+                TextColored(ImVec4(0.25f, 0.65f, 1.0f, 1.0f), "%s  (%s entry)",
+                    AutoQueue::TABLE_LABELS[smartIdx],
+                    AutoQueue::FormatCoins(AutoQueue::TABLE_ENTRY_FEES[smartIdx]).c_str());
             }
 
             if (persistent_int["iAutoQueue_Mode"] == 2) {
