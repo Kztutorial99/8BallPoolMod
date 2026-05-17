@@ -14,6 +14,7 @@ using namespace std;
 #include "game/Ruleset.h"
 #include "imgui/inc/8bp.h"
 #include "mod/keylogin.h"
+#include "mod/InjectTapPocket.h"
 #include "oxorany/oxorany.h"
 
 #include <EGL/egl.h>
@@ -700,6 +701,11 @@ static void DrawContentArea(float winW, float winH) {
             need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
             need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
 
+            if (ToggleSwitch(O("Auto Tap Pocket"), &persistent_bool[O("bAutoTapPocket")])) {
+                InjectTapPocket::bEnabled = persistent_bool[O("bAutoTapPocket")];
+                need_save = true;
+            }
+
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
             Dummy(ImVec2(0, 8));
@@ -1030,6 +1036,16 @@ INLINE void DrawMenu(ImGuiIO& io) {
             if (!s_autoOpened) { g_menu.isOpen = true; s_autoOpened = true; }
         }
 
+        // Restore state dari persistent storage saat pertama kali jalan
+        {
+            static bool s_stateRestored = false;
+            if (!s_stateRestored) {
+                AutoAim::bActive          = persistent_bool[O("bAutoAim")];
+                InjectTapPocket::bEnabled = persistent_bool[O("bAutoTapPocket")];
+                s_stateRestored = true;
+            }
+        }
+
         // Auto-open menu ketika match dimulai (transisi tidak-ingame → ingame)
         {
             static bool s_wasInGame = false;
@@ -1161,12 +1177,31 @@ static void DrawToggleButton() {
             AimMode capturedMode = g_aimMode;
             std::thread([capturedMode]() {
                 switch (capturedMode) {
-                    case AimMode::EIGHTBALL_PREDICT: AimLockTarget::Aim(); break;
-                    case AimMode::EIGHTBALL_BREAK:   AimBreak::Aim();      break;
-                    case AimMode::EIGHTBALL_8LOCK:   AimLock8Ball::Aim();  break;
-                    case AimMode::NINEBALL_PREDICT:  Aim9Ball::Aim();      break;
-                    case AimMode::NINEBALL_BREAK:    Aim9BallBreak::Aim(); break;
-                    default:                         AutoAim::TriggerAim();break;
+                    case AimMode::EIGHTBALL_PREDICT:
+                        AimLockTarget::Aim();
+                        if (AimLockTarget::lastHadShot && AimLockTarget::lastTargetPocket >= 0)
+                            InjectTapPocket::TapPocket(AimLockTarget::lastTargetPocket);
+                        break;
+                    case AimMode::EIGHTBALL_BREAK:
+                        AimBreak::Aim();
+                        // Break shot: tidak perlu tap pocket
+                        break;
+                    case AimMode::EIGHTBALL_8LOCK:
+                        AimLock8Ball::Aim();
+                        if (AimLock8Ball::lastHadShot && AimLock8Ball::lastTargetPocket >= 0)
+                            InjectTapPocket::TapPocket(AimLock8Ball::lastTargetPocket);
+                        break;
+                    case AimMode::NINEBALL_PREDICT:
+                        Aim9Ball::Aim();
+                        // 9-ball tidak wajib pocket nomination
+                        break;
+                    case AimMode::NINEBALL_BREAK:
+                        Aim9BallBreak::Aim();
+                        // Break shot: tidak perlu tap pocket
+                        break;
+                    default:
+                        AutoAim::TriggerAim();
+                        break;
                 }
                 AutoAim::bAimed       = true;
                 g_autoPlayCalculating = false;
