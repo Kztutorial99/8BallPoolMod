@@ -195,6 +195,11 @@ static std::string ReadNSString(ptr str) {
 // Set true by AutoPlay when scanning — shows CALCULATING overlay
 static bool g_autoPlayCalculating = false;
 
+// Game state flags — set by DrawESP (inside sigsetjmp), read by DrawMenu (outside)
+static bool g_espStateReady = false;
+static bool g_espIsInGame   = false;
+static bool g_espIsInQueue  = false;
+
 #include "mod/ButtonClicker.h"
 #include "game/inc/AutoPlay.h"
 #include "game/inc/AutoQueue.h"
@@ -311,12 +316,13 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         MainStateManager mainStateManager = sharedMainManager.mStateManager;
         if (!mainStateManager) return;
-        if (!mainStateManager.isInGame()) {
-        if (persistent_bool[O("bAutoQueue")]) {
-            if (!sharedMenuManager.isInQueue()) DrawAutoQueue();
-            DrawToggleButton(true);  // acts as cancel button for autoqueue
-        } return;
-        }
+
+        // Export game state for DrawMenu (used outside sigsetjmp guard)
+        g_espIsInGame    = mainStateManager.isInGame();
+        g_espIsInQueue   = sharedMenuManager.isInQueue();
+        g_espStateReady  = true;
+
+        if (!g_espIsInGame) return;
 
         auto visualCue = sharedGameManager.mVisualCue();
 
@@ -328,7 +334,7 @@ INLINE void DrawESP(ImDrawList* draw) {
         auto tableProperties = table.mTableProperties();
         if (!tableProperties) return;
 
-        auto& pockets = tableProperties.mPockets();
+        auto pockets = tableProperties.mPockets();
 
         if (persistent_bool[O("bESP_DrawPockets")]) {
             for (int i = 0; i < 6; i++) {
@@ -341,7 +347,6 @@ INLINE void DrawESP(ImDrawList* draw) {
         if (!gameStateManager) return;
 
         if (persistent_bool[O("bAutoPlay")]) {
-            DrawToggleButton(false);
             AutoPlay::Update();
         }
         //if (persistent_bool[O("bAutoAim")]) AutoAim::AIM();
@@ -917,12 +922,34 @@ static void DrawContentArea(float winW, float winH) {
 
 INLINE void DrawMenu(ImGuiIO& io) {
     if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
+        // Auto-open menu on first frame when bypassing login
+        if (DEBUG_BYPASS_LOGIN) {
+            static bool s_autoOpened = false;
+            if (!s_autoOpened) { g_menu.isOpen = true; s_autoOpened = true; }
+        }
+
         buttonClicker.Update();
+
+        // Reset game state flags before each frame's DrawESP
+        g_espStateReady = false;
 
         if (is_segv_handler_active()) {
             jump_buffer_active = 1;
             if (!sigsetjmp(jump_buffer, 1)) DrawESP(GetBackgroundDrawList());
             jump_buffer_active = 0;
+        }
+
+        // ── ImGui overlay windows — OUTSIDE sigsetjmp guard ─────────────────
+        // DrawAutoQueue and DrawToggleButton open ImGui::Begin/End windows.
+        // Calling them outside the sigsetjmp ensures the window stack stays
+        // clean even if DrawESP crashes mid-frame.
+        if (g_espStateReady) {
+            if (persistent_bool[O("bAutoQueue")]) {
+                if (!g_espIsInGame && !g_espIsInQueue) DrawAutoQueue();
+                DrawToggleButton(true);
+            } else if (persistent_bool[O("bAutoPlay")] && g_espIsInGame) {
+                DrawToggleButton(false);
+            }
         }
 
         float targetAlpha = g_menu.isOpen ? 1.0f : 0.0f;
