@@ -1,5 +1,3 @@
-#pragma once
-
 /* { // FrictionProperties
     {MCNumber=d}
     {MCNumber=d}

@@ -118,9 +118,8 @@
   include/external/Substrate/SubstrateHook.h \
   include/external/dlfcn/dlfcn.hpp include/input.h include/java.h \
   include/external/xhook/xhook.h include/external/xhook/src/xhook.h \
-  include/manual_dlsym.h include/random_defs.h game/inc/GameConstants.h \
-  menu.h include/external/imgui/imgui.h \
-  include/external/imgui/src/imgui.h \
+  include/manual_dlsym.h include/random_defs.h menu.h \
+  include/external/imgui/imgui.h include/external/imgui/src/imgui.h \
   include/external/imgui/src/imgui_internal.h \
   include/external/imgui/inc/../src/imstb_textedit.h \
   include/external/imgui/src/imstb_truetype.h \
@@ -135,15 +134,14 @@
   icons/play_on.h icons/play_off.h game.h game/Foundation.h game/Types.h \
   game/CCNode.h game/CCDirector.h game/StateManager.h game/State.h \
   game/GameManager.h game/VisualCue.h game/Ball.h game/inc/NumberUtils.h \
-  game/Table.h game/FrictionProperties.h game/VisualEnglishControl.h \
-  game/MainManager.h game/MenuManager.h game/UserInfo.h game/inc/game.h \
-  game/inc/Prediction.fast.h game/inc/Prediction.update.h \
-  game/inc/ScreenTable.h game/Ruleset.h \
+  game/inc/GameConstants.h game/Table.h game/FrictionProperties.h \
+  game/VisualEnglishControl.h game/MainManager.h game/MenuManager.h \
+  game/UserInfo.h game/inc/game.h game/inc/Prediction.fast.h \
+  game/inc/Prediction.update.h game/inc/AutoAim.h game/inc/ScreenTable.h \
+  game/Ruleset.h \
   /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/typeindex \
   include/external/imgui/inc/8bp.h mod/keylogin.h include/obfuscate.h \
-  game/inc/AutoPlay.h mod/PhysicsHack.h mod/SafetyCombo.h \
-  mod/SessionStats.h mod/ButtonClicker.h game/inc/AutoAim.h \
-  mod/PowerSlider.h mod/kill.h include/syscall.h
+  mod/ButtonClicker.h mod/kill.h include/syscall.h
 
 include/includes.h:
 
@@ -411,8 +409,6 @@ include/manual_dlsym.h:
 
 include/random_defs.h:
 
-game/inc/GameConstants.h:
-
 menu.h:
 
 include/external/imgui/imgui.h:
@@ -477,6 +473,8 @@ game/Ball.h:
 
 game/inc/NumberUtils.h:
 
+game/inc/GameConstants.h:
+
 game/Table.h:
 
 game/FrictionProperties.h:
@@ -495,6 +493,8 @@ game/inc/Prediction.fast.h:
 
 game/inc/Prediction.update.h:
 
+game/inc/AutoAim.h:
+
 game/inc/ScreenTable.h:
 
 game/Ruleset.h:
@@ -507,19 +507,7 @@ mod/keylogin.h:
 
 include/obfuscate.h:
 
-game/inc/AutoPlay.h:
-
-mod/PhysicsHack.h:
-
-mod/SafetyCombo.h:
-
-mod/SessionStats.h:
-
 mod/ButtonClicker.h:
-
-game/inc/AutoAim.h:
-
-mod/PowerSlider.h:
 
 mod/kill.h:
 

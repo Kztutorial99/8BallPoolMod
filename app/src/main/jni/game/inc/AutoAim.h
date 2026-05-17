@@ -1,111 +1,86 @@
 #pragma once
 
-#include "Prediction.fast.h"
+// Prediction.fast.h is already included before this file via game.h
+// Do NOT re-include Prediction.h to avoid redefinition errors
 #include <imgui/imgui.h>
-#include <ctime>
 
 using namespace ImGui;
 
-constexpr double maxAngle = 360.0 / (180.0 / M_PI);
-
-double normalizeAngle(double angle) {
-    double newAngle = angle;
-    if (newAngle >= maxAngle) newAngle = fmod(newAngle, maxAngle);
-    else if (newAngle < 0) newAngle = maxAngle - fmod(-newAngle, maxAngle);
-    return newAngle;
-}
-
 namespace AutoAim {
-    double lastSetAngle = 0.f;
-    bool didSetAngle = false;
+    double lastSetAngle = 0.0;
 
-    bool shouldAutoAIM() { return !didSetAngle || lastSetAngle == sharedGameManager.mVisualCue().mVisualGuide().mAimAngle(); }
+    static inline double normalizeAngle(double angle) {
+        if (angle >= MAX_ANGLE_RADIANS) angle = fmod(angle, MAX_ANGLE_RADIANS);
+        else if (angle < 0.0) angle = MAX_ANGLE_RADIANS - fmod(-angle, MAX_ANGLE_RADIANS);
+        return angle;
+    }
 
     void setAimAngle(double angle) {
         lastSetAngle = angle;
         sharedGameManager.mVisualCue().mVisualGuide().mAimAngle(angle);
     }
 
-    // Always use the current max power for aim calculations so the predicted
-    // line matches exactly what happens when the player shoots at full power.
+    // Always use max power so prediction matches full-power shot
     static double aimPower() {
         return CUE_PROPERTIES_MAX_POWER;
     }
 
-    // ── Spin search candidates ─────────────────────────────────────────────────
-    // After finding the best angle, scan spin variants and pick the one that
-    // maximises balls of our class being potted (without scratching or potting 8-ball early).
-    // Always applies the best spin found — even if no ball is potted, apply no-scratch spin.
-    static void ApplyBestSpin(double bestAngle, Ball::Classification targetClass, int eightBallIdx) {
-        static const Vec2d spinCandidates[] = {
-            { 0.0,  0.0 },   // no spin
-            { 0.0,  0.7 },   // top
-            { 0.0, -0.7 },   // bottom
-            { 0.65, 0.0 },   // right
-            {-0.65, 0.0 },   // left
-            { 0.45, 0.45 },  // top-right
-            {-0.45, 0.45 },  // top-left
-            { 0.45,-0.45 },  // bottom-right
-            {-0.45,-0.45 },  // bottom-left
-            { 0.0,  1.0 },   // max top
-            { 0.0, -1.0 },   // max bottom
-            { 0.9,  0.0 },   // max right
-            {-0.9,  0.0 },   // max left
-            { 0.6,  0.6 },   // strong top-right
-            {-0.6,  0.6 },   // strong top-left
-            { 0.6, -0.6 },   // strong bottom-right
-            {-0.6, -0.6 },   // strong bottom-left
-        };
+    // Apply best spin to maximize pot chance (uses VisualEnglishControl)
+    static void ApplyBestSpin(double angle) {
+        double pwr = aimPower();
+        Vec2d curSpin = sharedGameManager.getShotSpin();
 
-        int bestScore  = -9999;
-        Vec2d bestSpin = {0.0, 0.0};
-        double pwr     = aimPower();
+        static const double spinR[] = {0.0, 0.35, 0.7, 1.0};
+        static const double spinAngles[] = {0.0, M_PI/4, M_PI/2, 3*M_PI/4,
+                                             M_PI, 5*M_PI/4, 3*M_PI/2, 7*M_PI/4};
+        double maxSpin = CUE_PROPERTIES_SPIN;
 
-        for (const auto& spin : spinCandidates) {
-            gPrediction->determineShotResult(true, bestAngle, pwr, spin);
-            auto& cue = gPrediction->guiData.balls[0];
-            if (!cue.onTable) continue; // scratch — skip
+        double bestScore = -1e18;
+        double bestSX = 0.0, bestSY = 0.0;
+        bool found = false;
 
-            // Prevent accidentally potting the 8-ball before it's time
-            bool eightPotted = (eightBallIdx >= 0 &&
-                gPrediction->guiData.balls[eightBallIdx].originalOnTable &&
-                !gPrediction->guiData.balls[eightBallIdx].onTable);
-            if (targetClass != Ball::Classification::EIGHT_BALL && eightPotted) continue;
+        for (double r : spinR) {
+            for (double sa : spinAngles) {
+                double sx = cos(sa) * r * maxSpin;
+                double sy = sin(sa) * r * maxSpin;
+                Vec2d testSpin(sx, sy);
 
-            int score = 0;
-            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
-                auto& b = gPrediction->guiData.balls[i];
-                if (!b.originalOnTable) continue;
-                if (!b.onTable) {
-                    if (b.classification == targetClass)   score += 3;
-                    else if (b.classification != Ball::Classification::EIGHT_BALL)
-                                                           score -= 2;
+                gPrediction->determineShotResult(true, angle, pwr, testSpin);
+
+                auto& cueBall = gPrediction->guiData.balls[0];
+                if (!cueBall.onTable) continue;
+
+                double score = 0.0;
+                for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+                    auto& b = gPrediction->guiData.balls[i];
+                    if (b.originalOnTable && !b.onTable) score += 100.0;
+                }
+                if (score > bestScore) {
+                    bestScore = score; bestSX = sx; bestSY = sy; found = true;
                 }
             }
-            // Bonus: cue ball safe position
-            score += 1; // prefer any non-scratch spin
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestSpin  = spin;
-            }
         }
-
-        // Always apply — even if bestScore <= 0, the best non-scratch spin is used
-        sharedGameManager.mVisualEnglishControl().mEnglish(bestSpin);
+        if (found) {
+            sharedGameManager.mVisualEnglishControl().mEnglish(Vec2d(bestSX, bestSY));
+        }
     }
 
-    // ── Targeted ball aim ─────────────────────────────────────────────────────
-    // Scans angles in multiple passes (coarse→fine) to find the best shot angle
-    // where the cue first hits targetIdx and pots it.
-    // Ball 8 CAN be targeted directly — restriction is removed when explicitly chosen.
-    void AIM_Targeted(int targetIdx, double angleStep = 0.02) {
-        if (targetIdx < 1 || targetIdx >= gPrediction->guiData.ballsCount) return;
-        if (!gPrediction->guiData.balls[targetIdx].originalOnTable) return;
+    // 8-Ball mode: multi-pass coarse→fine scan
+    void AIM(double coarseStep = 0.08, double fineStep = 0.015) {
+        double startAngle = sharedGameManager.mVisualCue().getShotAngle();
+        double pwr = aimPower();
 
-        bool targetIs8Ball = (gPrediction->guiData.balls[targetIdx].classification ==
-                              Ball::Classification::EIGHT_BALL);
+        Ball::Classification myclass = (Ball::Classification)sharedGameManager.getPlayerClassification();
 
+        // Determine if only 8-ball is left for player
+        bool only8Left = true;
+        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+            auto& b = gPrediction->guiData.balls[i];
+            if (b.classification == myclass && b.originalOnTable) { only8Left = false; break; }
+        }
+        Ball::Classification target = only8Left ? Ball::Classification::EIGHT_BALL : myclass;
+
+        // Find 8-ball index
         int eightBallIdx = -1;
         for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
             if (gPrediction->guiData.balls[i].classification == Ball::Classification::EIGHT_BALL) {
@@ -113,304 +88,165 @@ namespace AutoAim {
             }
         }
 
+        Vec2d spin = sharedGameManager.getShotSpin();
+
+        struct Cand { double angle; int cnt; };
+        std::vector<Cand> coarseCands;
+        int coarseN = (int)(MAX_ANGLE_RADIANS / coarseStep) + 2;
+
+        for (int ci = 0; ci < coarseN; ci++) {
+            double angle = normalizeAngle(startAngle + ci * coarseStep);
+            gPrediction->determineShotResult(true, angle, pwr, spin);
+
+            auto& cueBall = gPrediction->guiData.balls[0];
+            if (cueBall.originalOnTable && !cueBall.onTable) continue;
+            if (!only8Left && eightBallIdx >= 0) {
+                auto& eb = gPrediction->guiData.balls[eightBallIdx];
+                if (eb.originalOnTable && !eb.onTable) continue;
+            }
+
+            bool good = false; int cnt = 0;
+            if (gPrediction->guiData.collision.firstHitBall &&
+                gPrediction->guiData.collision.firstHitBall->classification == target) {
+                for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+                    auto& b = gPrediction->guiData.balls[i];
+                    if (b.classification == target && b.originalOnTable && !b.onTable) {
+                        good = true; cnt++;
+                    }
+                }
+            }
+            if (good) coarseCands.push_back({angle, cnt});
+        }
+
+        if (!coarseCands.empty()) {
+            auto best = *std::max_element(coarseCands.begin(), coarseCands.end(),
+                [](const Cand& a, const Cand& b){ return a.cnt < b.cnt; });
+
+            double fineStart = best.angle - coarseStep;
+            Cand bestFine = best;
+            int fineN = (int)(coarseStep * 2.0 / fineStep) + 4;
+
+            for (int fi = 0; fi < fineN; fi++) {
+                double angle = normalizeAngle(fineStart + fi * fineStep);
+                gPrediction->determineShotResult(true, angle, pwr, spin);
+
+                auto& cueBall = gPrediction->guiData.balls[0];
+                if (cueBall.originalOnTable && !cueBall.onTable) continue;
+                if (!only8Left && eightBallIdx >= 0) {
+                    auto& eb = gPrediction->guiData.balls[eightBallIdx];
+                    if (eb.originalOnTable && !eb.onTable) continue;
+                }
+
+                bool good = false; int cnt = 0;
+                if (gPrediction->guiData.collision.firstHitBall &&
+                    gPrediction->guiData.collision.firstHitBall->classification == target) {
+                    for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+                        auto& b = gPrediction->guiData.balls[i];
+                        if (b.classification == target && b.originalOnTable && !b.onTable) {
+                            good = true; cnt++;
+                        }
+                    }
+                }
+                if (good && cnt >= bestFine.cnt) bestFine = {angle, cnt};
+            }
+            setAimAngle(bestFine.angle);
+            ApplyBestSpin(bestFine.angle);
+            return;
+        }
+
+        // Fallback: full fine scan
+        int fullN = (int)(MAX_ANGLE_RADIANS / fineStep) + 2;
+        for (int fi = 0; fi < fullN; fi++) {
+            double angle = normalizeAngle(startAngle + fi * fineStep);
+            gPrediction->determineShotResult(true, angle, pwr, spin);
+
+            auto& cueBall = gPrediction->guiData.balls[0];
+            if (cueBall.originalOnTable && !cueBall.onTable) continue;
+            if (!only8Left && eightBallIdx >= 0) {
+                auto& eb = gPrediction->guiData.balls[eightBallIdx];
+                if (eb.originalOnTable && !eb.onTable) continue;
+            }
+
+            bool good = false;
+            if (gPrediction->guiData.collision.firstHitBall &&
+                gPrediction->guiData.collision.firstHitBall->classification == target) {
+                for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+                    auto& b = gPrediction->guiData.balls[i];
+                    if (b.classification == target && b.originalOnTable && !b.onTable) { good = true; break; }
+                }
+            }
+            if (good) { setAimAngle(angle); ApplyBestSpin(angle); return; }
+        }
+    }
+
+    // 9-Ball mode: aim at lowest-numbered ball on table
+    void AIM_9Ball(double coarseStep = 0.08, double fineStep = 0.015) {
+        double startAngle = sharedGameManager.mVisualCue().getShotAngle();
         double pwr = aimPower();
+        Vec2d spin = sharedGameManager.getShotSpin();
 
-        // Multi-pass: coarse scan first for speed, then refine around best candidate
-        double bestAngle  = -1.0;
-        double coarseStep = 0.08;
-        double fineStep   = 0.015;
+        // Find lowest-numbered ball on table (index 1–9)
+        int targetIdx = -1;
+        for (int i = 1; i <= 9 && i < gPrediction->guiData.ballsCount; i++) {
+            if (gPrediction->guiData.balls[i].originalOnTable) { targetIdx = i; break; }
+        }
+        if (targetIdx < 0) return;
 
-        // ── Pass 1: coarse scan ──────────────────────────────────────────────
-        double startingAngle = NumberUtils::normalizeDoublePrecision(
-            sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+        double bestAngle = startAngle;
+        bool found = false;
+        int coarseN = (int)(MAX_ANGLE_RADIANS / coarseStep) + 2;
 
-        const int coarseMax = (int)((2.0 * M_PI) / coarseStep) + 2;
-        for (int iter = 0; iter < coarseMax; iter++) {
-            double a = NumberUtils::normalizeDoublePrecision(
-                normalizeAngle(startingAngle + coarseStep * (double)(iter + 1)));
+        for (int ci = 0; ci < coarseN; ci++) {
+            double angle = normalizeAngle(startAngle + ci * coarseStep);
+            gPrediction->determineShotResult(true, angle, pwr, spin);
 
-            gPrediction->determineShotResult(true, a, pwr);
-            auto& cue = gPrediction->guiData.balls[0];
-            if (!cue.onTable) continue;
-            if (!gPrediction->guiData.collision.firstHitBall) continue;
-            if (gPrediction->guiData.collision.firstHitBall->index != targetIdx) continue;
+            auto& cueBall = gPrediction->guiData.balls[0];
+            if (cueBall.originalOnTable && !cueBall.onTable) continue;
 
-            // Allow 8-ball potting only if it's the explicit target
-            if (!targetIs8Ball && eightBallIdx >= 0 &&
-                gPrediction->guiData.balls[eightBallIdx].originalOnTable &&
-                !gPrediction->guiData.balls[eightBallIdx].onTable) continue;
-
-            auto& tgt = gPrediction->guiData.balls[targetIdx];
-            if (tgt.originalOnTable && !tgt.onTable) {
-                bestAngle = a;
-                break;
+            auto& tb = gPrediction->guiData.balls[targetIdx];
+            if (tb.originalOnTable && !tb.onTable) {
+                bestAngle = angle; found = true; break;
             }
         }
 
-        // ── Pass 2: fine scan around best coarse angle (±coarseStep range) ──
-        if (bestAngle >= 0.0) {
+        if (found) {
             double fineStart = bestAngle - coarseStep;
-            double fineEnd   = bestAngle + coarseStep;
-            double refinedBest = bestAngle;
+            int fineN = (int)(coarseStep * 2.0 / fineStep) + 4;
+            for (int fi = 0; fi < fineN; fi++) {
+                double angle = normalizeAngle(fineStart + fi * fineStep);
+                gPrediction->determineShotResult(true, angle, pwr, spin);
 
-            const int fineMax = (int)((fineEnd - fineStart) / fineStep) + 2;
-            for (int iter = 0; iter < fineMax; iter++) {
-                double a = NumberUtils::normalizeDoublePrecision(
-                    normalizeAngle(fineStart + fineStep * (double)iter));
+                auto& cueBall = gPrediction->guiData.balls[0];
+                if (cueBall.originalOnTable && !cueBall.onTable) continue;
 
-                gPrediction->determineShotResult(true, a, pwr);
-                auto& cue = gPrediction->guiData.balls[0];
-                if (!cue.onTable) continue;
-                if (!gPrediction->guiData.collision.firstHitBall) continue;
-                if (gPrediction->guiData.collision.firstHitBall->index != targetIdx) continue;
-
-                if (!targetIs8Ball && eightBallIdx >= 0 &&
-                    gPrediction->guiData.balls[eightBallIdx].originalOnTable &&
-                    !gPrediction->guiData.balls[eightBallIdx].onTable) continue;
-
-                auto& tgt = gPrediction->guiData.balls[targetIdx];
-                if (tgt.originalOnTable && !tgt.onTable) {
-                    refinedBest = a;
-                    break;
-                }
+                auto& tb = gPrediction->guiData.balls[targetIdx];
+                if (tb.originalOnTable && !tb.onTable) { bestAngle = angle; break; }
             }
-            bestAngle = refinedBest;
-        }
-
-        // ── Pass 3: fallback — full fine scan if coarse failed ───────────────
-        if (bestAngle < 0.0) {
-            const int fineMax2 = (int)((2.0 * M_PI) / fineStep) + 2;
-            for (int iter = 0; iter < fineMax2; iter++) {
-                double a = NumberUtils::normalizeDoublePrecision(
-                    normalizeAngle(startingAngle + fineStep * (double)(iter + 1)));
-
-                gPrediction->determineShotResult(true, a, pwr);
-                auto& cue = gPrediction->guiData.balls[0];
-                if (!cue.onTable) continue;
-                if (!gPrediction->guiData.collision.firstHitBall) continue;
-                if (gPrediction->guiData.collision.firstHitBall->index != targetIdx) continue;
-
-                if (!targetIs8Ball && eightBallIdx >= 0 &&
-                    gPrediction->guiData.balls[eightBallIdx].originalOnTable &&
-                    !gPrediction->guiData.balls[eightBallIdx].onTable) continue;
-
-                auto& tgt = gPrediction->guiData.balls[targetIdx];
-                if (tgt.originalOnTable && !tgt.onTable) {
-                    bestAngle = a;
-                    break;
-                }
-            }
-        }
-
-        if (bestAngle >= 0.0) {
             setAimAngle(bestAngle);
-            Ball::Classification tgtClass = gPrediction->guiData.balls[targetIdx].classification;
-            ApplyBestSpin(bestAngle, tgtClass, eightBallIdx);
+            ApplyBestSpin(bestAngle);
         }
-    }
-
-    // ── Auto Aim Best Shot ────────────────────────────────────────────────────
-    // Scans ALL balls of player's class and picks the angle that pots the most.
-    // Multi-pass: coarse first, then refines the best window found.
-    void AIM_BestShot(double coarseStep = 0.08, double fineStep = 0.015) {
-        Ball::Classification myclass = sharedGameManager.getPlayerClassification();
-        bool canAimAny = (myclass == Ball::Classification::SOLID   ||
-                          myclass == Ball::Classification::STRIPE  ||
-                          myclass == Ball::Classification::ANY);
-        if (!canAimAny) return;
-
-        int eightBallIdx = -1;
-        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
-            if (gPrediction->guiData.balls[i].classification == Ball::Classification::EIGHT_BALL) {
-                eightBallIdx = i; break;
-            }
-        }
-
-        bool only8BPleft = true;
-        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
-            auto& b = gPrediction->guiData.balls[i];
-            if (b.classification == myclass && b.originalOnTable) {
-                only8BPleft = false; break;
-            }
-        }
-        Ball::Classification targetClass = only8BPleft
-            ? Ball::Classification::EIGHT_BALL : myclass;
-
-        double pwr = aimPower();
-        double startingAngle = NumberUtils::normalizeDoublePrecision(
-            sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
-
-        // ── Coarse scan: find best scoring angle ──────────────────────────────
-        int    bestScore       = -1;
-        double bestAngle       = -1.0;
-        double bestWindowStart = -1.0;
-
-        const int coarseMax = (int)((2.0 * M_PI) / coarseStep) + 2;
-        for (int iter = 0; iter < coarseMax; iter++) {
-            double a = NumberUtils::normalizeDoublePrecision(
-                normalizeAngle(startingAngle + coarseStep * (double)(iter + 1)));
-
-            gPrediction->determineShotResult(true, a, pwr);
-            auto& cue = gPrediction->guiData.balls[0];
-            if (!cue.onTable) continue;
-            if (!gPrediction->guiData.collision.firstHitBall) continue;
-            if (!only8BPleft &&
-                gPrediction->guiData.collision.firstHitBall->classification != targetClass) continue;
-            if (!only8BPleft && eightBallIdx >= 0 &&
-                gPrediction->guiData.balls[eightBallIdx].originalOnTable &&
-                !gPrediction->guiData.balls[eightBallIdx].onTable) continue;
-
-            int score = 0;
-            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
-                auto& b = gPrediction->guiData.balls[i];
-                if (b.classification == targetClass && b.originalOnTable && !b.onTable)
-                    score++;
-            }
-            if (score > bestScore) {
-                bestScore       = score;
-                bestAngle       = a;
-                bestWindowStart = a - coarseStep;
-            }
-        }
-
-        if (bestScore < 1) return; // nothing found even coarsely
-
-        // ── Fine scan: refine around best coarse window ───────────────────────
-        double fineWindowEnd = bestAngle + coarseStep;
-        int    fineBestScore = bestScore;
-        double fineBestAngle = bestAngle;
-
-        const int fineMax = (int)((fineWindowEnd - bestWindowStart) / fineStep) + 2;
-        for (int iter = 0; iter < fineMax; iter++) {
-            double a = NumberUtils::normalizeDoublePrecision(
-                normalizeAngle(bestWindowStart + fineStep * (double)iter));
-
-            gPrediction->determineShotResult(true, a, pwr);
-            auto& cue = gPrediction->guiData.balls[0];
-            if (!cue.onTable) continue;
-            if (!gPrediction->guiData.collision.firstHitBall) continue;
-            if (!only8BPleft &&
-                gPrediction->guiData.collision.firstHitBall->classification != targetClass) continue;
-            if (!only8BPleft && eightBallIdx >= 0 &&
-                gPrediction->guiData.balls[eightBallIdx].originalOnTable &&
-                !gPrediction->guiData.balls[eightBallIdx].onTable) continue;
-
-            int score = 0;
-            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
-                auto& b = gPrediction->guiData.balls[i];
-                if (b.classification == targetClass && b.originalOnTable && !b.onTable)
-                    score++;
-            }
-            if (score >= fineBestScore) {
-                fineBestScore = score;
-                fineBestAngle = a;
-            }
-        }
-
-        setAimAngle(fineBestAngle);
-        ApplyBestSpin(fineBestAngle, targetClass, eightBallIdx);
-    }
-
-    // ── Auto Aim Random ───────────────────────────────────────────────────────
-    // Tries each ball of player's class, picks a potting angle with best spin.
-    void AIM_Random(double angleStep = 0.02) {
-        Ball::Classification myclass = sharedGameManager.getPlayerClassification();
-        if (myclass != Ball::Classification::SOLID &&
-            myclass != Ball::Classification::STRIPE) return;
-
-        std::vector<int> candidates;
-        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
-            auto& b = gPrediction->guiData.balls[i];
-            if (b.classification == myclass && b.originalOnTable)
-                candidates.push_back(i);
-        }
-
-        int eightBallIdx = -1;
-        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
-            if (gPrediction->guiData.balls[i].classification == Ball::Classification::EIGHT_BALL) {
-                eightBallIdx = i; break;
-            }
-        }
-
-        // If all our balls potted → aim at 8-ball to win
-        if (candidates.empty()) {
-            if (eightBallIdx >= 0 && gPrediction->guiData.balls[eightBallIdx].originalOnTable) {
-                AIM_Targeted(eightBallIdx, angleStep);
-            }
-            return;
-        }
-
-        double pwr = aimPower();
-        int startIdx = (int)((int64_t)time(nullptr) % (int64_t)candidates.size());
-
-        for (int attempt = 0; attempt < (int)candidates.size(); attempt++) {
-            int ballIdx = candidates[(startIdx + attempt) % (int)candidates.size()];
-
-            double startingAngle = NumberUtils::normalizeDoublePrecision(
-                sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
-
-            const int maxIter = (int)((2.0 * M_PI) / fabs(angleStep)) + 2;
-            for (int iter = 0; iter < maxIter; iter++) {
-                double a = NumberUtils::normalizeDoublePrecision(
-                    normalizeAngle(startingAngle + angleStep * (double)(iter + 1)));
-
-                gPrediction->determineShotResult(true, a, pwr);
-                auto& cue = gPrediction->guiData.balls[0];
-                if (!cue.onTable) continue;
-
-                if (!gPrediction->guiData.collision.firstHitBall) continue;
-                if (gPrediction->guiData.collision.firstHitBall->index != ballIdx) continue;
-
-                // Never pot 8-ball early
-                if (eightBallIdx >= 0 &&
-                    gPrediction->guiData.balls[eightBallIdx].originalOnTable &&
-                    !gPrediction->guiData.balls[eightBallIdx].onTable) continue;
-
-                auto& tgt = gPrediction->guiData.balls[ballIdx];
-                if (tgt.originalOnTable && !tgt.onTable) {
-                    setAimAngle(a);
-                    ApplyBestSpin(a, myclass, eightBallIdx);
-                    return;
-                }
-            }
-        }
-    }
-
-    void AIM(double angleStep = 0.02) {
-        // Targeted ball aim — supports ball 8 explicitly
-        if (persistent_bool[O("bTargetedAim")]) {
-            int idx = persistent_int[O("iTargetBall")];
-            if (idx >= 1) { AIM_Targeted(idx, angleStep); return; }
-        }
-
-        // Random ball aim
-        if (persistent_bool[O("bRandomAim")]) {
-            AIM_Random(angleStep);
-            return;
-        }
-
-        // Default: best-shot scanner — picks angle that pots the most
-        AIM_BestShot();
     }
 
     void Draw() {
         ImGuiIO& io = GetIO();
-        SetNextWindowPos(ImVec2(io.DisplaySize.x - persistent_int["iAIM_WindowX"], persistent_int["iAIM_WindowY"]), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+        SetNextWindowPos(ImVec2(io.DisplaySize.x - persistent_int["iAIM_WindowX"],
+                                persistent_int["iAIM_WindowY"]),
+                         ImGuiCond_Always, ImVec2(1.0f, 0.0f));
         SetNextWindowSize(ImVec2(210, 65), ImGuiCond_FirstUseEver);
 
-        if (Begin("AutoAim", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings)) {
-            ImVec2 windowSize = GetWindowSize();
-            float availableWidth = windowSize.x - GetStyle().WindowPadding.x * 2 - GetStyle().ItemSpacing.x * 2;
-            float buttonWidth = availableWidth / 3;
-            float availableHeight = windowSize.y - GetStyle().WindowPadding.y * 2;
-            float buttonSize = (buttonWidth < availableHeight) ? buttonWidth : availableHeight;
+        if (Begin("AutoAim", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                  ImGuiWindowFlags_NoSavedSettings)) {
+            ImVec2 ws = GetWindowSize();
+            float aw = ws.x - GetStyle().WindowPadding.x * 2 - GetStyle().ItemSpacing.x * 2;
+            float bw = aw / 3;
+            float ah = ws.y - GetStyle().WindowPadding.y * 2;
+            float bs = (bw < ah) ? bw : ah;
 
-            Ball::Classification cls = sharedGameManager.getPlayerClassification();
-            const char* clsLabel = (cls == Ball::Classification::SOLID) ? "SOL"
-                                 : (cls == Ball::Classification::STRIPE) ? "STR" : "?";
-            TextDisabled("%s", clsLabel);
-            SameLine(); if (Button("<", ImVec2(buttonSize, buttonSize))) AIM(persistent_float["fAIM_AngleStep"]);
-            SameLine(); if (Button(">", ImVec2(buttonSize, buttonSize))) AIM(-persistent_float["fAIM_AngleStep"]);
+            if (Button("<", ImVec2(bs, bs))) AIM();
+            SameLine(); if (Button("9B", ImVec2(bs, bs))) AIM_9Ball();
+            SameLine(); if (Button(">", ImVec2(bs, bs))) AIM();
         } End();
     }
 };
+

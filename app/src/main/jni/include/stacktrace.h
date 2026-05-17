@@ -1,5 +1,6 @@
 #pragma once
 
+#include <execinfo.h>
 #include <cxxabi.h>
 #include <unwind.h>
 #include <dlfcn.h>

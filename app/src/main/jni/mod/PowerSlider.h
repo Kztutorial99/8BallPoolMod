@@ -75,20 +75,14 @@ struct PowerSlider {
     // DragTime is time to reach MAX power (666.0f)
     void SimulateDrag(ImVec4 Rect, float ShotPower = 0.f, float DragTime = .7f, float HoldTime = 0.35f) {
         if (this->Active) return;
-
-        // Precise power: compute ratio from actual shot power via ShotPowerToPower()
-        float powerRatio = 1.0f;
-        if (persistent_bool[O("bPrecisePower")] && sharedGameManager) {
-            double optP = sharedGameManager.mVisualCue().getShotPower();
-            double r = ShotPowerToPower(optP);
-            if (r > 0.01 && r <= 1.0) powerRatio = (float)r;
-        }
-
+        
+        ShotPower = 666.f;
         this->ShotPower = ShotPower > 0.f ? ShotPower : 666.0f;
+        float powerRatio = std::min(this->ShotPower / 666.0f, 1.0f);
         
         Start(Rect);
         
-        // Calculate exact target position for the requested power ratio
+        // Calculate exact target position for the requested power
         this->TargetPos = ImVec2(
             this->StartPos.x + (this->EndPos.x - this->StartPos.x) * powerRatio,
             this->StartPos.y + (this->EndPos.y - this->StartPos.y) * powerRatio
@@ -96,30 +90,6 @@ struct PowerSlider {
         
         this->Duration = DragTime * powerRatio;
         this->HoldDuration = HoldTime;
-    }
-
-    // Trigger a drag with explicit start/end positions and a given power ratio
-    void SimulateDragCoords(ImVec2 start, ImVec2 end, float powerRatio = 1.0f,
-                            float DragTime = 0.7f, float HoldTime = 0.35f) {
-        if (this->Active) return;
-        powerRatio = std::max(0.05f, std::min(powerRatio, 1.0f));
-        Start(start, end);
-        this->TargetPos   = ImVec2(start.x + (end.x - start.x) * powerRatio,
-                                   start.y + (end.y - start.y) * powerRatio);
-        this->Duration    = DragTime * powerRatio;
-        this->HoldDuration = HoldTime;
-    }
-
-    // Compute a power bar rect for the selected preset.
-    // Preset 0: Left Vertical, 1: Right Vertical (default), 2: Bottom Horizontal
-    static void GetPowerBarCoords(ImVec2& outStart, ImVec2& outEnd) {
-        ImGuiIO& io2 = ImGui::GetIO();
-        float W = io2.DisplaySize.x, H = io2.DisplaySize.y;
-        switch (persistent_int[O("iPowerBarPreset")]) {
-            case 0: outStart = ImVec2(W*0.10f, H*0.87f); outEnd = ImVec2(W*0.10f, H*0.44f); break;
-            case 2: outStart = ImVec2(W*0.20f, H*0.93f); outEnd = ImVec2(W*0.78f, H*0.93f); break;
-            default: outStart = ImVec2(W*0.90f, H*0.87f); outEnd = ImVec2(W*0.90f, H*0.44f); break;
-        }
     }
 
     void Update() {
@@ -149,11 +119,11 @@ struct PowerSlider {
 
                 NativeTouchesMove(this->TouchIndex, this->CurrentPos.x, this->CurrentPos.y);
             } else {
-                // Ensure we hit the target exactly, then wait before releasing
+                return Cancel();
+                // Ensure we hit the target exactly
                 this->CurrentPos = this->TargetPos;
                 NativeTouchesMove(this->TouchIndex, this->CurrentPos.x, this->CurrentPos.y);
                 this->state = ENDING;
-                this->HoldTime = 0.f;
             }
 
             if (dynamic_bool["DebugTouch"]) {

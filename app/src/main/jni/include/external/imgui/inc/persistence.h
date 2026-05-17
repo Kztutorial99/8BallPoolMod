@@ -69,29 +69,9 @@ static std::map<std::string, bool> persistent_bool = {
     {"bESP_DrawInitialPos", true},
     {"bESP_DrawPockets", false},
     {"bESP_DrawPocketsShotState", true},
-    {"bESP_EnemyLine", true},
-    {"bESP_TableOutline", false},
-    {"bESP_VelocityESP", false},
-    {"bESP_GhostBall", true},
-    {"bESP_AntiFoul", true},
-    {"bESP_BallCount", true},
-    {"bESP_Heatmap", false},
-    {"bESP_FullTrajectory", false},
 
     {"bAIM", true},
     {"bAutoPlay", false},
-    {"bAutoShoot", false},
-    {"bPrecisePower", true},
-    {"bStealth", false},
-    {"bTargetedAim", false},
-    {"bAutoPocketNomination", false},
-    {"bDefensiveFinder", false},
-    {"bComboFinder", false},
-
-    {"bPhysicsHack", false},
-    {"bTableSpeedHack", false},
-    {"bVIPUnlock", false},
-    {"bSessionStats", true},
 
     {"bImguiAutoSave", true},
     {"bAlwaysAutoResize", true},
@@ -133,11 +113,6 @@ static std::map<std::string, float> persistent_float = {
     {"fSelectedRangeY", 0.0f},
     {"fSelectedRangeW", 80.0f},
     {"fSelectedRangeH", 580.0f},
-
-    {"fMaxPower",      666.0f},
-    {"fMaxSpin",       1.0f},
-    {"fTableFriction", 1.0f},
-    {"fStealthNoise",  3.0f},
 };
 
 static std::map<std::string, int> persistent_int = {
@@ -151,12 +126,6 @@ static std::map<std::string, int> persistent_int = {
     {"iXray", 0},
 
     {"iNotchPadding", 90},
-
-    {"iTargetBall",    -1},
-    {"iSessionShots",   0},
-    {"iSessionPots",    0},
-    {"iSessionGames",   0},
-    {"iPowerBarPreset", 1},
 };
 
 static std::map<std::string, std::string> persistent_string = {

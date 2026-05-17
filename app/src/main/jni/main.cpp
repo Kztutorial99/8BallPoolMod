@@ -13,25 +13,7 @@
 #include "include/manual_dlsym.h"
 #include "include/random_defs.h"
 
-// ── Definitions for extern symbols declared in mod/PowerSlider.h ──────────────
-#include "game/inc/GameConstants.h"
-#include "Vector/Vectors.h"
-
-Candidate g_CurrentCandidate = { -1, 0.0, 0.0, -1, 0.0 };
-Point2D   lastFailedCuePos   = { -1000.0, -1000.0 };
-// ─────────────────────────────────────────────────────────────────────────────
-
 #include "menu.h"
-
-// IsShotValid — defined here so sharedGameManager (from menu.h) is in scope.
-// Returns true whenever the touch release is safe to perform.
-bool IsShotValid() {
-    if (!sharedGameManager) return true;
-    auto sm = sharedGameManager.mStateManager();
-    if (!sm) return true;
-    int sid = sm.getCurrentStateId();
-    return sid == 4 || sid == 6 || sid == 7 || sid == 8;
-}
 
 DEFINES(int32_t, setActiveVisualCue, ptr arg1) {
     sharedGameManager = arg1;
