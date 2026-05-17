@@ -181,7 +181,8 @@
   /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/8bp.h \
   /home/runner/workspace/app/src/main/jni/mod/keylogin.h \
   /home/runner/workspace/app/src/main/jni/include/obfuscate.h \
-  /home/runner/workspace/app/src/main/jni/mod/InjectTapPocket.h \
+  /home/runner/workspace/app/src/main/jni/mod/PocketSelector.h \
+  /home/runner/workspace/app/src/main/jni/mod/DumpOffset.h \
   /home/runner/workspace/app/src/main/jni/mod/ButtonClicker.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AutoPlay.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimLockTarget.h \
@@ -554,7 +555,9 @@
 
 /home/runner/workspace/app/src/main/jni/include/obfuscate.h:
 
-/home/runner/workspace/app/src/main/jni/mod/InjectTapPocket.h:
+/home/runner/workspace/app/src/main/jni/mod/PocketSelector.h:
+
+/home/runner/workspace/app/src/main/jni/mod/DumpOffset.h:
 
 /home/runner/workspace/app/src/main/jni/mod/ButtonClicker.h:
 

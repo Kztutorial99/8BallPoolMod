@@ -30,6 +30,9 @@ namespace AimLock8Ball {
         if (8 >= gPrediction->guiData.ballsCount) { lastHadShot = false; return; }
 
         // ── Phase 1: Coarse scan (full circle) ────────────────────────────────
+        // Pocket pilihan user (-1 = auto)
+        int forcePocket = PocketSelector::Get();
+
         double bestAngle  = startAngle;
         int    bestScore  = -9999;
         int    bestPocket = -1;
@@ -76,7 +79,7 @@ namespace AimLock8Ball {
                 if (ball.originalOnTable && !ball.onTable) score -= 40;
             }
 
-            if (score > bestScore) {
+            if (score > bestScore && (forcePocket < 0 || eightBall.pocketIndex == forcePocket)) {
                 bestScore  = score;
                 bestAngle  = scanAngle;
                 bestPocket = eightBall.pocketIndex;
@@ -119,7 +122,7 @@ namespace AimLock8Ball {
                     if (ball.originalOnTable && !ball.onTable) score -= 40;
                 }
 
-                if (score > bestScore) {
+                if (score > bestScore && (forcePocket < 0 || eightBall.pocketIndex == forcePocket)) {
                     bestScore  = score;
                     bestAngle  = fineAngle;
                     bestPocket = eightBall.pocketIndex;
@@ -135,8 +138,9 @@ namespace AimLock8Ball {
         lastHadShot      = true;
         vg.mAimAngle(bestAngle);
 
-        // Auto-nominate pocket di game — tidak perlu tap manual di layar
-        if (bestPocket >= 0 && sharedGameManager)
-            sharedGameManager.nominatePocket(bestPocket);
+        // Nominasi pocket — pakai pocket pilihan user jika ada, else best pocket
+        int pktToNominate8 = (forcePocket >= 0) ? forcePocket : bestPocket;
+        if (pktToNominate8 >= 0 && sharedGameManager)
+            sharedGameManager.nominatePocket(pktToNominate8);
     }
 }

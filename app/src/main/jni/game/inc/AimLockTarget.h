@@ -115,6 +115,9 @@ namespace AimLockTarget {
             ? Ball::Classification::STRIPE : Ball::Classification::SOLID;
 
         // ── Phase 1: Coarse scan ───────────────────────────────────────────
+        // Pocket pilihan user (-1 = auto, engine pilih terbaik)
+        int forcePocket = PocketSelector::Get();
+
         double bestAngle     = startAngle;
         int    bestScore     = -9999;
         int    bestBallIdx   = -1;
@@ -138,7 +141,8 @@ namespace AimLockTarget {
                         break;
                     }
                 }
-                if (sc > bestScore) {
+                bool pocketOK = (forcePocket < 0 || firstPocket == forcePocket);
+                if (sc > bestScore && pocketOK) {
                     bestScore     = sc;
                     bestAngle     = scanAngle;
                     bestBallIdx   = firstBall;
@@ -173,7 +177,8 @@ namespace AimLockTarget {
                         break;
                     }
                 }
-                if (sc > bestScore) {
+                bool pocketOK2 = (forcePocket < 0 || firstPocket == forcePocket);
+                if (sc > bestScore && pocketOK2) {
                     bestScore     = sc;
                     bestAngle     = fineAngle;
                     bestBallIdx   = firstBall;
@@ -189,8 +194,9 @@ namespace AimLockTarget {
         lastHadShot      = true;
         vg.mAimAngle(bestAngle);
 
-        // Auto-nominate pocket di game — tidak perlu tap manual di layar
-        if (bestPocketIdx >= 0 && sharedGameManager)
-            sharedGameManager.nominatePocket(bestPocketIdx);
+        // Nominasi pocket — pakai pocket pilihan user jika ada, else best pocket
+        int pktToNominate = (forcePocket >= 0) ? forcePocket : bestPocketIdx;
+        if (pktToNominate >= 0 && sharedGameManager)
+            sharedGameManager.nominatePocket(pktToNominate);
     }
 }

@@ -2,6 +2,11 @@
 
 bool bTouchFromOutsideImGui = false;
 
+// Touch coords terakhir di luar ImGui — dibaca oleh PocketSelector::Update() dari render thread
+static float g_lastOutsideTouchX = -1.0f;
+static float g_lastOutsideTouchY = -1.0f;
+static bool  g_pendingOutsideTouch = false;
+
 #include "java.h"
 
 DEFINES(void, nativeTouchesBegin, JNIEnv* env, jobject obj, jint i, float x, float y, jboolean isObscured, jboolean isPartiallyObscured) {
@@ -17,8 +22,15 @@ DEFINES(void, nativeTouchesBegin, JNIEnv* env, jobject obj, jint i, float x, flo
         // LOGI("bTouchFromOutsideImGui %d", bTouchFromOutsideImGui);
     }
 
-    // if (selector.IsActive()) return;
-    if (bTouchFromOutsideImGui) return _nativeTouchesBegin(env, obj, i, x, y, isObscured, isPartiallyObscured);
+    // Simpan touch coords untuk diproses PocketSelector di render thread
+    if (bTouchFromOutsideImGui) {
+        if (i == 0) {
+            g_lastOutsideTouchX  = x;
+            g_lastOutsideTouchY  = y;
+            g_pendingOutsideTouch = true;
+        }
+        return _nativeTouchesBegin(env, obj, i, x, y, isObscured, isPartiallyObscured);
+    }
 }
 
 DEFINES(void, nativeTouchesEnd, JNIEnv* env, jobject obj, jint i, float x, float y, jboolean isObscured, jboolean isPartiallyObscured) {

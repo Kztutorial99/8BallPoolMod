@@ -14,7 +14,8 @@ using namespace std;
 #include "game/Ruleset.h"
 #include "imgui/inc/8bp.h"
 #include "mod/keylogin.h"
-#include "mod/InjectTapPocket.h"
+#include "mod/PocketSelector.h"
+#include "mod/DumpOffset.h"
 #include "oxorany/oxorany.h"
 
 #include <EGL/egl.h>
@@ -404,7 +405,7 @@ static void DrawSidebar(float sidebarW) {
     float closeSize = 35.0f;
     float closeBtnW = 70.0f;
     float tabsW     = sidebarW - closeBtnW;
-    float btnW      = tabsW / 4.0f;
+    float btnW      = tabsW / 5.0f;
     float marginB   = 12.0f;
 
     dl->ChannelsSplit(2);
@@ -419,6 +420,8 @@ static void DrawSidebar(float sidebarW) {
     if (SidebarButton(O("9 Ball"), q_icon_tex,    g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
     SameLine(0, 0);
     if (SidebarButton(O("Info"),   user_icon_tex, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
+    SameLine(0, 0);
+    if (SidebarButton(O("Dump"),   draw_icon_tex, g_menu.currentTab == 4, btnW)) g_menu.currentTab = 4;
     EndGroup();
 
     // Measure actual rendered height — this is the true wrap_content
@@ -701,10 +704,6 @@ static void DrawContentArea(float winW, float winH) {
             need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
             need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
 
-            if (ToggleSwitch(O("Auto Tap Pocket"), &persistent_bool[O("bAutoTapPocket")])) {
-                InjectTapPocket::bEnabled = persistent_bool[O("bAutoTapPocket")];
-                need_save = true;
-            }
 
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
@@ -826,8 +825,14 @@ static void DrawContentArea(float winW, float winH) {
                         ImVec2(vp.x + ts.x + pad, vp.y + ts.y + 3),
                         ImColor(0.05f, 0.90f, 0.42f, gA), 6.0f, 0, 1.2f);
                     TextColored(ImVec4(0.10f, 0.95f, 0.50f, 1.0f), "%s", pBuf);
-                    SameLine(0, 20.0f);
-                    TextColored(ImVec4(0.35f, 0.40f, 0.50f, 0.80f), "(auto)");
+                    SameLine(0, 12.0f);
+                    // Label: user-selected vs auto
+                    int selPkt = PocketSelector::Get();
+                    if (selPkt >= 0) {
+                        TextColored(ImVec4(1.0f, 0.85f, 0.15f, 0.95f), "(locked)");
+                    } else {
+                        TextColored(ImVec4(0.35f, 0.40f, 0.50f, 0.80f), "(auto)");
+                    }
                 } else if (g_autoPlayCalculating.load() || g_aimThreadRunning.load()) {
                     TextColored(ImVec4(1.0f, 0.75f, 0.0f, 0.90f), "scanning...");
                 } else {
@@ -835,6 +840,51 @@ static void DrawContentArea(float winW, float winH) {
                 }
 
                 Dummy(ImVec2(0, cardH - 24.0f));
+            }
+
+            // Pocket Selector info + reset button
+            {
+                int selPkt = PocketSelector::Get();
+                Dummy(ImVec2(0, 10));
+
+                float infoW = GetContentRegionAvail().x;
+                ImVec2 infoPos = GetCursorScreenPos();
+                ImDrawList* dlp2 = GetWindowDrawList();
+
+                // Background card
+                float infoH = selPkt >= 0 ? 70.0f : 52.0f;
+                dlp2->AddRectFilled(infoPos, ImVec2(infoPos.x + infoW, infoPos.y + infoH),
+                    IM_COL32(12, 18, 32, 210), 10.0f);
+                dlp2->AddRect(infoPos, ImVec2(infoPos.x + infoW, infoPos.y + infoH),
+                    selPkt >= 0 ? IM_COL32(230, 180, 20, 180) : IM_COL32(50, 60, 90, 160),
+                    10.0f, 0, 1.2f);
+
+                SetCursorPosY(GetCursorPosY() + 8.0f);
+                SetCursorPosX(GetCursorPosX() + 12.0f);
+
+                if (selPkt >= 0) {
+                    TextColored(ImVec4(1.0f, 0.85f, 0.15f, 1.0f), "Pocket Terpilih:");
+                    SameLine();
+                    const char* pNames[6] = {"Top-Left","Top-Center","Top-Right","Bot-Right","Bot-Center","Bot-Left"};
+                    TextColored(ImVec4(0.15f, 1.0f, 0.55f, 1.0f), " [%d] %s", selPkt, pNames[selPkt]);
+
+                    SetCursorPosX(GetCursorPosX() + 12.0f);
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.50f, 0.15f, 0.08f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.20f, 0.10f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.40f, 0.10f, 0.05f, 1.0f));
+                    if (Button(O("Reset Auto"), ImVec2(infoW - 24.0f, 26.0f)))
+                        PocketSelector::Reset();
+                    PopStyleColor(3);
+                    PopStyleVar();
+                } else {
+                    TextColored(ImVec4(0.45f, 0.55f, 0.70f, 1.0f),
+                        "Tap pocket di layar saat giliran");
+                    SetCursorPosX(GetCursorPosX() + 12.0f);
+                    TextColored(ImVec4(0.30f, 0.38f, 0.55f, 0.80f),
+                        "Aim akan lock ke pocket itu");
+                }
+                Dummy(ImVec2(0, infoH - (selPkt >= 0 ? 46.0f : 32.0f)));
             }
 
             break;
@@ -1020,6 +1070,83 @@ static void DrawContentArea(float winW, float winH) {
             }
             break;
         }
+
+        case 4: {
+            // ── DUMP OFFSET ───────────────────────────────────────────────
+            Dummy(ImVec2(0, 10));
+
+            float halfW = (GetContentRegionAvail().x - 8.0f) * 0.5f;
+
+            // Tombol Scan + Copy (satu baris)
+            {
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.35f, 0.80f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.45f, 1.00f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.28f, 0.65f, 1.0f));
+                if (Button(DumpOffset::s_scanning ? O("Scanning...") : O("Scan Offset"),
+                           ImVec2(halfW, 48.0f))) {
+                    if (!DumpOffset::s_scanning) DumpOffset::RunScan();
+                }
+                PopStyleColor(3); PopStyleVar();
+
+                SameLine(0, 8.0f);
+
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.06f, 0.28f, 0.13f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.42f, 0.20f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.05f, 0.20f, 0.09f, 1.0f));
+                if (Button(O("Copy"), ImVec2(halfW, 48.0f))) {
+                    if (DumpOffset::s_dumpReady && !DumpOffset::s_dumpText.empty())
+                        SetClipboardText(DumpOffset::s_dumpText.c_str());
+                }
+                PopStyleColor(3); PopStyleVar();
+            }
+
+            Dummy(ImVec2(0, 6));
+
+            // Tombol Save to File
+            {
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.30f, 0.18f, 0.04f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.46f, 0.28f, 0.08f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.22f, 0.12f, 0.03f, 1.0f));
+                if (Button(O("Save to File"), ImVec2(GetContentRegionAvail().x, 40.0f)))
+                    DumpOffset::SaveToFile();
+                PopStyleColor(3); PopStyleVar();
+            }
+
+            // Status save
+            if (DumpOffset::s_saveStatus[0] != '\0') {
+                Dummy(ImVec2(0, 4));
+                TextColored(ImVec4(0.25f, 1.0f, 0.50f, 0.95f), "%s", DumpOffset::s_saveStatus);
+            }
+
+            Dummy(ImVec2(0, 8));
+
+            // Preview hasil dump
+            if (DumpOffset::s_dumpReady && !DumpOffset::s_dumpText.empty()) {
+                TextColored(ImVec4(0.45f, 0.55f, 0.70f, 1.0f), O("Preview:"));
+                Dummy(ImVec2(0, 4));
+                float previewH = GetContentRegionAvail().y - 6.0f;
+                PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.06f, 0.09f, 1.0f));
+                PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+                if (BeginChild(O("##dumpPreview"), ImVec2(0, previewH), true)) {
+                    PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.88f, 0.58f, 1.0f));
+                    TextUnformatted(DumpOffset::s_dumpText.c_str());
+                    PopStyleColor();
+                }
+                EndChild();
+                PopStyleVar(); PopStyleColor();
+            } else if (!DumpOffset::s_scanning) {
+                Dummy(ImVec2(0, 24));
+                const char* hint = O("Tekan Scan Offset untuk mulai");
+                float tw = CalcTextSize(hint).x;
+                SetCursorPosX((GetContentRegionAvail().x - tw) * 0.5f);
+                TextColored(ImVec4(0.32f, 0.38f, 0.52f, 0.75f), "%s", hint);
+            }
+
+            break;
+        }
     }
     
     if (need_save) save_persistence();
@@ -1041,7 +1168,6 @@ INLINE void DrawMenu(ImGuiIO& io) {
             static bool s_stateRestored = false;
             if (!s_stateRestored) {
                 AutoAim::bActive          = persistent_bool[O("bAutoAim")];
-                InjectTapPocket::bEnabled = persistent_bool[O("bAutoTapPocket")];
                 s_stateRestored = true;
             }
         }
@@ -1057,7 +1183,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
 
         buttonClicker.Update();
         AutoAim::Update();
-        InjectTapPocket::Update();  // GL thread — aman untuk nominatePocket()
+        PocketSelector::Update();  // proses tap pocket dari input thread
 
         g_espStateReady = false;
         g_espIsInGame   = false;    // reset tiap frame — DrawESP akan set true jika memang in-game
@@ -1174,15 +1300,12 @@ static void DrawToggleButton() {
             g_autoPlayCalculating = true;
             AutoAim::bAimed       = false;
             g_aimThreadRunning    = true;
-            InjectTapPocket::Reset();  // Reset nominasi saat aim baru dimulai
 
             AimMode capturedMode = g_aimMode;
             std::thread([capturedMode]() {
                 switch (capturedMode) {
                     case AimMode::EIGHTBALL_PREDICT:
                         AimLockTarget::Aim();
-                        if (AimLockTarget::lastHadShot && AimLockTarget::lastTargetPocket >= 0)
-                            InjectTapPocket::TapPocket(AimLockTarget::lastTargetPocket);
                         break;
                     case AimMode::EIGHTBALL_BREAK:
                         AimBreak::Aim();
@@ -1190,8 +1313,6 @@ static void DrawToggleButton() {
                         break;
                     case AimMode::EIGHTBALL_8LOCK:
                         AimLock8Ball::Aim();
-                        if (AimLock8Ball::lastHadShot && AimLock8Ball::lastTargetPocket >= 0)
-                            InjectTapPocket::TapPocket(AimLock8Ball::lastTargetPocket);
                         break;
                     case AimMode::NINEBALL_PREDICT:
                         Aim9Ball::Aim();
