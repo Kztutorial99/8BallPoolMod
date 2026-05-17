@@ -12,3 +12,9 @@ id = "J_oO2fTFbSHUs74xOgxGE"
 uri = "file://FluxProEngine8BP.zip"
 type = "unspecified"
 title = "FluxProEngine8BP - library.so (arm64-v8a)"
+
+[[outputs]]
+id = "u7av_CSTbIvU9aBNJ0e9q"
+uri = "file://FluxProEngine8BP_LYN4XP.zip"
+type = "unspecified"
+title = "FluxProEngine8BP - @LYN4XP (arm64-v8a)"

@@ -88,12 +88,12 @@ static bool SidebarButton(const char* label, GLuint iconTex, bool selected, floa
         bb.Min.y + vPad + iconSize * 0.5f
     );
 
-    // Selected: red rounded rect behind icon only
+    // Selected: blue rounded rect behind icon only
     if (selected) {
         dl->AddRectFilled(
             ImVec2(iconCenter.x - iconBgSize * 0.5f, iconCenter.y - iconBgSize * 0.5f),
             ImVec2(iconCenter.x + iconBgSize * 0.5f, iconCenter.y + iconBgSize * 0.5f),
-            IM_COL32(255, 0, 0, 255), 12.0f
+            IM_COL32(30, 100, 220, 255), 12.0f
         );
     }
 
@@ -157,7 +157,7 @@ static bool ToggleSwitch(const char* label, bool* v) {
     ImVec2 toggleEnd = ImVec2(togglePos.x + width, togglePos.y + height);
     
     ImVec4 offColor = ImVec4(0.27f, 0.27f, 0.31f, 1.0f);
-    ImVec4 onColor = ImVec4(1.0f, 0.f, 0.f, 1.0f);
+    ImVec4 onColor = ImVec4(0.12f, 0.45f, 0.95f, 1.0f);
     ImVec4 bgColorV = ImLerp(offColor, onColor, animT);
     dl->AddRectFilled(togglePos, toggleEnd, ImColor(bgColorV), radius);
     
@@ -208,7 +208,7 @@ INLINE void DrawExpired(ImGuiIO& io) {
 
         PushTextWrapPos(GetCursorPosX() + winW - 60.0f);
         TextColored(ImVec4(0.85f, 0.85f, 0.90f, 1.0f), "%s",
-            O("Beta Version Expired. Update on our Telegram Your Id"));
+            O("Beta Version Expired. Update on our Telegram t.me/Lyn4xp"));
         PopTextWrapPos();
 
         Dummy(ImVec2(0, 10));
@@ -259,7 +259,7 @@ INLINE void DrawAutoQueue() {
             dl->AddRectFilled(wp, ImVec2(wp.x + ws.x, wp.y + ws.y), IM_COL32(20, 20, 28, 0), 24.0f);
 
             SetWindowFontScale(3.5f);
-            TextColored(ImVec4(1.f, 0.f, 0.f, 1.0f), "%s", count_str.c_str());
+            TextColored(ImVec4(0.2f, 0.55f, 1.0f, 1.0f), "%s", count_str.c_str());
             SetWindowFontScale(1.0f);
         }
         End();
@@ -411,7 +411,9 @@ static void DrawSidebar(float sidebarW) {
 
     // Now draw background on channel 0 (behind the buttons)
     dl->ChannelsSetCurrent(0);
-    dl->AddRectFilled(wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH), IM_COL32(21, 21, 21, 255), 30.0f);
+    dl->AddRectFilledMultiColor(wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH),
+        IM_COL32(8, 22, 52, 255), IM_COL32(12, 32, 75, 255),
+        IM_COL32(12, 32, 75, 255), IM_COL32(8, 22, 52, 255));
     dl->ChannelsMerge();
 
     // Vertical separator between Queue and close strip
@@ -421,7 +423,7 @@ static void DrawSidebar(float sidebarW) {
     dl->AddLine(
         ImVec2(sepX, sepCenterY - sepHalfH),
         ImVec2(sepX, sepCenterY + sepHalfH),
-        IM_COL32(60, 60, 75, 200), 1.5f
+        IM_COL32(40, 100, 220, 180), 1.5f
     );
 
     // Close (X) button — truly centered in the measured sidebarH
@@ -503,7 +505,7 @@ static void DrawCalculating(ImGuiIO& io) {
     
     // Auto-resize face ca fereastra să aibă dimensiunea textului automat
     PushStyleColor(ImGuiCol_WindowBg, IM_COL32(21, 21, 21, 255));
-    PushStyleColor(ImGuiCol_Border, IM_COL32(220, 30, 30, 255));
+    PushStyleColor(ImGuiCol_Border, IM_COL32(30, 100, 220, 255));
     PushStyleVar(ImGuiStyleVar_WindowRounding, 18.0f);
     PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
 
@@ -533,10 +535,11 @@ static void DrawContentArea(float winW, float winH) {
     float contentW = winW;
 
     // Desenăm fundalul zonei de conținut sub sidebar
-    dl->AddRectFilled(
+    dl->AddRectFilledMultiColor(
         ImVec2(wp.x, wp.y + startY),
         ImVec2(wp.x + contentW, wp.y + winH),
-        IM_COL32(21, 21, 21, 255), 20.0f
+        IM_COL32(10, 18, 40, 255), IM_COL32(10, 18, 40, 255),
+        IM_COL32(14, 26, 58, 255), IM_COL32(14, 26, 58, 255)
     );
     
     const char* tabTitles[] = { 
@@ -568,7 +571,7 @@ static void DrawContentArea(float winW, float winH) {
     dl->AddLine(
         ImVec2(wp.x + 20.0f, wp.y + lineY),
         ImVec2(wp.x + contentW - 20.0f, wp.y + lineY),
-        IM_COL32(60, 60, 75, 150), 1.0f
+        IM_COL32(40, 100, 220, 180), 1.0f
     );
 
     float headerH = (lineY - startY) + 10.0f;
@@ -593,8 +596,8 @@ static void DrawContentArea(float winW, float winH) {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
                 PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.12f, 0.45f, 0.95f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.55f, 1.0f, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
                 need_save |= SliderInt(O("##lineThick"), &persistent_int[O("iLineThickness")], 1, 10, "%d");
                 PopStyleColor(3);
@@ -608,8 +611,8 @@ static void DrawContentArea(float winW, float winH) {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
                 PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.12f, 0.45f, 0.95f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.55f, 1.0f, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
                 int& menuSz = persistent_int[O("iMenuSizeOffset")];
                 bool changed = SliderInt(O("##menuSize"), &menuSz, -10, 10,
@@ -622,9 +625,9 @@ static void DrawContentArea(float winW, float winH) {
             Dummy(ImVec2(0, 20));
             {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.12f, 0.55f, 0.20f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.68f, 0.26f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.09f, 0.42f, 0.15f, 1.0f));
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.38f, 0.85f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.48f, 1.00f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.30f, 0.70f, 1.0f));
                 if (Button(O("Save Config"), ImVec2(GetContentRegionAvail().x, 55.0f))) {
                     svConfig_Save();
                 }
@@ -669,8 +672,8 @@ static void DrawContentArea(float winW, float winH) {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
                 PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.12f, 0.45f, 0.95f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.55f, 1.0f, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
                 need_save |= SliderInt("##betpercent", &persistent_int["iAutoQueue_BetPercent"], 1, 100, "%d%%");
                 PopStyleColor(3);
@@ -764,8 +767,8 @@ static void DrawContentArea(float winW, float winH) {
                 float  gap   = 8.0f;
                 float  lineW = (avail - ts.x - gap * 2.0f) * 0.5f;
                 ImDrawList* dl2 = GetWindowDrawList();
-                dl2->AddLine(ImVec2(p.x,                      lineY), ImVec2(p.x + lineW,                      lineY), IM_COL32(60,60,75,160), 1.0f);
-                dl2->AddLine(ImVec2(p.x + lineW + gap + ts.x + gap, lineY), ImVec2(p.x + avail, lineY), IM_COL32(60,60,75,160), 1.0f);
+                dl2->AddLine(ImVec2(p.x,                      lineY), ImVec2(p.x + lineW,                      lineY), IM_COL32(40,100,220,160), 1.0f);
+                dl2->AddLine(ImVec2(p.x + lineW + gap + ts.x + gap, lineY), ImVec2(p.x + avail, lineY), IM_COL32(40,100,220,160), 1.0f);
                 SetCursorPosX(GetCursorPosX() + lineW + gap);
                 TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), "%s", title);
                 Dummy(ImVec2(0, 6));
@@ -830,7 +833,9 @@ static void DrawContentArea(float winW, float winH) {
 
                 DrawInfoRow(O("Expire:       "), expireBuf);
                 Dummy(ImVec2(0, 6));
-                TextColored(ImVec4(0, 1.f, 0, 1.0f), O("Owner By Your Id"));
+                TextColored(ImVec4(0.2f, 0.55f, 1.0f, 1.0f), O("@LYN4XP"));
+                SameLine();
+                TextColored(ImVec4(0.5f, 0.7f, 1.0f, 0.85f), O("t.me/Lyn4xp"));
                 Dummy(ImVec2(0, 8));
                 PushTextWrapPos(GetContentRegionAvail().x + GetCursorPosX());
                 TextColored(ImVec4(1.f, 0.f, 0.f, 1.0f),
@@ -1052,12 +1057,12 @@ INLINE void DrawLogin(ImGuiIO& io) {
     dl->AddRectFilled(winPos, ImVec2(winPos.x + cardW, winPos.y + 20), IM_COL32(35, 95, 170, 255), 20.0f, ImDrawFlags_RoundCornersTop);
 
     SetWindowFontScale(1.4f);
-    ImVec2 titleSize = CalcTextSize(O("Your Name"));
-    dl->AddText(ImVec2(winPos.x + (cardW - titleSize.x) * 0.5f, winPos.y + 30), IM_COL32(255, 255, 255, 255), O("Your Name"));
+    ImVec2 titleSize = CalcTextSize(O("@LYN4XP"));
+    dl->AddText(ImVec2(winPos.x + (cardW - titleSize.x) * 0.5f, winPos.y + 30), IM_COL32(255, 255, 255, 255), O("@LYN4XP"));
     SetWindowFontScale(1.0f);
     
-    ImVec2 subSize = CalcTextSize(O("Premium Mod"));
-    dl->AddText(ImVec2(winPos.x + (cardW - subSize.x) * 0.5f, winPos.y + 70), IM_COL32(200, 220, 255, 200), O("Premium Mod"));
+    ImVec2 subSize = CalcTextSize(O("t.me/Lyn4xp"));
+    dl->AddText(ImVec2(winPos.x + (cardW - subSize.x) * 0.5f, winPos.y + 70), IM_COL32(200, 220, 255, 200), O("t.me/Lyn4xp"));
 
     SetCursorPosY(130);
 
@@ -1213,7 +1218,7 @@ DEFINES(EGLBoolean, Draw, EGLDisplay dpy, EGLSurface surface) {
           ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize | 
           ImGuiWindowFlags_NoInputs);
     
-    TextColored(ImColor(0, 255, 0, 255), O("Owner By your Id"));
+    TextColored(ImColor(51, 140, 255, 255), O("@LYN4XP  t.me/Lyn4xp"));
     
     End();
 }
