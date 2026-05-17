@@ -188,5 +188,9 @@ namespace AimLockTarget {
         lastTargetPocket = bestPocketIdx;
         lastHadShot      = true;
         vg.mAimAngle(bestAngle);
+
+        // Auto-nominate pocket di game — tidak perlu tap manual di layar
+        if (bestPocketIdx >= 0 && sharedGameManager)
+            sharedGameManager.nominatePocket(bestPocketIdx);
     }
 }

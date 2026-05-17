@@ -134,5 +134,9 @@ namespace AimLock8Ball {
         lastTargetPocket = bestPocket;
         lastHadShot      = true;
         vg.mAimAngle(bestAngle);
+
+        // Auto-nominate pocket di game — tidak perlu tap manual di layar
+        if (bestPocket >= 0 && sharedGameManager)
+            sharedGameManager.nominatePocket(bestPocket);
     }
 }
