@@ -1,19 +1,17 @@
 #pragma once
 
-// ── Auto Aim (Manual Trigger) ─────────────────────────────────────────────────
-// Behavior: User presses the in-game AIM button → DoAim() runs ONCE →
-// aim angle is set in-game → user shoots manually.
+// ── Auto Aim — Manual Trigger ─────────────────────────────────────────────────
+// Press in-game button → calculate aim once → user shoots manually.
 // Press again to recalculate. Does NOT auto-trigger every turn.
 // ─────────────────────────────────────────────────────────────────────────────
 
 namespace AutoAim {
-    bool bActive     = false;  // enabled (shows toggle button in-game)
-    bool bAimed      = false;  // true = aim already calculated this trigger
-    bool bCalculating = false; // true = currently running DoAim (shows overlay)
+    bool bActive      = false;
+    bool bAimed       = false;
+    int  aimedBallIdx = -1;   // ball index that was aimed at (for overlay)
 
     static constexpr double ANGLE_STEP = MIN_ANGLE_STEP_RADIANS;
 
-    // ── Core aim calculation ──────────────────────────────────────────────────
     static void DoAim() {
         if (!sharedGameManager) return;
 
@@ -73,6 +71,7 @@ namespace AutoAim {
 
             if (isGood && !curPotted.empty() && curPotted != startPotted) {
                 vg.mAimAngle(scanAngle);
+                if (!curPotted.empty()) aimedBallIdx = curPotted[0];
                 break;
             }
 
@@ -81,37 +80,26 @@ namespace AutoAim {
         }
     }
 
-    // ── Called by in-game button: calculate aim once ──────────────────────────
     void TriggerAim() {
         if (!sharedGameManager) return;
-        bCalculating      = true;
         g_autoPlayCalculating = true;
+        aimedBallIdx = -1;
         DoAim();
-        bAimed            = true;
-        bCalculating      = false;
+        bAimed                = true;
         g_autoPlayCalculating = false;
     }
 
-    // ── Reset after each shot/turn ────────────────────────────────────────────
     void ResetAimed() {
-        bAimed            = false;
-        bCalculating      = false;
+        bAimed                = false;
+        aimedBallIdx          = -1;
         g_autoPlayCalculating = false;
     }
 
-    // ── Update: only monitors turn-end to auto-reset bAimed ──────────────────
-    // Does NOT auto-calculate. Calculation is manual (TriggerAim).
     void Update() {
         if (!bActive || !sharedGameManager) return;
-
         GameStateManager gsm = sharedGameManager.mStateManager;
         if (!gsm) return;
-
         int stateId = gsm.getCurrentStateId();
-
-        // When it's no longer player's turn, clear aimed state
-        if (stateId != 4) {
-            if (bAimed) ResetAimed();
-        }
+        if (stateId != 4 && bAimed) ResetAimed();
     }
 }

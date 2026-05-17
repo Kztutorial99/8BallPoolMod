@@ -51,6 +51,14 @@ echo ""
 echo -e "${YELLOW}[2/4] Running ndk-build (fresh build)...${NC}"
 echo ""
 
+# NDK r25c needs toolchain/llvm-project/libcxxabi symlink for c++_static to work
+if [ ! -d "${NDK_DIR}/toolchain/llvm-project/libcxxabi" ]; then
+    mkdir -p "${NDK_DIR}/toolchain/llvm-project"
+    ln -sfn "${NDK_DIR}/sources/cxx-stl/llvm-libc++abi" \
+            "${NDK_DIR}/toolchain/llvm-project/libcxxabi"
+fi
+
+NDK_MODULE_PATH="${NDK_DIR}" \
 "${NDK_DIR}/ndk-build" \
     NDK_PROJECT_PATH="${JNI_DIR}" \
     APP_BUILD_SCRIPT="${JNI_DIR}/Android.mk" \

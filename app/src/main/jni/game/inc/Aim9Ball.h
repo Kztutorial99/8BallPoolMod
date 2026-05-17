@@ -1,26 +1,28 @@
 #pragma once
 
-// ── Aim 9 Ball ────────────────────────────────────────────────────────────────
+// ── Aim Predict + Combo — 9 Ball ──────────────────────────────────────────────
 // 9-Ball Pool Rules:
-//  - Must hit the LOWEST numbered ball on table first
-//  - Ball 9 can be pocketed on ANY shot (including first break) = WIN
-//  - Strategy: aim to hit lowest ball AND try to combo-pocket ball 9
-// Logic:
-//  1. Find the lowest numbered ball still on table
-//  2. Scan all angles where cue ball hits that ball first
-//  3. Among valid angles, prefer one that also pockets ball 9 (combo/one-shot)
-//  4. If no combo found, just find cleanest hit on lowest ball
+//  - MUST hit the lowest numbered ball on table first
+//  - Any ball can be pocketed after that (combinations are legal)
+//  - Pocketing ball 9 on any legal shot = instant WIN
+// Strategy:
+//  1. Scan all angles where cue hits lowest ball first
+//  2. Priority: angles that also pocket ball 9 (instant win)
+//  3. Otherwise: angles that pocket 2+ balls (combo)
+//  4. Fallback: best single ball, still hitting lowest first
 // ─────────────────────────────────────────────────────────────────────────────
 
 namespace Aim9Ball {
     bool bActive = false;
 
+    int lastTargetBall   = -1;
+    int lastTargetPocket = -1;
+    bool lastWasCombo    = false;
+
     static constexpr double ANGLE_STEP = MIN_ANGLE_STEP_RADIANS;
 
-    // Find the index of the lowest numbered ball still on table (balls 1-9)
-    // Returns -1 if no balls found
     static int FindLowestBall() {
-        for (int i = 1; i <= 9 && i < gPrediction->guiData.ballsCount; i++) {
+        for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
             auto& ball = gPrediction->guiData.balls[i];
             if (ball.originalOnTable) return i;
         }
@@ -30,8 +32,9 @@ namespace Aim9Ball {
     void Aim() {
         if (!sharedGameManager) return;
 
-        // Reinitialize prediction data from current game state
-        gPrediction->determineShotResult(false, sharedGameManager.mVisualCue().getShotAngle());
+        // Init prediction with current game state
+        gPrediction->determineShotResult(false,
+            sharedGameManager.mVisualCue().getShotAngle());
 
         int lowestIdx = FindLowestBall();
         if (lowestIdx < 0) return;
@@ -41,63 +44,108 @@ namespace Aim9Ball {
 
         double startAngle = NumberUtils::normalizeDoublePrecision(vg.mAimAngle());
 
-        double bestAngle       = startAngle;
-        double bestComboAngle  = -1.0; // angle that also pots ball 9
-        bool   foundClean      = false;
-        bool   foundCombo      = false;
+        // Candidates by priority
+        double win9Angle    = startAngle; bool foundWin9    = false; // ball 9 also potted
+        double combo2Angle  = startAngle; bool foundCombo2  = false; // 2+ balls potted
+        double cleanAngle   = startAngle; bool foundClean   = false; // hits lowest, 1 ball
+        int    winPocket    = -1;
+        int    comboBall    = -1;
+        int    cleanBall    = -1;
+        int    cleanPocket  = -1;
+        int    comboPocket  = -1;
+        int    maxCombo     = 0;
 
         double scanAngle = startAngle;
-        for (int iter = 0; iter < (int)(MAX_ANGLE_RADIANS / ANGLE_STEP) + 1; iter++) {
+        int    maxIter   = (int)(MAX_ANGLE_RADIANS / ANGLE_STEP) + 2;
+
+        for (int iter = 0; iter < maxIter; iter++) {
             gPrediction->determineShotResult(true, scanAngle);
 
             auto& cueBall = gPrediction->guiData.balls[0];
 
-            // Cue ball must stay on table (no scratch)
+            // No scratch
             if (!cueBall.onTable) {
                 scanAngle = fmod(scanAngle + ANGLE_STEP + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS);
                 scanAngle = NumberUtils::normalizeDoublePrecision(scanAngle);
-                if (std::abs(scanAngle - startAngle) < ANGLE_STEP * 0.5 && iter > 0) break;
+                if (iter > 0 && std::abs(scanAngle - startAngle) < ANGLE_STEP * 0.5) break;
                 continue;
             }
 
-            // First hit must be the lowest ball
-            if (!gPrediction->guiData.collision.firstHitBall) {
+            // Must hit lowest ball first
+            if (!gPrediction->guiData.collision.firstHitBall ||
+                gPrediction->guiData.collision.firstHitBall->index != lowestIdx) {
                 scanAngle = fmod(scanAngle + ANGLE_STEP + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS);
                 scanAngle = NumberUtils::normalizeDoublePrecision(scanAngle);
-                if (std::abs(scanAngle - startAngle) < ANGLE_STEP * 0.5 && iter > 0) break;
-                continue;
-            }
-            if (gPrediction->guiData.collision.firstHitBall->index != lowestIdx) {
-                scanAngle = fmod(scanAngle + ANGLE_STEP + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS);
-                scanAngle = NumberUtils::normalizeDoublePrecision(scanAngle);
-                if (std::abs(scanAngle - startAngle) < ANGLE_STEP * 0.5 && iter > 0) break;
+                if (iter > 0 && std::abs(scanAngle - startAngle) < ANGLE_STEP * 0.5) break;
                 continue;
             }
 
-            // Valid: hits lowest ball first
-            if (!foundClean) {
-                bestAngle  = scanAngle;
-                foundClean = true;
-            }
+            // Count potted balls
+            int potted     = 0;
+            bool nine_in   = false;
+            int  firstBall = -1;
+            int  firstPock = -1;
 
-            // Check if ball 9 is also pocketed (combo / one-shot win)
-            if (lowestIdx != 9 && 9 < gPrediction->guiData.ballsCount) {
-                auto& ball9 = gPrediction->guiData.balls[9];
-                if (ball9.originalOnTable && !ball9.onTable) {
-                    // Ball 9 potted = instant win candidate
-                    bestComboAngle = scanAngle;
-                    foundCombo     = true;
-                    break; // take the first combo found
+            for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
+                auto& ball = gPrediction->guiData.balls[i];
+                if (ball.originalOnTable && !ball.onTable) {
+                    potted++;
+                    if (firstBall < 0) { firstBall = i; firstPock = ball.pocketIndex; }
+                    if (i == 9) nine_in = true;
                 }
+            }
+
+            // Priority 1: ball 9 potted = win
+            if (nine_in && !foundWin9) {
+                win9Angle  = scanAngle;
+                foundWin9  = true;
+                winPocket  = 9 < gPrediction->guiData.ballsCount
+                    ? gPrediction->guiData.balls[9].pocketIndex : -1;
+            }
+
+            // Priority 2: 2+ balls potted (combo)
+            if (potted >= 2 && potted > maxCombo) {
+                maxCombo    = potted;
+                combo2Angle = scanAngle;
+                foundCombo2 = true;
+                comboBall   = firstBall;
+                comboPocket = firstPock;
+            }
+
+            // Priority 3: any clean valid hit
+            if (!foundClean && potted >= 1) {
+                cleanAngle  = scanAngle;
+                foundClean  = true;
+                cleanBall   = firstBall;
+                cleanPocket = firstPock;
             }
 
             scanAngle = fmod(scanAngle + ANGLE_STEP + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS);
             scanAngle = NumberUtils::normalizeDoublePrecision(scanAngle);
-            if (std::abs(scanAngle - startAngle) < ANGLE_STEP * 0.5 && iter > 0) break;
+            if (iter > 0 && std::abs(scanAngle - startAngle) < ANGLE_STEP * 0.5) break;
         }
 
-        // Prefer combo (pots ball 9), fallback to clean hit on lowest
-        double finalAngle = foundCombo ? bestComboAngle : (foundClean ? bestAngle : startAngle);
+        // Pick best candidate
+        double finalAngle;
+        if (foundWin9) {
+            finalAngle       = win9Angle;
+            lastTargetBall   = 9;
+            lastTargetPocket = winPocket;
+            lastWasCombo     = true;
+        } else if (foundCombo2) {
+            finalAngle       = combo2Angle;
+            lastTargetBall   = comboBall;
+            lastTargetPocket = comboPocket;
+            lastWasCombo     = true;
+        } else if (foundClean) {
+            finalAngle       = cleanAngle;
+            lastTargetBall   = cleanBall;
+            lastTargetPocket = cleanPocket;
+            lastWasCombo     = false;
+        } else {
+            return; // no valid shot found
+        }
+
         vg.mAimAngle(finalAngle);
     }
 }

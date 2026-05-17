@@ -184,8 +184,9 @@
   /home/runner/workspace/app/src/main/jni/mod/ButtonClicker.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AutoPlay.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimLockTarget.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/Aim9Ball.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimBreak.h \
+  /home/runner/workspace/app/src/main/jni/game/inc/Aim9Ball.h \
+  /home/runner/workspace/app/src/main/jni/game/inc/Aim9BallBreak.h \
   /home/runner/workspace/app/src/main/jni/mod/kill.h \
   /home/runner/workspace/app/src/main/jni/include/syscall.h
 
@@ -557,9 +558,11 @@
 
 /home/runner/workspace/app/src/main/jni/game/inc/AimLockTarget.h:
 
+/home/runner/workspace/app/src/main/jni/game/inc/AimBreak.h:
+
 /home/runner/workspace/app/src/main/jni/game/inc/Aim9Ball.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/AimBreak.h:
+/home/runner/workspace/app/src/main/jni/game/inc/Aim9BallBreak.h:
 
 /home/runner/workspace/app/src/main/jni/mod/kill.h:
 
