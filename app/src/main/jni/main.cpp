@@ -90,9 +90,7 @@ extern "C" JNIEXPORT void JNICALL Java_android_service_SurfaceView_onSendConfig(
     } else if (strcmp(k, "ESP::STATES") == 0) {
         persistent_bool[O("bESP_DrawPocketsShotState")] = isOn;
     } else if (strcmp(k, "AUTO::PLAY") == 0) {
-        persistent_bool[O("bAutoPlay")] = isOn;
-    } else if (strcmp(k, "AUTO::QUEUE") == 0) {
-        persistent_bool[O("bAutoQueue")] = isOn;
+        persistent_bool[O("bAutoAim")] = isOn;
     }
     
     save_persistence();

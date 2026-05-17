@@ -196,6 +196,19 @@ static bool g_espIsInGame   = false;
 
 #include "mod/ButtonClicker.h"
 #include "game/inc/AutoPlay.h"
+#include "game/inc/AimLockTarget.h"
+#include "game/inc/Aim9Ball.h"
+#include "game/inc/AimBreak.h"
+
+// Active aim mode (only one active at a time)
+enum class AimMode : int {
+    NONE        = 0,
+    AUTO_AIM    = 1,
+    LOCK_TARGET = 2,
+    NINE_BALL   = 3,
+    AIM_BREAK   = 4
+};
+static AimMode g_aimMode = AimMode::AUTO_AIM;
 
 
 static bool IsExpired() {
@@ -513,12 +526,11 @@ static void DrawContentArea(float winW, float winH) {
         IM_COL32(14, 26, 58, 255), IM_COL32(14, 26, 58, 255)
     );
     
-    const char* tabTitles[] = { 
-    O("Draw Settings"), 
-    O("Auto Play"), 
-    O("Auto Queue"), 
-    O("User") 
-};
+    const char* tabTitles[] = {
+        O("Draw Settings"),
+        O("Auto Aim"),
+        O("User")
+    };
 
     // --- CENTRARE TITLU TAB ---
     const char* currentTitle = tabTitles[g_menu.currentTab];
@@ -611,13 +623,73 @@ static void DrawContentArea(float winW, float winH) {
         
         case 1: {
             Dummy(ImVec2(0, 10));
-            need_save |= ToggleSwitch(O("Enable AutoAim"), &persistent_bool[O("bAutoAim")]);
+
+            // ── Enable Auto Aim (shows in-game button) ────────────────────
+            if (ToggleSwitch(O("Enable Auto Aim"), &persistent_bool[O("bAutoAim")])) {
+                AutoAim::bActive = persistent_bool[O("bAutoAim")];
+                need_save = true;
+            }
+
+            Dummy(ImVec2(0, 18));
+            TextColored(ImVec4(0.45f, 0.45f, 0.52f, 1.0f),
+                O("Tap in-game button to calculate aim once."));
+            TextColored(ImVec4(0.45f, 0.45f, 0.52f, 1.0f),
+                O("You shoot manually. Tap again to recalculate."));
 
             Dummy(ImVec2(0, 20));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("Auto Aim will find the best"));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("angle each turn. You shoot"));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("manually. Tap the Aim button"));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("to toggle on/off anytime."));
+
+            // ── Section: Select Aim Mode ──────────────────────────────────
+            {
+                float avail = GetContentRegionAvail().x;
+                ImVec2 p    = GetCursorScreenPos();
+                float  fs   = GImGui->FontSize;
+                const char* hdr = O("Select Aim Mode");
+                ImVec2 ts2  = CalcTextSize(hdr);
+                float  lineY = p.y + fs * 0.5f;
+                float  gap   = 8.0f;
+                float  lineW = (avail - ts2.x - gap * 2.0f) * 0.5f;
+                ImDrawList* dlc = GetWindowDrawList();
+                dlc->AddLine(ImVec2(p.x, lineY), ImVec2(p.x + lineW, lineY), IM_COL32(40,100,220,160), 1.0f);
+                dlc->AddLine(ImVec2(p.x + lineW + gap + ts2.x + gap, lineY), ImVec2(p.x + avail, lineY), IM_COL32(40,100,220,160), 1.0f);
+                SetCursorPosX(GetCursorPosX() + lineW + gap);
+                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), "%s", hdr);
+                Dummy(ImVec2(0, 8));
+            }
+
+            // Helper: styled radio-style button
+            auto ModeButton = [&](const char* label, AimMode mode, const char* desc) {
+                bool selected = (g_aimMode == mode);
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                if (selected) {
+                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.40f, 0.90f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.50f, 1.00f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.32f, 0.75f, 1.0f));
+                } else {
+                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.14f, 0.14f, 0.18f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.20f, 0.28f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.10f, 0.10f, 0.14f, 1.0f));
+                }
+                if (Button(label, ImVec2(GetContentRegionAvail().x, 52.0f))) {
+                    g_aimMode = mode;
+                }
+                PopStyleColor(3);
+                PopStyleVar();
+                Dummy(ImVec2(0, 2));
+                PushTextWrapPos(GetContentRegionAvail().x + GetCursorPosX());
+                TextColored(ImVec4(0.42f, 0.42f, 0.50f, 1.0f), "%s", desc);
+                PopTextWrapPos();
+                Dummy(ImVec2(0, 10));
+            };
+
+            ModeButton(O("Auto Aim"),        AimMode::AUTO_AIM,
+                O("Best angle for your balls (solid/stripe/8-ball)."));
+            ModeButton(O("Aim Lock Target"),  AimMode::LOCK_TARGET,
+                O("Lock on your solid/stripe, avoid opponent balls."));
+            ModeButton(O("Aim 9 Ball"),       AimMode::NINE_BALL,
+                O("Hit lowest ball first, try to combo-pocket ball 9."));
+            ModeButton(O("Aim Break"),        AimMode::AIM_BREAK,
+                O("Find break angle that pockets 2+ balls."));
+
             break;
         }
         
@@ -819,7 +891,8 @@ static void DrawToggleButton() {
 
         bool clicked = InvisibleButton(O("##TglBtnHit"), size);
 
-        GLuint tex = AutoAim::bActive ? play_on_tex : play_off_tex;
+        // play_on = aimed/calculating, play_off = idle (ready to aim)
+        GLuint tex = AutoAim::bAimed ? play_on_tex : play_off_tex;
 
         float r = size.x * 0.5f;
         ImDrawList* dl = GetWindowDrawList();
@@ -835,8 +908,28 @@ static void DrawToggleButton() {
         }
 
         if (clicked) {
-            AutoAim::bActive = !AutoAim::bActive;
-            if (AutoAim::bActive) AutoAim::ClearState();
+            // Trigger the selected aim mode once, user shoots manually
+            g_autoPlayCalculating = true;
+            switch (g_aimMode) {
+                case AimMode::AUTO_AIM:
+                    AutoAim::TriggerAim();
+                    break;
+                case AimMode::LOCK_TARGET:
+                    AimLockTarget::Aim();
+                    g_autoPlayCalculating = false;
+                    break;
+                case AimMode::NINE_BALL:
+                    Aim9Ball::Aim();
+                    g_autoPlayCalculating = false;
+                    break;
+                case AimMode::AIM_BREAK:
+                    AimBreak::Aim();
+                    g_autoPlayCalculating = false;
+                    break;
+                default:
+                    AutoAim::TriggerAim();
+                    break;
+            }
         }
     }
     End();
