@@ -178,6 +178,27 @@ static bool g_aqCounting = false;
 static std::chrono::steady_clock::time_point g_aqLastCall;
 static std::chrono::steady_clock::time_point g_aqCountdownStart;
 
+// Reads an IL2CPP/Unity NSString (UTF-16 internal buffer at offset 0x14, length at 0x10)
+static std::string ReadNSString(ptr str) {
+    if (!str) return "null";
+    int32_t len = F(int32_t, str + 0x10);
+    if (len <= 0 || len > 512) return "?";
+    std::string result;
+    result.reserve(len);
+    for (int32_t i = 0; i < len; i++) {
+        uint16_t ch = F(uint16_t, str + 0x14 + i * 2);
+        result += (ch > 0 && ch < 128) ? (char)ch : '?';
+    }
+    return result;
+}
+
+// Set true by AutoPlay when scanning — shows CALCULATING overlay
+static bool g_autoPlayCalculating = false;
+
+#include "mod/ButtonClicker.h"
+#include "game/inc/AutoPlay.h"
+#include "game/inc/AutoQueue.h"
+
 
 static bool IsExpired() {
     return (int64_t)time(nullptr) >= EXPIRY_TS;
@@ -265,8 +286,6 @@ INLINE void DrawAutoQueue() {
         PopStyleColor();
     }
 }
-
-#include "mod/ButtonClicker.h"
 
 static void DrawToggleButton(bool cancelMode); // forward declaration — defined after DrawFloatingButton
 
@@ -477,29 +496,10 @@ static void DrawSidebar(float sidebarW) {
     Dummy(ImVec2(sidebarW, marginB));
 }
 
-// Reads an IL2CPP/Unity NSString (UTF-16 internal buffer at offset 0x14, length at 0x10)
-static std::string ReadNSString(ptr str) {
-    if (!str) return "null";
-    int32_t len = F(int32_t, str + 0x10);
-    if (len <= 0 || len > 512) return "?";
-    std::string result;
-    result.reserve(len);
-    for (int32_t i = 0; i < len; i++) {
-        uint16_t ch = F(uint16_t, str + 0x14 + i * 2);
-        result += (ch > 0 && ch < 128) ? (char)ch : '?';
-    }
-    return result;
-}
-
 // Shared vertical position for DrawToggleButton and DrawFloatingButton (they move together)
 static float g_sideBtnsY      = 0.0f;
 // Kept for linker compatibility — no longer used for animation
 static float g_toggleRotAngle = 0.0f;
-// Set true by AutoPlay when in SLOW scan state — shows CALCULATING overlay
-static bool  g_autoPlayCalculating = false;
-
-#include "game/inc/AutoPlay.h"
-#include "game/inc/AutoQueue.h"
 
 // ── svConfig ──────────────────────────────────────────────────────────────────
 static void svConfig_Save() {

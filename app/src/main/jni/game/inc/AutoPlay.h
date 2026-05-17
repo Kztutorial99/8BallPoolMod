@@ -13,8 +13,8 @@ namespace AutoPlay {
     static constexpr double ANGLE_STEP  = MIN_ANGLE_STEP_RADIANS;
 
     static void DoAim() {
-        auto& vc = sharedGameManager.mVisualCue();
-        auto& vg = vc.mVisualGuide();
+        auto vc = sharedGameManager.mVisualCue();
+        auto vg = vc.mVisualGuide();
 
         double startAngle = NumberUtils::normalizeDoublePrecision(vg.mAimAngle());
         Ball::Classification myclass = sharedGameManager.getPlayerClassification();
