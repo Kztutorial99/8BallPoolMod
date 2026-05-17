@@ -852,7 +852,7 @@ static void DrawContentArea(float winW, float winH) {
                 ImDrawList* dlp2 = GetWindowDrawList();
 
                 // Background card
-                float infoH = selPkt >= 0 ? 70.0f : 52.0f;
+                float infoH = selPkt >= 0 ? 70.0f : 72.0f;
                 dlp2->AddRectFilled(infoPos, ImVec2(infoPos.x + infoW, infoPos.y + infoH),
                     IM_COL32(12, 18, 32, 210), 10.0f);
                 dlp2->AddRect(infoPos, ImVec2(infoPos.x + infoW, infoPos.y + infoH),
@@ -878,13 +878,43 @@ static void DrawContentArea(float winW, float winH) {
                     PopStyleColor(3);
                     PopStyleVar();
                 } else {
-                    TextColored(ImVec4(0.45f, 0.55f, 0.70f, 1.0f),
-                        "Tap pocket di layar saat giliran");
-                    SetCursorPosX(GetCursorPosX() + 12.0f);
-                    TextColored(ImVec4(0.30f, 0.38f, 0.55f, 0.80f),
-                        "Aim akan lock ke pocket itu");
+                    // Ambil lastTargetPocket dari mode yang aktif
+                    int lastPkt = -1;
+                    if (g_aimMode == AimMode::EIGHTBALL_PREDICT)
+                        lastPkt = AimLockTarget::lastTargetPocket;
+                    else if (g_aimMode == AimMode::EIGHTBALL_8LOCK)
+                        lastPkt = AimLock8Ball::lastTargetPocket;
+
+                    if (lastPkt >= 0 && !g_aimThreadRunning.load()) {
+                        // Ada hasil aim sebelumnya — tampilkan tombol Lock
+                        const char* pNamesL[6] = {"Top-L","Top-C","Top-R","Bot-R","Bot-C","Bot-L"};
+                        TextColored(ImVec4(0.55f, 0.65f, 0.90f, 1.0f),
+                            "Saran: [%d] %s", lastPkt, pNamesL[lastPkt]);
+
+                        SetCursorPosX(GetCursorPosX() + 12.0f);
+                        PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                        PushStyleColor(ImGuiCol_Button,        ImVec4(0.08f, 0.35f, 0.55f, 1.0f));
+                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.50f, 0.78f, 1.0f));
+                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.06f, 0.28f, 0.44f, 1.0f));
+                        char lockLabel[40];
+                        snprintf(lockLabel, sizeof(lockLabel),
+                            "Kunci ke [%d] %s", lastPkt, pNamesL[lastPkt]);
+                        if (Button(lockLabel, ImVec2(infoW - 24.0f, 26.0f)))
+                            PocketSelector::selectedPocket.store(lastPkt);
+                        PopStyleColor(3);
+                        PopStyleVar();
+                    } else {
+                        TextColored(ImVec4(0.45f, 0.55f, 0.70f, 1.0f),
+                            "Jalankan Auto Aim dahulu");
+                        SetCursorPosX(GetCursorPosX() + 12.0f);
+                        TextColored(ImVec4(0.30f, 0.38f, 0.55f, 0.80f),
+                            "Lalu klik Lock untuk mengunci pocket");
+                    }
                 }
-                Dummy(ImVec2(0, infoH - (selPkt >= 0 ? 46.0f : 32.0f)));
+                // Tinggi card menyesuaikan konten
+                float usedH = selPkt >= 0 ? 46.0f : 46.0f;
+                float leftH = infoH - usedH;
+                if (leftH > 0) Dummy(ImVec2(0, leftH));
             }
 
             break;
@@ -1139,10 +1169,10 @@ static void DrawContentArea(float winW, float winH) {
                 PopStyleVar(); PopStyleColor();
             } else if (!DumpOffset::s_scanning) {
                 Dummy(ImVec2(0, 24));
-                const char* hint = O("Tekan Scan Offset untuk mulai");
-                float tw = CalcTextSize(hint).x;
-                SetCursorPosX((GetContentRegionAvail().x - tw) * 0.5f);
-                TextColored(ImVec4(0.32f, 0.38f, 0.52f, 0.75f), "%s", hint);
+                float tw = CalcTextSize(O("Tekan Scan Offset untuk mulai")).x;
+                float avail = GetContentRegionAvail().x;
+                SetCursorPosX(GetCursorPosX() + (avail - tw) * 0.5f);
+                TextColored(ImVec4(0.32f, 0.38f, 0.52f, 0.75f), O("Tekan Scan Offset untuk mulai"));
             }
 
             break;
