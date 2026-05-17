@@ -64,9 +64,9 @@ static bool SidebarButton(const char* label, GLuint iconTex, bool selected, floa
     const ImGuiStyle& style = g.Style;
     const ImGuiID id = window->GetID(label);
 
-    float iconSize   = 68.0f;
-    float vPad       = 12.0f;
-    float btnH       = vPad + iconSize + 6.0f + g.FontSize + vPad;
+    float iconSize   = 60.0f;
+    float vPad       = 10.0f;
+    float btnH       = vPad + iconSize + 4.0f + g.FontSize + vPad;
 
     ImVec2 pos  = window->DC.CursorPos;
     ImVec2 size = ImVec2(width, btnH);
@@ -88,18 +88,13 @@ static bool SidebarButton(const char* label, GLuint iconTex, bool selected, floa
         bb.Min.y + vPad + iconSize * 0.5f
     );
 
-    // Selected: blue gradient rounded rect behind icon
+    // Selected: red rounded rect behind icon only
     if (selected) {
-        ImVec2 selMin(iconCenter.x - iconBgSize * 0.5f, iconCenter.y - iconBgSize * 0.5f);
-        ImVec2 selMax(iconCenter.x + iconBgSize * 0.5f, iconCenter.y + iconBgSize * 0.5f);
-        dl->AddRectFilledMultiColor(selMin, selMax,
-            IM_COL32(15, 90, 230, 240), IM_COL32(15, 90, 230, 240),
-            IM_COL32(30, 130, 255, 200), IM_COL32(30, 130, 255, 200));
-        dl->AddRect(selMin, selMax, IM_COL32(80, 160, 255, 120), 14.0f, 0, 1.2f);
-    } else if (hovered) {
-        ImVec2 hovMin(iconCenter.x - iconBgSize * 0.5f, iconCenter.y - iconBgSize * 0.5f);
-        ImVec2 hovMax(iconCenter.x + iconBgSize * 0.5f, iconCenter.y + iconBgSize * 0.5f);
-        dl->AddRectFilled(hovMin, hovMax, IM_COL32(40, 80, 160, 80), 14.0f);
+        dl->AddRectFilled(
+            ImVec2(iconCenter.x - iconBgSize * 0.5f, iconCenter.y - iconBgSize * 0.5f),
+            ImVec2(iconCenter.x + iconBgSize * 0.5f, iconCenter.y + iconBgSize * 0.5f),
+            IM_COL32(255, 0, 0, 255), 12.0f
+        );
     }
 
     // Draw icon texture centered, with color filter when not selected
@@ -162,7 +157,7 @@ static bool ToggleSwitch(const char* label, bool* v) {
     ImVec2 toggleEnd = ImVec2(togglePos.x + width, togglePos.y + height);
     
     ImVec4 offColor = ImVec4(0.27f, 0.27f, 0.31f, 1.0f);
-    ImVec4 onColor = ImVec4(0.12f, 0.47f, 1.0f, 1.0f);
+    ImVec4 onColor = ImVec4(1.0f, 0.f, 0.f, 1.0f);
     ImVec4 bgColorV = ImLerp(offColor, onColor, animT);
     dl->AddRectFilled(togglePos, toggleEnd, ImColor(bgColorV), radius);
     
@@ -183,13 +178,6 @@ static bool g_aqCounting = false;
 static std::chrono::steady_clock::time_point g_aqLastCall;
 static std::chrono::steady_clock::time_point g_aqCountdownStart;
 
-// Stub AutoPlay namespace (AutoPlay.h not included in this source build)
-namespace AutoPlay {
-    static bool bAutoPlaying = false;
-    static inline void Update() {}
-    static inline void ClearState() {}
-}
-
 
 static bool IsExpired() {
     return (int64_t)time(nullptr) >= EXPIRY_TS;
@@ -200,7 +188,7 @@ INLINE void DrawExpired(ImGuiIO& io) {
 
     SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     SetNextWindowSize(ImVec2(winW, 0), ImGuiCond_Always);
-    PushStyleColor(ImGuiCol_WindowBg, IM_COL32(14, 18, 35, 255));
+    PushStyleColor(ImGuiCol_WindowBg, IM_COL32(21, 21, 21, 255));
     PushStyleVar(ImGuiStyleVar_WindowRounding, 20.0f);
     PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(30.0f, 30.0f));
     PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -246,12 +234,12 @@ INLINE void DrawAutoQueue() {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - g_aqCountdownStart).count();
         int remaining_ms = 8000 - (int)elapsed;
 
-        if (remaining_ms <= 0) {
-            // if (sharedMenuManager.getMenuStateId() == 13) PopMenuState(13);
-            // StartLastMatch();
-            g_aqCounting = false;
-            return;
-        }
+      // if (remaining_ms <= 0) {
+           // if (sharedMenuManager.getMenuStateId() == 13) PopMenuState(13);
+            //StartLastMatch();
+           // g_aqCounting = false;
+          //  return;
+       // }
 
         std::string count_str = std::to_string((remaining_ms / 1000) + 1);
 
@@ -271,7 +259,7 @@ INLINE void DrawAutoQueue() {
             dl->AddRectFilled(wp, ImVec2(wp.x + ws.x, wp.y + ws.y), IM_COL32(20, 20, 28, 0), 24.0f);
 
             SetWindowFontScale(3.5f);
-            TextColored(ImVec4(0.20f, 0.65f, 1.0f, 1.0f), "%s", count_str.c_str());
+            TextColored(ImVec4(1.f, 0.f, 0.f, 1.0f), "%s", count_str.c_str());
             SetWindowFontScale(1.0f);
         }
         End();
@@ -337,12 +325,9 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         if (persistent_bool[O("bAutoPlay")]) {
             DrawToggleButton(false);
-              AutoPlay::Update();
+      //      AutoPlay::Update();
         }
-        if (persistent_bool[O("bAutoAim")]) AutoAim::AIM();
-        if (persistent_bool[O("b9BallShoot")]) AutoAim::AIM_9Ball();
-        if (persistent_bool[O("bAutoSpin")]) AutoAim::ApplyBestSpin(
-            sharedGameManager.mVisualCue().mVisualGuide().mAimAngle());
+        //if (persistent_bool[O("bAutoAim")]) AutoAim::AIM();
 
         auto stateId = gameStateManager.getCurrentStateId();
         if (stateId == 4) gPrediction->determineShotResult(false);
@@ -426,10 +411,7 @@ static void DrawSidebar(float sidebarW) {
 
     // Now draw background on channel 0 (behind the buttons)
     dl->ChannelsSetCurrent(0);
-    dl->AddRectFilledMultiColor(wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH),
-        IM_COL32(10, 14, 30, 255), IM_COL32(18, 28, 55, 255),
-        IM_COL32(12, 20, 45, 255), IM_COL32(8, 12, 28, 255));
-    dl->AddRect(wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH), IM_COL32(30, 80, 200, 40), 30.0f, 0, 1.0f);
+    dl->AddRectFilled(wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH), IM_COL32(21, 21, 21, 255), 30.0f);
     dl->ChannelsMerge();
 
     // Vertical separator between Queue and close strip
@@ -520,8 +502,8 @@ static void DrawCalculating(ImGuiIO& io) {
     SetNextWindowPos(ImVec2(Width * 0.5f, Height * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     
     // Auto-resize face ca fereastra să aibă dimensiunea textului automat
-    PushStyleColor(ImGuiCol_WindowBg, IM_COL32(14, 18, 35, 255));
-    PushStyleColor(ImGuiCol_Border, IM_COL32(30, 110, 255, 255));
+    PushStyleColor(ImGuiCol_WindowBg, IM_COL32(21, 21, 21, 255));
+    PushStyleColor(ImGuiCol_Border, IM_COL32(220, 30, 30, 255));
     PushStyleVar(ImGuiStyleVar_WindowRounding, 18.0f);
     PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
 
@@ -554,7 +536,7 @@ static void DrawContentArea(float winW, float winH) {
     dl->AddRectFilled(
         ImVec2(wp.x, wp.y + startY),
         ImVec2(wp.x + contentW, wp.y + winH),
-        IM_COL32(12, 16, 32, 255), 20.0f
+        IM_COL32(21, 21, 21, 255), 20.0f
     );
     
     const char* tabTitles[] = { 
@@ -586,7 +568,7 @@ static void DrawContentArea(float winW, float winH) {
     dl->AddLine(
         ImVec2(wp.x + 20.0f, wp.y + lineY),
         ImVec2(wp.x + contentW - 20.0f, wp.y + lineY),
-        IM_COL32(35, 90, 210, 110), 1.2f
+        IM_COL32(60, 60, 75, 150), 1.0f
     );
 
     float headerH = (lineY - startY) + 10.0f;
@@ -600,8 +582,8 @@ static void DrawContentArea(float winW, float winH) {
         case 0: {
             Dummy(ImVec2(0, 10));
             need_save |= ToggleSwitch(O("Draw Lines"), &persistent_bool[O("bESP_DrawPredictionLine")]);
-            need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPockets")]);
-            need_save |= ToggleSwitch(O("Draw Pockets Shot State"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
+           // need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPockets")]);
+            need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
 
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
@@ -611,8 +593,8 @@ static void DrawContentArea(float winW, float winH) {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
                 PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.12f, 0.47f, 1.0f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.12f, 0.47f, 1.0f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
                 need_save |= SliderInt(O("##lineThick"), &persistent_int[O("iLineThickness")], 1, 10, "%d");
                 PopStyleColor(3);
@@ -626,8 +608,8 @@ static void DrawContentArea(float winW, float winH) {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
                 PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.12f, 0.47f, 1.0f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.12f, 0.47f, 1.0f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
                 int& menuSz = persistent_int[O("iMenuSizeOffset")];
                 bool changed = SliderInt(O("##menuSize"), &menuSz, -10, 10,
@@ -640,9 +622,9 @@ static void DrawContentArea(float winW, float winH) {
             Dummy(ImVec2(0, 20));
             {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.42f, 0.90f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.55f, 1.00f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.32f, 0.75f, 1.0f));
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.12f, 0.55f, 0.20f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.68f, 0.26f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.09f, 0.42f, 0.15f, 1.0f));
                 if (Button(O("Save Config"), ImVec2(GetContentRegionAvail().x, 55.0f))) {
                     svConfig_Save();
                 }
@@ -656,23 +638,11 @@ static void DrawContentArea(float winW, float winH) {
             Dummy(ImVec2(0, 10));
             need_save |= ToggleSwitch(O("Enable AutoPlay"), &persistent_bool[O("bAutoPlay")]);
             
-            need_save |= ToggleSwitch(O("Auto Aiming"), &persistent_bool[O("bAutoAim")]);
-            need_save |= ToggleSwitch(O("9 Ball Shoot"), &persistent_bool[O("b9BallShoot")]);
-            need_save |= ToggleSwitch(O("Auto Spin"), &persistent_bool[O("bAutoSpin")]);
-
-            Dummy(ImVec2(0, 14));
-            {
-                float avail = GetContentRegionAvail().x;
-                ImVec2 bp = GetCursorScreenPos();
-                ImDrawList* pd = GetWindowDrawList();
-                pd->AddRectFilled(bp, ImVec2(bp.x + avail, bp.y + 2.0f), IM_COL32(30, 90, 200, 80), 2.0f);
-                Dummy(ImVec2(0, 10));
-            }
-            TextColored(ImVec4(0.35f, 0.60f, 1.0f, 0.75f), O("Auto Play"));
-            Dummy(ImVec2(0, 5));
-            TextColored(ImVec4(0.5f, 0.5f, 0.58f, 1.0f), O("Automatically aims and shoots for you"));
-            TextColored(ImVec4(0.5f, 0.5f, 0.58f, 1.0f), O("Auto Aiming: finds best angle & pots ball"));
-            TextColored(ImVec4(0.5f, 0.5f, 0.58f, 1.0f), O("9 Ball Shoot: aims in 9-ball game mode"));
+            //need_save |= ToggleSwitch(O("Auto Aiming"), &persistent_bool[O("bAutoAim")]);
+            
+            Dummy(ImVec2(0, 20));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("Auto play will automatically"));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("aim and shoot for you"));
             break;
         }
         
@@ -699,8 +669,8 @@ static void DrawContentArea(float winW, float winH) {
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
                 PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.12f, 0.47f, 1.0f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.12f, 0.47f, 1.0f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(1.0f, 0, 0, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0, 0, 1.0f));
                 SetNextItemWidth(GetContentRegionAvail().x);
                 need_save |= SliderInt("##betpercent", &persistent_int["iAutoQueue_BetPercent"], 1, 100, "%d%%");
                 PopStyleColor(3);
@@ -794,10 +764,10 @@ static void DrawContentArea(float winW, float winH) {
                 float  gap   = 8.0f;
                 float  lineW = (avail - ts.x - gap * 2.0f) * 0.5f;
                 ImDrawList* dl2 = GetWindowDrawList();
-                dl2->AddLine(ImVec2(p.x,                      lineY), ImVec2(p.x + lineW,                      lineY), IM_COL32(35, 90, 200, 110), 1.0f);
-                dl2->AddLine(ImVec2(p.x + lineW + gap + ts.x + gap, lineY), ImVec2(p.x + avail, lineY), IM_COL32(35, 90, 200, 110), 1.0f);
+                dl2->AddLine(ImVec2(p.x,                      lineY), ImVec2(p.x + lineW,                      lineY), IM_COL32(60,60,75,160), 1.0f);
+                dl2->AddLine(ImVec2(p.x + lineW + gap + ts.x + gap, lineY), ImVec2(p.x + avail, lineY), IM_COL32(60,60,75,160), 1.0f);
                 SetCursorPosX(GetCursorPosX() + lineW + gap);
-                TextColored(ImVec4(0.40f, 0.65f, 1.0f, 0.85f), "%s", title);
+                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), "%s", title);
                 Dummy(ImVec2(0, 6));
             };
 
@@ -808,7 +778,7 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 4));
             };
 
-            // ── User Game Info ────────────────────────────────────────────────
+          /*  // ── User Game Info ────────────────────────────────────────────────
             DrawSectionHeader(O("User Game Info"));
 
             if (sharedUserInfo) {
@@ -817,8 +787,8 @@ static void DrawContentArea(float winW, float winH) {
                 DrawInfoRow(O("Display Name: "), ReadNSString(sharedUserInfo.DisplayName()).c_str());
                 DrawInfoRow(O("Country Code: "), ReadNSString(sharedUserInfo.loginCountryCode()).c_str());
             } else {
-                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), O("UserInfo not available"));
-            }
+                TextColored(ImVec4(0.6f, 0.3f, 0.3f, 1.0f), O("UserInfo not available"));
+            }*/
 
             // ── Device Info ───────────────────────────────────────────────────
             DrawSectionHeader(O("Device"));
@@ -962,8 +932,8 @@ static void DrawToggleButton(bool cancelMode) {
         bool clicked = InvisibleButton(O("##TglBtnHit"), size);
 
         // Pick texture based on state
-        GLuint tex = cancelMode ? queue_cancel_tex
-                               : (AutoPlay::bAutoPlaying ? play_on_tex : play_off_tex);
+        GLuint tex = cancelMode ? queue_cancel_tex : play_off_tex;
+               //    : (AutoPlay::bAutoPlaying ? play_on_tex : play_off_tex);
 
         float r = size.x * 0.5f;
         ImDrawList* dl = GetWindowDrawList();
@@ -983,8 +953,8 @@ static void DrawToggleButton(bool cancelMode) {
                 persistent_bool[O("bAutoQueue")] = false;
                 g_aqCounting = false;
             } else {
-                AutoPlay::bAutoPlaying = !AutoPlay::bAutoPlaying;
-                if (AutoPlay::bAutoPlaying) AutoPlay::ClearState();
+             //   AutoPlay::bAutoPlaying = !AutoPlay::bAutoPlaying;
+              //  if (AutoPlay::bAutoPlaying) AutoPlay::ClearState();
             }
         }
     }
