@@ -772,54 +772,63 @@ static void DrawContentArea(float winW, float winH) {
             ModeSwitch8(O("Aim Predict"),     AimMode::EIGHTBALL_PREDICT);
             ModeSwitch8(O("Aim Lock 8 Ball"), AimMode::EIGHTBALL_8LOCK);
 
-            // ── Pocket Selector (khusus Aim Predict & Lock 8) ─────────────
+            // ── Pocket Info (read-only, selalu otomatis) ──────────────────
             if (g_aimMode == AimMode::EIGHTBALL_PREDICT || g_aimMode == AimMode::EIGHTBALL_8LOCK) {
-                Dummy(ImVec2(0, 12));
-                TextColored(ImVec4(0.60f, 0.65f, 0.80f, 1.0f), O("Target Pocket"));
-                Dummy(ImVec2(0, 8));
+                Dummy(ImVec2(0, 14));
 
-                float avail  = GetContentRegionAvail().x;
-                float btnW   = (avail - 6.0f * 5.0f) / 7.0f; // 7 tombol: Auto + P0-P5
-                float btnH   = 42.0f;
+                float cardW = GetContentRegionAvail().x;
+                ImVec2 cPos = GetCursorScreenPos();
+                ImDrawList* dlp = GetWindowDrawList();
 
-                // Tombol "Auto"
-                {
-                    bool isAuto = (g_selectedPocket8 < 0);
-                    if (isAuto) PushStyleColor(ImGuiCol_Button, ImVec4(0.12f, 0.45f, 0.95f, 1.0f));
-                    else        PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.18f, 0.22f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.55f, 1.0f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.30f, 0.70f, 1.0f));
-                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                    if (Button(O("Auto"), ImVec2(btnW, btnH))) g_selectedPocket8 = -1;
-                    PopStyleVar();
-                    PopStyleColor(3);
-                    SameLine(0, 5.0f);
-                }
+                // Tentukan pocket terakhir yang dipilih engine
+                int lastPkt = -1;
+                if (g_aimMode == AimMode::EIGHTBALL_PREDICT)
+                    lastPkt = AimLockTarget::lastTargetPocket;
+                else
+                    lastPkt = AimLock8Ball::lastTargetPocket;
 
-                // Tombol P0-P5
-                const char* pktLabels[] = { O("P0"), O("P1"), O("P2"), O("P3"), O("P4"), O("P5") };
-                for (int p = 0; p < 6; p++) {
-                    bool isSel = (g_selectedPocket8 == p);
-                    if (isSel) PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.75f, 0.45f, 1.0f));
-                    else        PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.18f, 0.22f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.85f, 0.55f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.60f, 0.35f, 1.0f));
-                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                    if (Button(pktLabels[p], ImVec2(btnW, btnH))) g_selectedPocket8 = p;
-                    PopStyleVar();
-                    PopStyleColor(3);
-                    if (p < 5) SameLine(0, 5.0f);
-                }
+                bool hasResult = (AutoAim::bAimed.load() && lastPkt >= 0);
 
-                Dummy(ImVec2(0, 4));
-                // Info pocket yang dipilih
-                if (g_selectedPocket8 >= 0) {
-                    char pkBuf[48];
-                    snprintf(pkBuf, sizeof(pkBuf), O("Aim locked to Pocket %d"), g_selectedPocket8);
-                    TextColored(ImVec4(0.10f, 0.90f, 0.55f, 0.90f), "%s", pkBuf);
+                // Background pill
+                float cardH = 48.0f;
+                dlp->AddRectFilled(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH),
+                    IM_COL32(14, 22, 40, 200), 10.0f);
+
+                // Label kiri — "Pocket"
+                SetCursorPosY(GetCursorPosY() + 12.0f);
+                SetCursorPosX(GetCursorPosX() + 14.0f);
+                TextColored(ImVec4(0.45f, 0.50f, 0.65f, 1.0f), "Pocket");
+
+                SameLine();
+
+                // Nilai pocket di kanan
+                if (hasResult) {
+                    char pBuf[16];
+                    snprintf(pBuf, sizeof(pBuf), "P%d", lastPkt);
+                    // Pill hijau kecil di belakang angka
+                    ImVec2 vp = GetCursorScreenPos();
+                    ImVec2 ts = CalcTextSize(pBuf);
+                    float pad = 8.0f;
+                    float t   = (float)GetTime();
+                    float gA  = 0.55f + 0.30f * sinf(t * 3.0f);
+                    dlp->AddRectFilled(
+                        ImVec2(vp.x - pad, vp.y - 3),
+                        ImVec2(vp.x + ts.x + pad, vp.y + ts.y + 3),
+                        IM_COL32(8, 50, 25, 200), 6.0f);
+                    dlp->AddRect(
+                        ImVec2(vp.x - pad, vp.y - 3),
+                        ImVec2(vp.x + ts.x + pad, vp.y + ts.y + 3),
+                        ImColor(0.05f, 0.90f, 0.42f, gA), 6.0f, 0, 1.2f);
+                    TextColored(ImVec4(0.10f, 0.95f, 0.50f, 1.0f), "%s", pBuf);
+                    SameLine(0, 20.0f);
+                    TextColored(ImVec4(0.35f, 0.40f, 0.50f, 0.80f), "(auto)");
+                } else if (g_autoPlayCalculating.load() || g_aimThreadRunning.load()) {
+                    TextColored(ImVec4(1.0f, 0.75f, 0.0f, 0.90f), "scanning...");
                 } else {
-                    TextColored(ImVec4(0.50f, 0.55f, 0.65f, 0.80f), O("Auto pocket selection"));
+                    TextColored(ImVec4(0.35f, 0.40f, 0.55f, 0.70f), "-- (press aim)");
                 }
+
+                Dummy(ImVec2(0, cardH - 24.0f));
             }
 
             break;

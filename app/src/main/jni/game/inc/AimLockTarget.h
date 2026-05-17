@@ -138,13 +138,6 @@ namespace AimLockTarget {
                         break;
                     }
                 }
-                // Filter pocket: jika user sudah pilih pocket, skip angle ini jika bukan pocket itu
-                if (g_selectedPocket8 >= 0 && firstPocket != g_selectedPocket8) {
-                    scanAngle = fmod(scanAngle + COARSE_STEP + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS);
-                    scanAngle = NumberUtils::normalizeDoublePrecision(scanAngle);
-                    if (iter > 0 && std::abs(scanAngle - startAngle) < COARSE_STEP * 0.5) break;
-                    continue;
-                }
                 if (sc > bestScore) {
                     bestScore     = sc;
                     bestAngle     = scanAngle;
@@ -179,11 +172,6 @@ namespace AimLockTarget {
                         firstPocket = ball.pocketIndex;
                         break;
                     }
-                }
-                if (g_selectedPocket8 >= 0 && firstPocket != g_selectedPocket8) {
-                    fineAngle += FINE_STEP;
-                    if (fineAngle - refineEnd > 0.0) break;
-                    continue;
                 }
                 if (sc > bestScore) {
                     bestScore     = sc;
