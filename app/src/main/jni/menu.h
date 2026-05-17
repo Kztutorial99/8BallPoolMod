@@ -1057,6 +1057,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
 
         buttonClicker.Update();
         AutoAim::Update();
+        InjectTapPocket::Update();  // GL thread — aman untuk nominatePocket()
 
         g_espStateReady = false;
         g_espIsInGame   = false;    // reset tiap frame — DrawESP akan set true jika memang in-game
@@ -1173,6 +1174,7 @@ static void DrawToggleButton() {
             g_autoPlayCalculating = true;
             AutoAim::bAimed       = false;
             g_aimThreadRunning    = true;
+            InjectTapPocket::Reset();  // Reset nominasi saat aim baru dimulai
 
             AimMode capturedMode = g_aimMode;
             std::thread([capturedMode]() {
