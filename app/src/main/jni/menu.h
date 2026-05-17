@@ -16,6 +16,7 @@ using namespace std;
 #include "mod/keylogin.h"
 #include "mod/PocketSelector.h"
 #include "mod/DumpOffset.h"
+#include "mod/OffsetSearch.h"
 #include "oxorany/oxorany.h"
 
 #include <EGL/egl.h>
@@ -405,7 +406,7 @@ static void DrawSidebar(float sidebarW) {
     float closeSize = 35.0f;
     float closeBtnW = 70.0f;
     float tabsW     = sidebarW - closeBtnW;
-    float btnW      = tabsW / 5.0f;
+    float btnW      = tabsW / 6.0f;
     float marginB   = 12.0f;
 
     dl->ChannelsSplit(2);
@@ -422,6 +423,8 @@ static void DrawSidebar(float sidebarW) {
     if (SidebarButton(O("Info"),   user_icon_tex, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
     SameLine(0, 0);
     if (SidebarButton(O("Dump"),   draw_icon_tex, g_menu.currentTab == 4, btnW)) g_menu.currentTab = 4;
+    SameLine(0, 0);
+    if (SidebarButton(O("Search"), draw_icon_tex, g_menu.currentTab == 5, btnW)) g_menu.currentTab = 5;
     EndGroup();
 
     // Measure actual rendered height — this is the true wrap_content
@@ -1174,6 +1177,167 @@ static void DrawContentArea(float winW, float winH) {
                 SetCursorPosX(GetCursorPosX() + (avail - tw) * 0.5f);
                 TextColored(ImVec4(0.32f, 0.38f, 0.52f, 0.75f), O("Tekan Scan Offset untuk mulai"));
             }
+
+            break;
+        }
+
+        case 5: {
+            // ── OFFSET SEARCH ─────────────────────────────────────────────────
+            using namespace OffsetSearch;
+
+            Dummy(ImVec2(0, 8));
+
+            // ── Header ────────────────────────────────────────────────────────
+            TextColored(ImVec4(0.45f, 0.70f, 1.0f, 1.0f), O("Search Offsets"));
+            Dummy(ImVec2(0, 4));
+            TextColored(ImVec4(0.38f, 0.44f, 0.58f, 0.85f),
+                        O("Database: %d entries  |  Hasil: %d"),
+                        DB_SIZE, (int)s_results.size());
+            Dummy(ImVec2(0, 8));
+
+            // ── Search Input ──────────────────────────────────────────────────
+            float avail = GetContentRegionAvail().x;
+            SetNextItemWidth(avail);
+            PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+            PushStyleColor(ImGuiCol_FrameBg,        ImVec4(0.07f, 0.10f, 0.18f, 1.0f));
+            PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.10f, 0.16f, 0.28f, 1.0f));
+            PushStyleColor(ImGuiCol_FrameBgActive,  ImVec4(0.12f, 0.20f, 0.35f, 1.0f));
+            bool changed = InputText(O("##offsetSearch"), s_searchBuf, sizeof(s_searchBuf));
+            PopStyleColor(3); PopStyleVar();
+
+            // Re-run search setiap query berubah
+            if (changed || memcmp(s_searchBuf, s_lastQuery, sizeof(s_searchBuf)) != 0) {
+                memcpy(s_lastQuery, s_searchBuf, sizeof(s_searchBuf));
+                RunSearch();
+            }
+
+            Dummy(ImVec2(0, 4));
+
+            // ── Tombol Copy All + Clear ───────────────────────────────────────
+            {
+                float halfW = (avail - 8.0f) * 0.5f;
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.06f, 0.28f, 0.13f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.42f, 0.20f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.05f, 0.20f, 0.09f, 1.0f));
+                if (Button(O("Copy All Results"), ImVec2(halfW, 40.0f))) {
+                    if (!s_results.empty()) {
+                        std::string all = BuildAllResultsText();
+                        SetClipboardText(all.c_str());
+                        SetCopyStatus("Copied!");
+                    } else {
+                        SetCopyStatus("Tidak ada hasil!");
+                    }
+                }
+                PopStyleColor(3); PopStyleVar();
+
+                SameLine(0, 8.0f);
+
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.28f, 0.10f, 0.10f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.42f, 0.15f, 0.15f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.20f, 0.06f, 0.06f, 1.0f));
+                if (Button(O("Clear"), ImVec2(halfW, 40.0f))) {
+                    memset(s_searchBuf, 0, sizeof(s_searchBuf));
+                    memset(s_lastQuery, 1, sizeof(s_lastQuery));
+                }
+                PopStyleColor(3); PopStyleVar();
+            }
+
+            // ── Copy status toast ─────────────────────────────────────────────
+            if (s_copyStatusTimer > 0.0f) {
+                s_copyStatusTimer -= GetIO().DeltaTime;
+                Dummy(ImVec2(0, 3));
+                TextColored(ImVec4(0.25f, 1.0f, 0.50f, ImSaturate(s_copyStatusTimer)),
+                            "%s", s_copyStatus);
+            } else {
+                Dummy(ImVec2(0, 3));
+                Dummy(ImVec2(0, GetTextLineHeight()));
+            }
+
+            Dummy(ImVec2(0, 4));
+
+            // ── Tabel Hasil ───────────────────────────────────────────────────
+            float tableH = GetContentRegionAvail().y - 4.0f;
+            PushStyleColor(ImGuiCol_ChildBg,        ImVec4(0.04f, 0.06f, 0.10f, 1.0f));
+            PushStyleColor(ImGuiCol_Header,         ImVec4(0.10f, 0.28f, 0.58f, 0.80f));
+            PushStyleColor(ImGuiCol_HeaderHovered,  ImVec4(0.14f, 0.38f, 0.78f, 0.90f));
+            PushStyleColor(ImGuiCol_HeaderActive,   ImVec4(0.08f, 0.22f, 0.48f, 1.00f));
+            PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
+            PushStyleVar(ImGuiStyleVar_CellPadding,   ImVec2(8.0f, 6.0f));
+
+            if (BeginChild(O("##searchScroll"), ImVec2(0, tableH), false)) {
+                // Header kolom
+                {
+                    PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.65f, 0.85f, 1.0f));
+                    float colW = avail / 5.0f;
+                    Text(O("%-16s"), "Class");
+                    SameLine(colW * 1.0f); Text(O("%-24s"), "Field");
+                    SameLine(colW * 2.5f); Text(O("%-10s"), "Offset");
+                    SameLine(colW * 3.2f); Text(O("%-12s"), "Type");
+                    SameLine(colW * 4.0f); Text(O("%s"), "Note");
+                    PopStyleColor();
+                    Separator();
+                    Dummy(ImVec2(0, 2));
+                }
+
+                if (s_results.empty()) {
+                    Dummy(ImVec2(0, 16));
+                    float tw = CalcTextSize(O("Tidak ada hasil ditemukan")).x;
+                    SetCursorPosX(GetCursorPosX() + (avail - tw) * 0.5f);
+                    TextColored(ImVec4(0.32f, 0.38f, 0.52f, 0.70f), O("Tidak ada hasil ditemukan"));
+                } else {
+                    float colW = avail / 5.0f;
+                    for (int i = 0; i < (int)s_results.size(); i++) {
+                        const FilteredEntry& fe = s_results[i];
+
+                        PushID(i);
+                        // Row warna selang-seling
+                        if (i % 2 == 0) {
+                            ImVec2 rMin = GetCursorScreenPos();
+                            ImVec2 rMax = ImVec2(rMin.x + avail, rMin.y + GetTextLineHeightWithSpacing() + 8.0f);
+                            GetWindowDrawList()->AddRectFilled(rMin, rMax, IM_COL32(18, 30, 55, 180));
+                        }
+
+                        // Nama Class
+                        TextColored(ImVec4(0.40f, 0.72f, 1.00f, 1.0f), "%s", fe.e->className);
+
+                        // Field Name
+                        SameLine(colW * 1.0f);
+                        TextColored(ImVec4(0.90f, 0.90f, 0.95f, 1.0f), "%s", fe.e->fieldName);
+
+                        // Offset hex
+                        SameLine(colW * 2.5f);
+                        TextColored(ImVec4(0.35f, 1.00f, 0.55f, 1.0f), "%s", fe.hexOffset);
+
+                        // Type
+                        SameLine(colW * 3.2f);
+                        TextColored(ImVec4(1.00f, 0.75f, 0.35f, 1.0f), "%s", fe.e->type);
+
+                        // Note
+                        SameLine(colW * 4.0f);
+                        TextColored(ImVec4(0.55f, 0.60f, 0.70f, 0.90f), "%s", fe.e->note);
+
+                        // Tombol copy per baris — muncul saat di-hover
+                        SameLine(avail - 60.0f);
+                        PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
+                        PushStyleColor(ImGuiCol_Button,        ImVec4(0.06f, 0.22f, 0.50f, 0.85f));
+                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.35f, 0.80f, 1.00f));
+                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.06f, 0.18f, 0.40f, 1.00f));
+                        if (SmallButton(O("Copy"))) {
+                            std::string line = EntryToString(fe);
+                            SetClipboardText(line.c_str());
+                            SetCopyStatus("Copied!");
+                        }
+                        PopStyleColor(3); PopStyleVar();
+
+                        PopID();
+                        Dummy(ImVec2(0, 2));
+                    }
+                }
+            }
+            EndChild();
+            PopStyleVar(2); PopStyleColor(4);
 
             break;
         }
