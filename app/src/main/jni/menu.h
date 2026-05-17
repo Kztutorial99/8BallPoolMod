@@ -198,6 +198,7 @@ static bool g_espIsInGame   = false;
 #include "game/inc/AutoPlay.h"
 #include "game/inc/AimLockTarget.h"
 #include "game/inc/AimBreak.h"
+#include "game/inc/AimLock8Ball.h"
 #include "game/inc/Aim9Ball.h"
 #include "game/inc/Aim9BallBreak.h"
 #include <thread>
@@ -210,6 +211,7 @@ enum class AimMode : int {
     EIGHTBALL_BREAK   = 2,
     NINEBALL_PREDICT  = 3,
     NINEBALL_BREAK    = 4,
+    EIGHTBALL_8LOCK   = 5,
 };
 static AimMode g_aimMode = AimMode::EIGHTBALL_PREDICT;
 
@@ -490,12 +492,15 @@ static void svConfig_Load() {
     fclose(f);
 }
 
-// ── Aim Info Overlay — top-left animated panel ────────────────────────────────
-// Shows: mode name, target ball, status, smooth pulsing animation
-// Called every frame when Auto Aim is active and in-game
+// ── Aim Info Overlay — text-only, no background box ───────────────────────────
+// Hanya tampil saat analyzing atau sudah aimed.
+// Auto-reset setelah shoot (AutoAim::bAimed reset oleh AutoAim::Update()).
 static void DrawAimInfoOverlay(ImGuiIO& io) {
-    // Auto-reset: jika g_aimThreadRunning sudah selesai dan bAimed true
-    // AutoAim::Update() sudah dipanggil setiap frame untuk reset setelah shoot
+    bool isAnalyzing = g_autoPlayCalculating.load() || g_aimThreadRunning.load();
+    bool isAimed     = AutoAim::bAimed.load();
+
+    // Hanya tampil saat analyzing atau aimed — hilang otomatis setelah shoot
+    if (!isAnalyzing && !isAimed) return;
 
     float t = (float)GetTime();
 
@@ -505,24 +510,21 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
     switch (g_aimMode) {
         case AimMode::EIGHTBALL_PREDICT: modeName = O("8BP Predict");   modeColor = ImVec4(0.25f, 0.60f, 1.0f, 1.0f); break;
         case AimMode::EIGHTBALL_BREAK:   modeName = O("8BP Break");     modeColor = ImVec4(1.0f,  0.50f, 0.10f, 1.0f); break;
+        case AimMode::EIGHTBALL_8LOCK:   modeName = O("8BP Lock 8");    modeColor = ImVec4(0.90f, 0.20f, 0.90f, 1.0f); break;
         case AimMode::NINEBALL_PREDICT:  modeName = O("9BP Predict");   modeColor = ImVec4(0.15f, 0.85f, 0.55f, 1.0f); break;
-        case AimMode::NINEBALL_BREAK:    modeName = O("9BP Break Win"); modeColor = ImVec4(1.0f,  0.82f, 0.05f, 1.0f); break;
+        case AimMode::NINEBALL_BREAK:    modeName = O("9BP Ghost Win"); modeColor = ImVec4(1.0f,  0.82f, 0.05f, 1.0f); break;
         default: break;
     }
 
     // ── Status ────────────────────────────────────────────────────────────
     const char* statusText;
     ImVec4 statusColor;
-    bool isAnalyzing = g_autoPlayCalculating || g_aimThreadRunning.load();
     if (isAnalyzing) {
         statusText  = O("ANALYZING...");
         statusColor = ImVec4(1.0f, 0.78f, 0.0f, 1.0f);
-    } else if (AutoAim::bAimed) {
+    } else {
         statusText  = O("AIMED");
         statusColor = ImVec4(0.15f, 1.0f, 0.42f, 1.0f);
-    } else {
-        statusText  = O("READY");
-        statusColor = ImVec4(0.50f, 0.68f, 1.0f, 1.0f);
     }
 
     // ── Target ball ───────────────────────────────────────────────────────
@@ -531,6 +533,7 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
     switch (g_aimMode) {
         case AimMode::EIGHTBALL_PREDICT: tgtBall = AimLockTarget::lastTargetBall; break;
         case AimMode::EIGHTBALL_BREAK:   tgtBall = AimBreak::lastTargetBall;      break;
+        case AimMode::EIGHTBALL_8LOCK:   tgtBall = 8;                             break;
         case AimMode::NINEBALL_PREDICT:  tgtBall = Aim9Ball::lastTargetBall;      break;
         case AimMode::NINEBALL_BREAK:    tgtBall = Aim9BallBreak::lastTargetBall; break;
         default: break;
@@ -545,8 +548,14 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
                 snprintf(extraBuf, sizeof(extraBuf), O("Pocket: %d balls"), AimBreak::lastBestCount);
             break;
         case AimMode::EIGHTBALL_PREDICT:
-            if (!AimLockTarget::lastHadShot && AutoAim::bAimed)
+            if (!AimLockTarget::lastHadShot && isAimed)
                 snprintf(extraBuf, sizeof(extraBuf), O("No valid shot found"));
+            break;
+        case AimMode::EIGHTBALL_8LOCK:
+            if (!AimLock8Ball::lastHadShot && isAimed)
+                snprintf(extraBuf, sizeof(extraBuf), O("No valid shot found"));
+            else if (AimLock8Ball::lastTargetPocket >= 0)
+                snprintf(extraBuf, sizeof(extraBuf), O("Pocket %d"), AimLock8Ball::lastTargetPocket);
             break;
         case AimMode::NINEBALL_PREDICT:
             if (Aim9Ball::lastWasCombo) snprintf(extraBuf, sizeof(extraBuf), O("COMBO / WIN 9!"));
@@ -560,106 +569,51 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
         default: break;
     }
 
-    // ── Window ────────────────────────────────────────────────────────────
-    const float margin = 20.0f;
-    const float panelW = 310.0f;
+    // ── Draw text-only — langsung ke ForegroundDrawList, tanpa window/box ─
+    ImDrawList* fg    = GetForegroundDrawList();
+    float       x     = 24.0f;
+    float       y     = 30.0f;
+    float       lineH = GImGui->FontSize + 8.0f;
 
-    SetNextWindowPos(ImVec2(margin, margin), ImGuiCond_Always);
-    SetNextWindowSizeConstraints(ImVec2(panelW, 0), ImVec2(panelW, 9999));
-    PushStyleColor(ImGuiCol_WindowBg, IM_COL32(6, 12, 28, 225));
-    PushStyleColor(ImGuiCol_Border,   IM_COL32(25, 70, 190, 210));
-    PushStyleVar(ImGuiStyleVar_WindowRounding,   18.0f);
-    PushStyleVar(ImGuiStyleVar_WindowBorderSize,  1.5f);
-    PushStyleVar(ImGuiStyleVar_WindowPadding,    ImVec2(16.0f, 14.0f));
-
-    if (Begin(O("##AimInfo"), nullptr,
-              ImGuiWindowFlags_NoTitleBar  | ImGuiWindowFlags_NoResize  |
-              ImGuiWindowFlags_NoMove      | ImGuiWindowFlags_NoScrollbar |
-              ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs |
-              ImGuiWindowFlags_NoSavedSettings  | ImGuiWindowFlags_NoBringToFrontOnFocus)) {
-
-        ImDrawList* dlx  = GetWindowDrawList();
-        ImVec2      wpos = GetWindowPos();
-        ImVec2      wsz  = GetWindowSize();
-
-        // ── Top accent bar (animated pulse) ──────────────────────────────
-        float pulse = (sinf(t * 3.0f) + 1.0f) * 0.5f;
-        ImU32 colL = ImColor(modeColor.x, modeColor.y, modeColor.z, 0.45f + 0.55f * pulse);
-        ImU32 colR = ImColor(modeColor.x, modeColor.y, modeColor.z, 0.0f);
-        dlx->AddRectFilledMultiColor(
-            wpos, ImVec2(wpos.x + wsz.x, wpos.y + 4.0f),
-            colL, colR, colR, colL);
-
-        // ── Row 1: spinning dots (decoration only, DrawList) + mode name ─
-        {
-            // Draw spinning dots purely via DrawList — does NOT affect text cursor
-            ImVec2 curSS = GetCursorScreenPos();
-            float  dotCY = curSS.y + GImGui->FontSize * 0.65f;
-            float  dotCX = curSS.x + 10.0f;  // will be covered by indent below
-            float  orbit = 9.0f;
-            int    nDots = 8;
-            for (int i = 0; i < nDots; i++) {
-                float ang   = t * 4.5f + (float)i * (6.2831853f / nDots);
-                float alpha = isAnalyzing
-                    ? (0.30f + 0.70f * ((float)(i + 1) / nDots))
-                    : 0.15f;
-                dlx->AddCircleFilled(
-                    ImVec2(dotCX + cosf(ang) * orbit, dotCY + sinf(ang) * orbit),
-                    3.8f * (isAnalyzing ? 1.0f : 0.7f),
-                    ImColor(modeColor.x, modeColor.y, modeColor.z, alpha));
-            }
-            // Now render mode name text, indent past the dots area
-            SetCursorPosX(GetCursorPosX() + 26.0f);
-            SetWindowFontScale(1.12f);
-            TextColored(modeColor, "%s", modeName);
-            SetWindowFontScale(1.0f);
-        }
-
-        Dummy(ImVec2(0, 5));
-
-        // ── Row 2: status badge ───────────────────────────────────────────
-        {
-            float badgeAlpha = isAnalyzing ? (0.60f + 0.40f * sinf(t * 9.0f)) : 1.0f;
-            ImVec4 bc = statusColor;
-            bc.w = badgeAlpha;
-
-            ImVec2 bPos  = GetCursorScreenPos();
-            float  bW    = CalcTextSize(statusText).x + 16.0f;
-            float  bH    = GImGui->FontSize + 6.0f;
-            dlx->AddRectFilled(
-                ImVec2(bPos.x - 2, bPos.y - 1),
-                ImVec2(bPos.x + bW, bPos.y + bH),
-                ImColor(bc.x * 0.22f, bc.y * 0.22f, bc.z * 0.22f, 0.55f * badgeAlpha), 7.0f);
-            dlx->AddRect(
-                ImVec2(bPos.x - 2, bPos.y - 1),
-                ImVec2(bPos.x + bW, bPos.y + bH),
-                ImColor(bc.x, bc.y, bc.z, 0.4f * badgeAlpha), 7.0f, 0, 1.0f);
-            SetWindowFontScale(1.05f);
-            TextColored(bc, "%s", statusText);
-            SetWindowFontScale(1.0f);
-        }
-
-        Dummy(ImVec2(0, 5));
-
-        // ── Row 3: target ball ────────────────────────────────────────────
-        TextColored(ImVec4(0.42f, 0.46f, 0.56f, 1.0f), O("Target: "));
-        SameLine(0, 4);
-        TextColored(ImVec4(0.95f, 0.95f, 1.0f, 1.0f), "%s", ballBuf);
-
-        // ── Row 4: extra info ─────────────────────────────────────────────
-        if (extraBuf[0] != '\0') {
-            Dummy(ImVec2(0, 3));
-            float glow = 0.72f + 0.28f * sinf(t * 5.5f);
-            TextColored(ImVec4(
-                modeColor.x * glow, modeColor.y * glow, modeColor.z * glow, 1.0f),
-                "%s", extraBuf);
-        }
-
-        Dummy(ImVec2(0, 5));
+    // Row 1: spinning dot + mode name (animated pulse)
+    {
+        float pulse   = 0.70f + 0.30f * sinf(t * 3.0f);
+        float dotR    = isAnalyzing ? 4.5f : 3.0f;
+        float dotAlpha = isAnalyzing ? (0.55f + 0.45f * sinf(t * 7.0f)) : 0.40f;
+        float dotCX   = x + 6.0f;
+        float dotCY   = y + GImGui->FontSize * 0.55f;
+        fg->AddCircleFilled(ImVec2(dotCX, dotCY), dotR,
+            ImColor(modeColor.x, modeColor.y, modeColor.z, dotAlpha));
+        fg->AddText(ImVec2(x + 16.0f, y),
+            ImColor(modeColor.x, modeColor.y, modeColor.z, pulse),
+            modeName);
+        y += lineH;
     }
-    End();
-    PopStyleVar(3);
-    PopStyleColor(2);
+
+    // Row 2: status text (blink when analyzing)
+    {
+        float alpha = isAnalyzing ? (0.50f + 0.50f * sinf(t * 8.5f)) : 1.0f;
+        fg->AddText(ImVec2(x, y),
+            ImColor(statusColor.x, statusColor.y, statusColor.z, alpha),
+            statusText);
+        y += lineH;
+    }
+
+    // Row 3: target ball
+    {
+        char targetLine[64];
+        snprintf(targetLine, sizeof(targetLine), O("Target: %s"), ballBuf);
+        fg->AddText(ImVec2(x, y), IM_COL32(160, 175, 200, 210), targetLine);
+        y += lineH;
+    }
+
+    // Row 4: extra info (glow animation)
+    if (extraBuf[0] != '\0') {
+        float glow = 0.65f + 0.35f * sinf(t * 5.5f);
+        fg->AddText(ImVec2(x, y),
+            ImColor(modeColor.x * glow, modeColor.y * glow, modeColor.z * glow, 1.0f),
+            extraBuf);
+    }
 }
 
 
@@ -780,7 +734,7 @@ static void DrawContentArea(float winW, float winH) {
         case 1: {
             // ── 8 BALL POOL ───────────────────────────────────────────────
             Dummy(ImVec2(0, 10));
-            if (ToggleSwitch(O("Enable Auto Aim"), &persistent_bool[O("bAutoAim")])) {
+            if (ToggleSwitch(O("Enable Play Button"), &persistent_bool[O("bAutoAim")])) {
                 AutoAim::bActive = persistent_bool[O("bAutoAim")];
                 need_save = true;
             }
@@ -797,8 +751,9 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 8));
             };
 
-            ModeSwitch8(O("Aim Break"),   AimMode::EIGHTBALL_BREAK);
-            ModeSwitch8(O("Aim Predict"), AimMode::EIGHTBALL_PREDICT);
+            ModeSwitch8(O("Aim Break"),        AimMode::EIGHTBALL_BREAK);
+            ModeSwitch8(O("Aim Predict"),      AimMode::EIGHTBALL_PREDICT);
+            ModeSwitch8(O("Aim Lock 8 Ball"),  AimMode::EIGHTBALL_8LOCK);
 
             break;
         }
@@ -806,7 +761,7 @@ static void DrawContentArea(float winW, float winH) {
         case 2: {
             // ── 9 BALL POOL ───────────────────────────────────────────────
             Dummy(ImVec2(0, 10));
-            if (ToggleSwitch(O("Enable Auto Aim"), &persistent_bool[O("bAutoAim")])) {
+            if (ToggleSwitch(O("Enable Play Button"), &persistent_bool[O("bAutoAim")])) {
                 AutoAim::bActive = persistent_bool[O("bAutoAim")];
                 need_save = true;
             }
@@ -822,8 +777,8 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 8));
             };
 
-            ModeSwitch9(O("Aim Break One Shot Win"), AimMode::NINEBALL_BREAK);
-            ModeSwitch9(O("Aim Predict + Combo"),    AimMode::NINEBALL_PREDICT);
+            ModeSwitch9(O("Aim Ghost 90% Win"), AimMode::NINEBALL_BREAK);
+            ModeSwitch9(O("Aim Predict"),       AimMode::NINEBALL_PREDICT);
 
             break;
         }
@@ -1071,6 +1026,7 @@ static void DrawToggleButton() {
                 switch (capturedMode) {
                     case AimMode::EIGHTBALL_PREDICT: AimLockTarget::Aim(); break;
                     case AimMode::EIGHTBALL_BREAK:   AimBreak::Aim();      break;
+                    case AimMode::EIGHTBALL_8LOCK:   AimLock8Ball::Aim();  break;
                     case AimMode::NINEBALL_PREDICT:  Aim9Ball::Aim();      break;
                     case AimMode::NINEBALL_BREAK:    Aim9BallBreak::Aim(); break;
                     default:                         AutoAim::TriggerAim();break;
