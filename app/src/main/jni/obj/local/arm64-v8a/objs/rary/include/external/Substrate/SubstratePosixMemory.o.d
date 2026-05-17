@@ -1,20 +1,20 @@
-/home/runner/workspace/app/src/main/jni/obj/local/arm64-v8a/objs/rary/include/external/Substrate/SubstratePosixMemory.o: \
+./obj/local/arm64-v8a/objs/rary/include/external/Substrate/SubstratePosixMemory.o: \
   include/external/Substrate/SubstratePosixMemory.cpp \
   include/external/Substrate/CydiaSubstrate.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config \
   include/external/Substrate/SubstrateLog.hpp \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h
 
 include/external/Substrate/CydiaSubstrate.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config:
 
 include/external/Substrate/SubstrateLog.hpp:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h:

@@ -1,224 +1,224 @@
-/home/runner/workspace/app/src/main/jni/obj/local/arm64-v8a/objs/rary/include/external/And64InlineHook/And64InlineHook.o: \
+./obj/local/arm64-v8a/objs/rary/include/external/And64InlineHook/And64InlineHook.o: \
   include/external/And64InlineHook/And64InlineHook.cpp \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/inttypes.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstring \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/inttypes.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstring \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h \
   include/external/And64InlineHook/And64InlineHook.hpp \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdint \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdint.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdint \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdint.h \
   include/obfuscation.h include/external/obfy/instr.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string_view \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__string \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/algorithm \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/initializer_list \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstddef \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/type_traits \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/utility \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__tuple \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/version \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__debug \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iosfwd \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wchar.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/memory \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/typeinfo \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/exception \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdlib \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/new \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iterator \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__functional_base \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/tuple \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdexcept \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/atomic \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__threading_support \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/chrono \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctime \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ratio \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/climits \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/functional \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bit \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdio \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cwchar \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cwctype \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cctype \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctype.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wctype.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/random \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cmath \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/math.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/numeric \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/vector \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bit_reference \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__split_buffer \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/istream \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ostream \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ios \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__locale \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/mutex \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__mutex_base \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/system_error \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__errc \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cerrno \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/locale.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/support/android/locale_bionic.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/streambuf \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/locale \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdarg \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bsd_locale_fallbacks.h \
-  /tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bitset \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string_view \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__string \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/algorithm \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/initializer_list \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstddef \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/type_traits \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/utility \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__tuple \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/version \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__debug \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iosfwd \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wchar.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/memory \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/typeinfo \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/exception \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdlib \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/new \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iterator \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__functional_base \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/tuple \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdexcept \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/atomic \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__threading_support \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/chrono \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctime \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ratio \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/climits \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/functional \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bit \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdio \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cwchar \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cwctype \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cctype \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctype.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wctype.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/random \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cmath \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/math.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/numeric \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/vector \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bit_reference \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__split_buffer \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/istream \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ostream \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ios \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__locale \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/mutex \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__mutex_base \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/system_error \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__errc \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cerrno \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/locale.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/support/android/locale_bionic.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/streambuf \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/locale \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdarg \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bsd_locale_fallbacks.h \
+  /home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bitset \
   include/external/oxorany/oxorany.h include/random_names.h
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/inttypes.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/inttypes.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstring:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstring:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h:
 
 include/external/And64InlineHook/And64InlineHook.hpp:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdint:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdint:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdint.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdint.h:
 
 include/obfuscation.h:
 
 include/external/obfy/instr.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string_view:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string_view:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__string:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__string:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/algorithm:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/algorithm:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/initializer_list:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/initializer_list:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstddef:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstddef:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/type_traits:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/type_traits:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/utility:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/utility:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__tuple:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__tuple:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/version:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/version:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__debug:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__debug:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iosfwd:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iosfwd:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wchar.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wchar.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/memory:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/memory:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/typeinfo:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/typeinfo:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/exception:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/exception:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdlib:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdlib:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/new:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/new:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iterator:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iterator:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__functional_base:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__functional_base:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/tuple:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/tuple:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdexcept:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdexcept:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/atomic:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/atomic:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__threading_support:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__threading_support:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/chrono:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/chrono:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctime:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctime:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ratio:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ratio:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/climits:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/climits:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/functional:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/functional:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bit:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bit:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdio:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdio:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cwchar:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cwchar:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cwctype:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cwctype:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cctype:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cctype:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctype.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctype.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wctype.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wctype.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/random:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/random:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cmath:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cmath:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/math.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/math.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/numeric:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/numeric:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/vector:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/vector:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bit_reference:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bit_reference:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__split_buffer:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__split_buffer:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/istream:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/istream:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ostream:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ostream:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ios:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ios:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__locale:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__locale:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/mutex:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/mutex:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__mutex_base:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__mutex_base:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/system_error:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/system_error:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__errc:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__errc:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cerrno:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cerrno:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/locale.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/locale.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/support/android/locale_bionic.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/support/android/locale_bionic.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/streambuf:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/streambuf:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/locale:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/locale:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdarg:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdarg:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bsd_locale_fallbacks.h:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bsd_locale_fallbacks.h:
 
-/tmp/ndk/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bitset:
+/home/runner/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bitset:
 
 include/external/oxorany/oxorany.h:
 
