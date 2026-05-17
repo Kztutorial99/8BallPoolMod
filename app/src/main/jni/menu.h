@@ -194,6 +194,9 @@ static std::atomic<bool> g_autoPlayCalculating{false};
 static bool g_espStateReady = false;
 static bool g_espIsInGame   = false;
 
+// Pocket selector for Aim Predict (8 Ball): -1 = auto, 0-5 = specific pocket
+static int g_selectedPocket8 = -1;
+
 #include "mod/ButtonClicker.h"
 #include "game/inc/AutoPlay.h"
 #include "game/inc/AimLockTarget.h"
@@ -492,128 +495,143 @@ static void svConfig_Load() {
     fclose(f);
 }
 
-// ── Aim Info Overlay — text-only, no background box ───────────────────────────
-// Hanya tampil saat analyzing atau sudah aimed.
-// Auto-reset setelah shoot (AutoAim::bAimed reset oleh AutoAim::Update()).
+// ── Aim Info Overlay — 2 baris simpel, text-only, auto-hide ──────────────────
 static void DrawAimInfoOverlay(ImGuiIO& io) {
     bool isAnalyzing = g_autoPlayCalculating.load() || g_aimThreadRunning.load();
     bool isAimed     = AutoAim::bAimed.load();
-
-    // Hanya tampil saat analyzing atau aimed — hilang otomatis setelah shoot
     if (!isAnalyzing && !isAimed) return;
 
     float t = (float)GetTime();
 
-    // ── Mode name + accent color ───────────────────────────────────────────
-    const char* modeName  = O("---");
-    ImVec4      modeColor = ImVec4(0.50f, 0.70f, 1.0f, 1.0f);
+    // ── Warna mode ────────────────────────────────────────────────────────
+    ImVec4 modeColor = ImVec4(0.50f, 0.70f, 1.0f, 1.0f);
+    const char* modeName = O("AIM");
     switch (g_aimMode) {
-        case AimMode::EIGHTBALL_PREDICT: modeName = O("8BP Predict");   modeColor = ImVec4(0.25f, 0.60f, 1.0f, 1.0f); break;
-        case AimMode::EIGHTBALL_BREAK:   modeName = O("8BP Break");     modeColor = ImVec4(1.0f,  0.50f, 0.10f, 1.0f); break;
-        case AimMode::EIGHTBALL_8LOCK:   modeName = O("8BP Lock 8");    modeColor = ImVec4(0.90f, 0.20f, 0.90f, 1.0f); break;
-        case AimMode::NINEBALL_PREDICT:  modeName = O("9BP Predict");   modeColor = ImVec4(0.15f, 0.85f, 0.55f, 1.0f); break;
-        case AimMode::NINEBALL_BREAK:    modeName = O("9BP Ghost Win"); modeColor = ImVec4(1.0f,  0.82f, 0.05f, 1.0f); break;
+        case AimMode::EIGHTBALL_PREDICT: modeName = O("8BP"); modeColor = ImVec4(0.25f, 0.60f, 1.0f, 1.0f); break;
+        case AimMode::EIGHTBALL_BREAK:   modeName = O("8BK"); modeColor = ImVec4(1.0f,  0.50f, 0.10f, 1.0f); break;
+        case AimMode::EIGHTBALL_8LOCK:   modeName = O("LK8"); modeColor = ImVec4(0.90f, 0.20f, 0.90f, 1.0f); break;
+        case AimMode::NINEBALL_PREDICT:  modeName = O("9BP"); modeColor = ImVec4(0.15f, 0.85f, 0.55f, 1.0f); break;
+        case AimMode::NINEBALL_BREAK:    modeName = O("9GW"); modeColor = ImVec4(1.0f,  0.82f, 0.05f, 1.0f); break;
         default: break;
     }
 
-    // ── Status ────────────────────────────────────────────────────────────
-    const char* statusText;
-    ImVec4 statusColor;
-    if (isAnalyzing) {
-        statusText  = O("ANALYZING...");
-        statusColor = ImVec4(1.0f, 0.78f, 0.0f, 1.0f);
-    } else {
-        statusText  = O("AIMED");
-        statusColor = ImVec4(0.15f, 1.0f, 0.42f, 1.0f);
-    }
+    // ── Baris 1: [MODE] · STATUS ──────────────────────────────────────────
+    char row1[64];
+    const char* status = isAnalyzing ? O("ANALYZING...") : O("AIMED");
+    snprintf(row1, sizeof(row1), O("[%s] %s"), modeName, status);
 
-    // ── Target ball ───────────────────────────────────────────────────────
-    char ballBuf[32] = "---";
-    int tgtBall = -1;
-    switch (g_aimMode) {
-        case AimMode::EIGHTBALL_PREDICT: tgtBall = AimLockTarget::lastTargetBall; break;
-        case AimMode::EIGHTBALL_BREAK:   tgtBall = AimBreak::lastTargetBall;      break;
-        case AimMode::EIGHTBALL_8LOCK:   tgtBall = 8;                             break;
-        case AimMode::NINEBALL_PREDICT:  tgtBall = Aim9Ball::lastTargetBall;      break;
-        case AimMode::NINEBALL_BREAK:    tgtBall = Aim9BallBreak::lastTargetBall; break;
-        default: break;
-    }
-    if (tgtBall >= 0) snprintf(ballBuf, sizeof(ballBuf), O("Ball %d"), tgtBall);
+    ImVec4 statusColor = isAnalyzing
+        ? ImVec4(1.0f, 0.78f, 0.0f, 1.0f)
+        : ImVec4(0.15f, 1.0f, 0.42f, 1.0f);
+    float statusAlpha = isAnalyzing ? (0.55f + 0.45f * sinf(t * 8.0f)) : (0.80f + 0.20f * sinf(t * 2.5f));
 
-    // ── Extra info ────────────────────────────────────────────────────────
-    char extraBuf[64] = "";
+    // ── Baris 2: info singkat ─────────────────────────────────────────────
+    char row2[64] = "";
     switch (g_aimMode) {
+        case AimMode::EIGHTBALL_PREDICT:
+            if (isAimed && !AimLockTarget::lastHadShot)
+                snprintf(row2, sizeof(row2), O("No shot"));
+            else if (AimLockTarget::lastTargetBall >= 0)
+                snprintf(row2, sizeof(row2), O("Ball %d  Pkt %d"),
+                    AimLockTarget::lastTargetBall, AimLockTarget::lastTargetPocket);
+            break;
         case AimMode::EIGHTBALL_BREAK:
             if (AimBreak::lastBestCount > 0)
-                snprintf(extraBuf, sizeof(extraBuf), O("Pocket: %d balls"), AimBreak::lastBestCount);
-            break;
-        case AimMode::EIGHTBALL_PREDICT:
-            if (!AimLockTarget::lastHadShot && isAimed)
-                snprintf(extraBuf, sizeof(extraBuf), O("No valid shot found"));
+                snprintf(row2, sizeof(row2), O("%d balls"), AimBreak::lastBestCount);
             break;
         case AimMode::EIGHTBALL_8LOCK:
-            if (!AimLock8Ball::lastHadShot && isAimed)
-                snprintf(extraBuf, sizeof(extraBuf), O("No valid shot found"));
+            if (isAimed && !AimLock8Ball::lastHadShot)
+                snprintf(row2, sizeof(row2), O("No shot"));
             else if (AimLock8Ball::lastTargetPocket >= 0)
-                snprintf(extraBuf, sizeof(extraBuf), O("Pocket %d"), AimLock8Ball::lastTargetPocket);
+                snprintf(row2, sizeof(row2), O("Ball 8  Pkt %d"), AimLock8Ball::lastTargetPocket);
             break;
         case AimMode::NINEBALL_PREDICT:
-            if (Aim9Ball::lastWasCombo) snprintf(extraBuf, sizeof(extraBuf), O("COMBO / WIN 9!"));
+            if (Aim9Ball::lastTargetBall >= 0)
+                snprintf(row2, sizeof(row2), O("Ball %d"), Aim9Ball::lastTargetBall);
             break;
         case AimMode::NINEBALL_BREAK:
-            if (Aim9BallBreak::lastWasWin9)
-                snprintf(extraBuf, sizeof(extraBuf), O("WIN 9 FOUND!"));
-            else if (Aim9BallBreak::lastBestCount > 0)
-                snprintf(extraBuf, sizeof(extraBuf), O("Pocket: %d balls"), Aim9BallBreak::lastBestCount);
+            if (Aim9BallBreak::lastBestCount > 0)
+                snprintf(row2, sizeof(row2), O("%d balls"), Aim9BallBreak::lastBestCount);
             break;
         default: break;
     }
 
-    // ── Draw text-only — langsung ke ForegroundDrawList, tanpa window/box ─
-    ImDrawList* fg    = GetForegroundDrawList();
-    float       x     = 24.0f;
-    float       y     = 30.0f;
-    float       lineH = GImGui->FontSize + 8.0f;
+    // ── Draw ke ForegroundDrawList ────────────────────────────────────────
+    ImDrawList* fg  = GetForegroundDrawList();
+    float       fs  = GImGui->FontSize;
+    float       x   = 22.0f;
+    float       y   = 28.0f;
 
-    // Row 1: spinning dot + mode name (animated pulse)
-    {
-        float pulse   = 0.70f + 0.30f * sinf(t * 3.0f);
-        float dotR    = isAnalyzing ? 4.5f : 3.0f;
-        float dotAlpha = isAnalyzing ? (0.55f + 0.45f * sinf(t * 7.0f)) : 0.40f;
-        float dotCX   = x + 6.0f;
-        float dotCY   = y + GImGui->FontSize * 0.55f;
-        fg->AddCircleFilled(ImVec2(dotCX, dotCY), dotR,
-            ImColor(modeColor.x, modeColor.y, modeColor.z, dotAlpha));
-        fg->AddText(ImVec2(x + 16.0f, y),
-            ImColor(modeColor.x, modeColor.y, modeColor.z, pulse),
-            modeName);
-        y += lineH;
-    }
+    // Dot animasi kecil
+    float dotAlpha = isAnalyzing ? (0.5f + 0.5f * sinf(t * 7.0f)) : 0.6f;
+    float dotR     = isAnalyzing ? 4.0f : 3.0f;
+    fg->AddCircleFilled(ImVec2(x + 5.0f, y + fs * 0.55f), dotR,
+        ImColor(modeColor.x, modeColor.y, modeColor.z, dotAlpha));
 
-    // Row 2: status text (blink when analyzing)
-    {
-        float alpha = isAnalyzing ? (0.50f + 0.50f * sinf(t * 8.5f)) : 1.0f;
-        fg->AddText(ImVec2(x, y),
-            ImColor(statusColor.x, statusColor.y, statusColor.z, alpha),
-            statusText);
-        y += lineH;
-    }
+    // Baris 1
+    float pulse1 = 0.75f + 0.25f * sinf(t * 3.0f);
+    // Shadow
+    fg->AddText(ImVec2(x + 15.0f + 1, y + 1), IM_COL32(0, 0, 0, 100), row1);
+    fg->AddText(ImVec2(x + 15.0f, y),
+        ImColor(statusColor.x, statusColor.y, statusColor.z, statusAlpha * pulse1), row1);
+    y += fs + 5.0f;
 
-    // Row 3: target ball
-    {
-        char targetLine[64];
-        snprintf(targetLine, sizeof(targetLine), O("Target: %s"), ballBuf);
-        fg->AddText(ImVec2(x, y), IM_COL32(160, 175, 200, 210), targetLine);
-        y += lineH;
+    // Baris 2 (hanya jika ada info)
+    if (row2[0] != '\0') {
+        float glow = 0.70f + 0.30f * sinf(t * 4.5f);
+        fg->AddText(ImVec2(x + 15.0f + 1, y + 1), IM_COL32(0, 0, 0, 80), row2);
+        fg->AddText(ImVec2(x + 15.0f, y),
+            ImColor(modeColor.x * glow, modeColor.y * glow, modeColor.z * glow, 0.95f), row2);
     }
+}
 
-    // Row 4: extra info (glow animation)
-    if (extraBuf[0] != '\0') {
-        float glow = 0.65f + 0.35f * sinf(t * 5.5f);
-        fg->AddText(ImVec2(x, y),
-            ImColor(modeColor.x * glow, modeColor.y * glow, modeColor.z * glow, 1.0f),
-            extraBuf);
+// ── WIN Center Banner — muncul di tengah atas layar ───────────────────────────
+static void DrawWinCenterBanner(ImGuiIO& io) {
+    if (!AutoAim::bAimed.load()) return;
+
+    bool hasWin = false;
+    const char* winMsg = "";
+    ImVec4 winColor = ImVec4(0.10f, 1.0f, 0.45f, 1.0f);
+
+    if (g_aimMode == AimMode::NINEBALL_BREAK && Aim9BallBreak::lastWasWin9) {
+        hasWin = true;
+        winMsg = O("WIN 9 FOUND!");
+        winColor = ImVec4(1.0f, 0.85f, 0.0f, 1.0f);
+    } else if (g_aimMode == AimMode::NINEBALL_PREDICT && Aim9Ball::lastWasCombo) {
+        hasWin = true;
+        winMsg = O("COMBO WIN!");
+        winColor = ImVec4(0.10f, 1.0f, 0.55f, 1.0f);
     }
+    if (!hasWin) return;
+
+    float t = (float)GetTime();
+    ImDrawList* fg = GetForegroundDrawList();
+    float fs2 = GImGui->FontSize * 1.85f;
+
+    // Hitung lebar teks dengan skala besar (estimasi: scale * lebar normal)
+    float normalW  = GImGui->Font->CalcTextSizeA(GImGui->FontSize, FLT_MAX, 0.0f, winMsg, nullptr, nullptr).x;
+    float scaledW  = normalW * 1.85f;
+    float cx       = io.DisplaySize.x * 0.5f - scaledW * 0.5f;
+    float cy       = 52.0f;
+
+    // Glow halo di belakang
+    float halo = 0.20f + 0.15f * sinf(t * 3.5f);
+    fg->AddRectFilled(
+        ImVec2(cx - 18.0f, cy - 6.0f),
+        ImVec2(cx + scaledW + 18.0f, cy + fs2 + 6.0f),
+        ImColor(winColor.x * 0.15f, winColor.y * 0.15f, winColor.z * 0.15f, halo + 0.25f),
+        10.0f);
+    fg->AddRect(
+        ImVec2(cx - 18.0f, cy - 6.0f),
+        ImVec2(cx + scaledW + 18.0f, cy + fs2 + 6.0f),
+        ImColor(winColor.x, winColor.y, winColor.z, 0.30f + 0.20f * sinf(t * 4.0f)),
+        10.0f, 0, 1.5f);
+
+    // Shadow + teks utama besar
+    float alpha = 0.88f + 0.12f * sinf(t * 2.5f);
+    fg->AddText(GImGui->Font, fs2, ImVec2(cx + 2, cy + 2), IM_COL32(0, 0, 0, 140), winMsg);
+    fg->AddText(GImGui->Font, fs2, ImVec2(cx, cy),
+        ImColor(winColor.x, winColor.y, winColor.z, alpha), winMsg);
 }
 
 
@@ -738,22 +756,71 @@ static void DrawContentArea(float winW, float winH) {
                 AutoAim::bActive = persistent_bool[O("bAutoAim")];
                 need_save = true;
             }
-            Dummy(ImVec2(0, 20));
+            Dummy(ImVec2(0, 16));
 
-            // ── Mode selector: radio-style toggle switches ─────────────────
+            // ── Mode selector ─────────────────────────────────────────────
             auto ModeSwitch8 = [&](const char* label, AimMode mode) {
                 bool isOn  = (g_aimMode == mode);
                 bool wasOn = isOn;
                 ToggleSwitch(label, &isOn);
-                // Jika user aktifkan switch ini, set mode (jangan bisa di-off tanpa pilih lain)
                 if (isOn && !wasOn) g_aimMode = mode;
-                if (!isOn && wasOn) {} // abaikan — tidak bisa turn off manual
-                Dummy(ImVec2(0, 8));
+                if (!isOn && wasOn) {}
+                Dummy(ImVec2(0, 6));
             };
 
-            ModeSwitch8(O("Aim Break"),        AimMode::EIGHTBALL_BREAK);
-            ModeSwitch8(O("Aim Predict"),      AimMode::EIGHTBALL_PREDICT);
-            ModeSwitch8(O("Aim Lock 8 Ball"),  AimMode::EIGHTBALL_8LOCK);
+            ModeSwitch8(O("Aim Break"),       AimMode::EIGHTBALL_BREAK);
+            ModeSwitch8(O("Aim Predict"),     AimMode::EIGHTBALL_PREDICT);
+            ModeSwitch8(O("Aim Lock 8 Ball"), AimMode::EIGHTBALL_8LOCK);
+
+            // ── Pocket Selector (khusus Aim Predict & Lock 8) ─────────────
+            if (g_aimMode == AimMode::EIGHTBALL_PREDICT || g_aimMode == AimMode::EIGHTBALL_8LOCK) {
+                Dummy(ImVec2(0, 12));
+                TextColored(ImVec4(0.60f, 0.65f, 0.80f, 1.0f), O("Target Pocket"));
+                Dummy(ImVec2(0, 8));
+
+                float avail  = GetContentRegionAvail().x;
+                float btnW   = (avail - 6.0f * 5.0f) / 7.0f; // 7 tombol: Auto + P0-P5
+                float btnH   = 42.0f;
+
+                // Tombol "Auto"
+                {
+                    bool isAuto = (g_selectedPocket8 < 0);
+                    if (isAuto) PushStyleColor(ImGuiCol_Button, ImVec4(0.12f, 0.45f, 0.95f, 1.0f));
+                    else        PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.18f, 0.22f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.55f, 1.0f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.30f, 0.70f, 1.0f));
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                    if (Button(O("Auto"), ImVec2(btnW, btnH))) g_selectedPocket8 = -1;
+                    PopStyleVar();
+                    PopStyleColor(3);
+                    SameLine(0, 5.0f);
+                }
+
+                // Tombol P0-P5
+                const char* pktLabels[] = { O("P0"), O("P1"), O("P2"), O("P3"), O("P4"), O("P5") };
+                for (int p = 0; p < 6; p++) {
+                    bool isSel = (g_selectedPocket8 == p);
+                    if (isSel) PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.75f, 0.45f, 1.0f));
+                    else        PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.18f, 0.22f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.85f, 0.55f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.60f, 0.35f, 1.0f));
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                    if (Button(pktLabels[p], ImVec2(btnW, btnH))) g_selectedPocket8 = p;
+                    PopStyleVar();
+                    PopStyleColor(3);
+                    if (p < 5) SameLine(0, 5.0f);
+                }
+
+                Dummy(ImVec2(0, 4));
+                // Info pocket yang dipilih
+                if (g_selectedPocket8 >= 0) {
+                    char pkBuf[48];
+                    snprintf(pkBuf, sizeof(pkBuf), O("Aim locked to Pocket %d"), g_selectedPocket8);
+                    TextColored(ImVec4(0.10f, 0.90f, 0.55f, 0.90f), "%s", pkBuf);
+                } else {
+                    TextColored(ImVec4(0.50f, 0.55f, 0.65f, 0.80f), O("Auto pocket selection"));
+                }
+            }
 
             break;
         }
@@ -785,37 +852,107 @@ static void DrawContentArea(float winW, float winH) {
         
         case 3: {
             // ── INFO ──────────────────────────────────────────────────────────
-            auto DrawSecHdr = [&](const char* title) {
-                Dummy(ImVec2(0, 12));
+            ImDrawList* dl3 = GetWindowDrawList();
+
+            // Helper: section header dengan gradient line kiri-kanan
+            auto DrawSecHdr = [&](const char* title, ImVec4 lineCol) {
+                Dummy(ImVec2(0, 14));
                 float avail = GetContentRegionAvail().x;
                 ImVec2 p    = GetCursorScreenPos();
                 float  fs   = GImGui->FontSize;
                 ImVec2 ts   = CalcTextSize(title);
-                float  lineY = p.y + fs * 0.5f;
-                float  gap   = 8.0f;
+                float  gap  = 10.0f;
                 float  lineW = (avail - ts.x - gap * 2.0f) * 0.5f;
-                ImDrawList* dl2 = GetWindowDrawList();
-                dl2->AddLine(ImVec2(p.x, lineY), ImVec2(p.x + lineW, lineY), IM_COL32(40,100,220,160), 1.0f);
-                dl2->AddLine(ImVec2(p.x + lineW + gap + ts.x + gap, lineY), ImVec2(p.x + avail, lineY), IM_COL32(40,100,220,160), 1.0f);
+                float  lineY = p.y + fs * 0.52f;
+                ImU32  lc   = ImColor(lineCol);
+                ImU32  lc0  = ImColor(lineCol.x, lineCol.y, lineCol.z, 0.0f);
+                // Gradient line kiri (fade ke kanan)
+                dl3->AddRectFilledMultiColor(
+                    ImVec2(p.x, lineY - 1.0f), ImVec2(p.x + lineW, lineY + 1.5f),
+                    lc0, lc, lc, lc0);
+                // Gradient line kanan (fade ke kiri)
+                dl3->AddRectFilledMultiColor(
+                    ImVec2(p.x + lineW + gap + ts.x + gap, lineY - 1.0f),
+                    ImVec2(p.x + avail, lineY + 1.5f),
+                    lc, lc0, lc0, lc);
                 SetCursorPosX(GetCursorPosX() + lineW + gap);
-                TextColored(ImVec4(0.50f, 0.55f, 0.70f, 1.0f), "%s", title);
-                Dummy(ImVec2(0, 6));
+                TextColored(lineCol, "%s", title);
+                Dummy(ImVec2(0, 8));
             };
-            auto DrawRow = [&](const char* key, const char* val) {
-                TextColored(ImVec4(0.45f, 0.48f, 0.58f, 1.0f), "%s", key);
+
+            // Helper: baris info — key kiri, value kanan (aligned)
+            auto DrawInfoRow = [&](const char* key, const char* val, ImVec4 valColor) {
+                ImVec2 cp = GetCursorScreenPos();
+                float  fs = GImGui->FontSize;
+                // Dot kecil dekorasi
+                dl3->AddCircleFilled(ImVec2(cp.x + 5.0f, cp.y + fs * 0.52f),
+                    2.5f, IM_COL32(60, 130, 220, 180));
+                SetCursorPosX(GetCursorPosX() + 14.0f);
+                TextColored(ImVec4(0.45f, 0.50f, 0.62f, 1.0f), "%s", key);
                 SameLine();
-                TextColored(ImVec4(0.88f, 0.90f, 0.96f, 1.0f), "%s", val);
-                Dummy(ImVec2(0, 3));
+                TextColored(valColor, "%s", val);
+                Dummy(ImVec2(0, 4));
             };
+
+            // ── Kartu @LYN4XP (hero card) ─────────────────────────────────────
+            {
+                float t   = (float)GetTime();
+                float cardW = GetContentRegionAvail().x;
+                float cardH = 90.0f;
+                ImVec2 cPos = GetCursorScreenPos();
+
+                // Background gelap gradient
+                dl3->AddRectFilledMultiColor(
+                    cPos, ImVec2(cPos.x + cardW, cPos.y + cardH),
+                    IM_COL32(5, 20, 12, 240), IM_COL32(8, 28, 18, 240),
+                    IM_COL32(6, 24, 14, 240), IM_COL32(4, 18, 10, 240));
+
+                // Border hijau neon (animated glow)
+                float glowA = 0.55f + 0.35f * sinf(t * 2.8f);
+                float glowA2 = 0.20f + 0.15f * sinf(t * 2.8f + 1.0f);
+                dl3->AddRect(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH),
+                    ImColor(0.05f, 0.95f, 0.45f, glowA), 14.0f, 0, 1.8f);
+                // Outer soft glow
+                dl3->AddRect(
+                    ImVec2(cPos.x - 2, cPos.y - 2),
+                    ImVec2(cPos.x + cardW + 2, cPos.y + cardH + 2),
+                    ImColor(0.05f, 0.95f, 0.45f, glowA2), 16.0f, 0, 3.5f);
+
+                // @LYN4XP — centered, scale besar, bold feel
+                float bigScale = 1.55f;
+                SetWindowFontScale(bigScale);
+                float tw = CalcTextSize(O("@LYN4XP")).x;
+                float tx = cPos.x - GetWindowPos().x + (cardW - tw) * 0.5f;
+                SetCursorPosX(tx);
+                SetCursorPosY(GetCursorPosY() + 12.0f);
+                // Shadow teks
+                ImVec2 tSS = GetCursorScreenPos();
+                dl3->AddText(GImGui->Font, GImGui->FontSize * bigScale,
+                    ImVec2(tSS.x + 2, tSS.y + 2), IM_COL32(0, 60, 20, 140), O("@LYN4XP"));
+                // Teks hijau neon pulse
+                float pulse = 0.80f + 0.20f * sinf(t * 3.5f);
+                TextColored(ImVec4(0.08f, 0.95f + 0.05f * pulse, 0.45f, 1.0f), O("@LYN4XP"));
+                SetWindowFontScale(1.0f);
+
+                // t.me/Lyn4xp — centered, kecil
+                float tw2 = CalcTextSize(O("t.me/Lyn4xp")).x;
+                float tx2 = cPos.x - GetWindowPos().x + (cardW - tw2) * 0.5f;
+                SetCursorPosX(tx2);
+                TextColored(ImVec4(0.25f, 0.75f, 0.45f, 0.80f), O("t.me/Lyn4xp"));
+
+                // Advance cursor past card
+                SetCursorPosY(GetCursorPosY() + (cardH - (GetCursorPosY() - (cPos.y - GetWindowPos().y))) + 10.0f);
+                Dummy(ImVec2(0, 0));
+            }
 
             // ── Mod Info ─────────────────────────────────────────────────────
-            DrawSecHdr(O("Mod Info"));
-            DrawRow(O("Engine:  "), O("Flux Pro Engine v2.0"));
-            DrawRow(O("Game:    "), O("8 Ball Pool"));
-            DrawRow(O("Arch:    "), O("arm64-v8a"));
-            DrawRow(O("Build:   "), O(__DATE__ " " __TIME__));
-
+            DrawSecHdr(O("Mod Info"), ImVec4(0.30f, 0.65f, 1.0f, 0.85f));
             {
+                DrawInfoRow(O("Engine  "), O("Flux Pro Engine v2.0"),  ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
+                DrawInfoRow(O("Game    "), O("8 Ball Pool"),            ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
+                DrawInfoRow(O("Arch    "), O("arm64-v8a"),              ImVec4(0.55f, 0.85f, 1.0f, 1.0f));
+                DrawInfoRow(O("Build   "), O(__DATE__ " " __TIME__),    ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
+
                 int64_t now_ts = (int64_t)time(nullptr);
                 int64_t diff   = EXPIRY_TS - now_ts;
                 char expBuf[64];
@@ -824,51 +961,14 @@ static void DrawContentArea(float winW, float winH) {
                     int hours = (int)((diff % 86400) / 3600);
                     int mins  = (int)((diff % 3600)  / 60);
                     snprintf(expBuf, sizeof(expBuf), "%dd %dh %dm", days, hours, mins);
+                    DrawInfoRow(O("Expires "), expBuf, ImVec4(0.30f, 1.0f, 0.55f, 1.0f));
                 } else {
-                    snprintf(expBuf, sizeof(expBuf), "%s", O("EXPIRED"));
+                    DrawInfoRow(O("Expires "), O("EXPIRED"), ImVec4(1.0f, 0.25f, 0.25f, 1.0f));
                 }
-                DrawRow(O("Expires: "), expBuf);
             }
-
-            // ── Contact & Owner ───────────────────────────────────────────────
-            DrawSecHdr(O("Contact & Owner"));
-            Dummy(ImVec2(0, 6));
-
-            // Kartu owner — gunakan ImGui child window agar tidak overlap
-            {
-                float cardW = GetContentRegionAvail().x;
-                PushStyleColor(ImGuiCol_ChildBg, IM_COL32(14, 38, 88, 220));
-                PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
-                if (BeginChild(O("##OwnerCard"), ImVec2(cardW, 76), false,
-                               ImGuiWindowFlags_NoScrollbar)) {
-                    float innerW = GetContentRegionAvail().x;
-                    Dummy(ImVec2(0, 8));
-
-                    // @LYN4XP — centered, besar
-                    SetWindowFontScale(1.22f);
-                    float tw = CalcTextSize(O("@LYN4XP")).x;
-                    SetCursorPosX((innerW - tw) * 0.5f);
-                    TextColored(ImVec4(0.30f, 0.78f, 1.0f, 1.0f), O("@LYN4XP"));
-                    SetWindowFontScale(1.0f);
-
-                    // t.me/Lyn4xp — centered, kecil
-                    float tw2 = CalcTextSize(O("t.me/Lyn4xp")).x;
-                    SetCursorPosX((innerW - tw2) * 0.5f);
-                    TextColored(ImVec4(0.60f, 0.80f, 1.0f, 0.80f), O("t.me/Lyn4xp"));
-                }
-                EndChild();
-                PopStyleVar();
-                PopStyleColor();
-            }
-
-            Dummy(ImVec2(0, 8));
-            PushTextWrapPos(GetContentRegionAvail().x + GetCursorPosX());
-            TextColored(ImVec4(0.85f, 0.20f, 0.20f, 1.0f),
-                O("FREE BETA. If you paid for this, you were SCAMMED."));
-            PopTextWrapPos();
 
             // ── Device Info ───────────────────────────────────────────────────
-            DrawSecHdr(O("Device"));
+            DrawSecHdr(O("Device"), ImVec4(0.25f, 0.80f, 0.55f, 0.85f));
             {
                 static char s_mfr[PROP_VALUE_MAX] = {};
                 static char s_mdl[PROP_VALUE_MAX] = {};
@@ -882,10 +982,26 @@ static void DrawContentArea(float winW, float winH) {
                     __system_property_get("ro.build.version.release",s_and);
                     loaded = true;
                 }
-                DrawRow(O("Maker:   "), s_mfr);
-                DrawRow(O("Model:   "), s_mdl);
-                DrawRow(O("ABI:     "), s_abi);
-                DrawRow(O("Android: "), s_and);
+                DrawInfoRow(O("Maker   "), s_mfr, ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
+                DrawInfoRow(O("Model   "), s_mdl, ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
+                DrawInfoRow(O("ABI     "), s_abi, ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
+                DrawInfoRow(O("Android "), s_and, ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
+            }
+
+            // ── Free Beta notice ──────────────────────────────────────────────
+            Dummy(ImVec2(0, 10));
+            {
+                float nW = GetContentRegionAvail().x;
+                ImVec2 nPos = GetCursorScreenPos();
+                dl3->AddRectFilled(nPos, ImVec2(nPos.x + nW, nPos.y + GImGui->FontSize + 14.0f),
+                    IM_COL32(60, 15, 15, 200), 8.0f);
+                Dummy(ImVec2(0, 5));
+                SetCursorPosX(GetCursorPosX() + 8.0f);
+                PushTextWrapPos(GetCursorPosX() + nW - 16.0f);
+                TextColored(ImVec4(1.0f, 0.38f, 0.38f, 1.0f),
+                    O("FREE BETA — If you paid, you were SCAMMED."));
+                PopTextWrapPos();
+                Dummy(ImVec2(0, 6));
             }
             break;
         }
@@ -899,16 +1015,24 @@ static void DrawContentArea(float winW, float winH) {
 
 INLINE void DrawMenu(ImGuiIO& io) {
     if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
-        // Auto-open menu on first frame when bypassing login
+        // Auto-open menu saat pertama kali bypass login
         if (DEBUG_BYPASS_LOGIN) {
             static bool s_autoOpened = false;
             if (!s_autoOpened) { g_menu.isOpen = true; s_autoOpened = true; }
         }
 
-        buttonClicker.Update();
-        AutoAim::Update();   // auto-reset bAimed setelah shoot (state bukan giliran)
+        // Auto-open menu ketika match dimulai (transisi tidak-ingame → ingame)
+        {
+            static bool s_wasInGame = false;
+            if (g_espIsInGame && !s_wasInGame) {
+                g_menu.isOpen = true;
+            }
+            s_wasInGame = g_espIsInGame;
+        }
 
-        // Reset game state flags before each frame's DrawESP
+        buttonClicker.Update();
+        AutoAim::Update();
+
         g_espStateReady = false;
 
         if (is_segv_handler_active()) {
@@ -917,10 +1041,6 @@ INLINE void DrawMenu(ImGuiIO& io) {
             jump_buffer_active = 0;
         }
 
-        // ── ImGui overlay windows — OUTSIDE sigsetjmp guard ─────────────────
-        // DrawToggleButton opens an ImGui::Begin/End window.
-        // Calling it outside the sigsetjmp ensures the window stack stays
-        // clean even if DrawESP crashes mid-frame.
         if (g_espStateReady && persistent_bool[O("bAutoAim")] && g_espIsInGame) {
             DrawToggleButton();
         }
@@ -942,7 +1062,8 @@ INLINE void DrawMenu(ImGuiIO& io) {
             SetNextWindowPos(ImVec2(Width / 2.0f, Height / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
             
             PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.13f, 0.f));
-            PushStyleVar(ImGuiStyleVar_WindowRounding, 16.0f);
+            PushStyleVar(ImGuiStyleVar_WindowRounding, 24.0f);
+            PushStyleVar(ImGuiStyleVar_ChildRounding,  16.0f);
             PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
             PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
             PushStyleVar(ImGuiStyleVar_Alpha, g_menu.menuAlpha);
@@ -957,7 +1078,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
             }
             End();
             
-            PopStyleVar(4);
+            PopStyleVar(5);
             PopStyleColor();
         }
     }
@@ -1016,7 +1137,13 @@ static void DrawToggleButton() {
         }
 
         if (clicked && !g_aimThreadRunning.load()) {
-            // Jalankan di background thread agar game TIDAK freeze saat scan angle
+            // Reset hasil aim sebelumnya agar overlay bersih
+            AimLockTarget::lastTargetBall  = -1; AimLockTarget::lastHadShot    = false;
+            AimLock8Ball::lastHadShot      = false; AimLock8Ball::lastTargetPocket = -1;
+            AimBreak::lastBestCount        = 0;  AimBreak::lastTargetBall       = -1;
+            Aim9Ball::lastTargetBall       = -1; Aim9Ball::lastWasCombo         = false;
+            Aim9BallBreak::lastWasWin9     = false; Aim9BallBreak::lastBestCount = 0;
+
             g_autoPlayCalculating = true;
             AutoAim::bAimed       = false;
             g_aimThreadRunning    = true;
@@ -1077,7 +1204,19 @@ static void DrawFloatingButton(ImGuiIO& io) {
         SetCursorPos(ImVec2(0, 0));
         InvisibleButton(O("##FloatBtnHit"), ImVec2(winSize, winSize));
 
-        // Draw logo — no animations, fixed size
+        // Glow ring di belakang logo
+        float t = (float)GetTime();
+        bool menuOpen = g_menu.isOpen;
+        float glowPulse = 0.40f + 0.25f * sinf(t * 2.5f);
+        ImU32 glowCol = menuOpen
+            ? ImColor(0.20f, 0.65f, 1.0f, glowPulse)
+            : ImColor(0.10f, 0.35f, 0.80f, glowPulse * 0.6f);
+        dl->AddCircleFilled(center, buttonRadius + 8.0f, ImColor(0.0f, 0.0f, 0.0f, 0.35f));
+        dl->AddCircle(center, buttonRadius + 5.0f, glowCol, 0, 3.0f);
+        dl->AddCircle(center, buttonRadius + 9.0f,
+            ImColor(0.15f, 0.50f, 1.0f, glowPulse * 0.30f), 0, 5.0f);
+
+        // Logo
         dl->AddImage((void*)(intptr_t)logo_tex,
                      ImVec2(center.x - buttonRadius, center.y - buttonRadius),
                      ImVec2(center.x + buttonRadius, center.y + buttonRadius));
@@ -1292,13 +1431,35 @@ DEFINES(EGLBoolean, Draw, EGLDisplay dpy, EGLSurface surface) {
           ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize | 
           ImGuiWindowFlags_NoInputs);
     
-    TextColored(ImColor(51, 140, 255, 255), O("@LYN4XP"));
+    {
+        float t2 = (float)ImGui::GetTime();
+        float gA  = 0.75f + 0.25f * sinf(t2 * 2.8f);
+        ImVec2 cp = ImGui::GetCursorScreenPos();
+        ImDrawList* fgDl = ImGui::GetWindowDrawList();
+        const char* lbl  = O("@LYN4XP");
+        ImVec2 ts2 = ImGui::CalcTextSize(lbl);
+        // Subtle dark pill bg
+        fgDl->AddRectFilled(
+            ImVec2(cp.x - 8, cp.y - 3),
+            ImVec2(cp.x + ts2.x + 8, cp.y + ts2.y + 3),
+            IM_COL32(3, 18, 10, 180), 8.0f);
+        // Green border pulse
+        fgDl->AddRect(
+            ImVec2(cp.x - 8, cp.y - 3),
+            ImVec2(cp.x + ts2.x + 8, cp.y + ts2.y + 3),
+            ImColor(0.05f, 0.92f, 0.42f, gA * 0.70f), 8.0f, 0, 1.2f);
+        // Shadow
+        fgDl->AddText(ImVec2(cp.x + 1, cp.y + 1), IM_COL32(0, 40, 15, 120), lbl);
+        ImGui::TextColored(ImVec4(0.06f, 0.95f + 0.05f * sinf(t2 * 4.0f), 0.42f, gA), "%s", lbl);
+    }
     
     End();
 }
 
-        if (persistent_bool[O("bAutoAim")] && g_espIsInGame)
+        if (persistent_bool[O("bAutoAim")] && g_espIsInGame) {
             DrawAimInfoOverlay(io);
+            DrawWinCenterBanner(io);
+        }
     } else {
         DrawLogin(io);
     }

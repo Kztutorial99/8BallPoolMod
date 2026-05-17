@@ -106,22 +106,17 @@ namespace AimLockTarget {
         bool classValid = false;
         Ball::Classification myClass = DetectMyClass(classValid);
 
-        // Jika kelas belum ditentukan (belum pilih solid/stripe), tidak bisa aim
-        if (!classValid) {
-            lastHadShot = false;
-            return;
-        }
+        if (!classValid) { lastHadShot = false; return; }
 
-        // Tentukan target: 8-ball jika semua bola sendiri sudah masuk
         bool only8BLeft = (CountMyBallsOnTable(myClass) == 0);
         Ball::Classification target   = only8BLeft
             ? Ball::Classification::EIGHT_BALL : myClass;
         Ball::Classification opponent = (myClass == Ball::Classification::SOLID)
             ? Ball::Classification::STRIPE : Ball::Classification::SOLID;
 
-        // ── Phase 1: Coarse scan (full circle) ────────────────────────────
-        double bestAngle  = startAngle;
-        int    bestScore  = -9999;
+        // ── Phase 1: Coarse scan ───────────────────────────────────────────
+        double bestAngle     = startAngle;
+        int    bestScore     = -9999;
         int    bestBallIdx   = -1;
         int    bestPocketIdx = -1;
 
@@ -130,18 +125,31 @@ namespace AimLockTarget {
 
         for (int iter = 0; iter < maxIter; iter++) {
             int sc = ScoreAngle(scanAngle, target, opponent, only8BLeft);
-            if (sc > bestScore) {
-                bestScore = sc;
-                bestAngle = scanAngle;
-                // Catat bola target pertama yang masuk
+            if (sc > 0) {
+                // Ambil pocket bola target pertama yang masuk
+                int firstBall   = -1;
+                int firstPocket = -1;
                 for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
                     auto& ball = gPrediction->guiData.balls[i];
                     if (!ball.originalOnTable || ball.onTable) continue;
                     if (ball.classification == target) {
-                        bestBallIdx   = i;
-                        bestPocketIdx = ball.pocketIndex;
+                        firstBall   = i;
+                        firstPocket = ball.pocketIndex;
                         break;
                     }
+                }
+                // Filter pocket: jika user sudah pilih pocket, skip angle ini jika bukan pocket itu
+                if (g_selectedPocket8 >= 0 && firstPocket != g_selectedPocket8) {
+                    scanAngle = fmod(scanAngle + COARSE_STEP + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS);
+                    scanAngle = NumberUtils::normalizeDoublePrecision(scanAngle);
+                    if (iter > 0 && std::abs(scanAngle - startAngle) < COARSE_STEP * 0.5) break;
+                    continue;
+                }
+                if (sc > bestScore) {
+                    bestScore     = sc;
+                    bestAngle     = scanAngle;
+                    bestBallIdx   = firstBall;
+                    bestPocketIdx = firstPocket;
                 }
             }
             scanAngle = fmod(scanAngle + COARSE_STEP + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS);
@@ -149,14 +157,9 @@ namespace AimLockTarget {
             if (iter > 0 && std::abs(scanAngle - startAngle) < COARSE_STEP * 0.5) break;
         }
 
-        // Tidak ada shot valid sama sekali
-        if (bestScore < 0) {
-            lastTargetBall  = -1;
-            lastHadShot     = false;
-            return;
-        }
+        if (bestScore < 0) { lastTargetBall = -1; lastHadShot = false; return; }
 
-        // ── Phase 2: Fine refinement di sekitar best angle ─────────────────
+        // ── Phase 2: Fine refinement ───────────────────────────────────────
         double refineStart = bestAngle - COARSE_STEP;
         double refineEnd   = bestAngle + COARSE_STEP;
         double fineAngle   = refineStart;
@@ -165,27 +168,35 @@ namespace AimLockTarget {
             fineAngle = NumberUtils::normalizeDoublePrecision(
                 fmod(fineAngle + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS));
             int sc = ScoreAngle(fineAngle, target, opponent, only8BLeft);
-            if (sc > bestScore) {
-                bestScore = sc;
-                bestAngle = fineAngle;
+            if (sc > 0) {
+                int firstBall   = -1;
+                int firstPocket = -1;
                 for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
                     auto& ball = gPrediction->guiData.balls[i];
                     if (!ball.originalOnTable || ball.onTable) continue;
                     if (ball.classification == target) {
-                        bestBallIdx   = i;
-                        bestPocketIdx = ball.pocketIndex;
+                        firstBall   = i;
+                        firstPocket = ball.pocketIndex;
                         break;
                     }
                 }
+                if (g_selectedPocket8 >= 0 && firstPocket != g_selectedPocket8) {
+                    fineAngle += FINE_STEP;
+                    if (fineAngle - refineEnd > 0.0) break;
+                    continue;
+                }
+                if (sc > bestScore) {
+                    bestScore     = sc;
+                    bestAngle     = fineAngle;
+                    bestBallIdx   = firstBall;
+                    bestPocketIdx = firstPocket;
+                }
             }
             fineAngle += FINE_STEP;
-            // Hentikan refinement jika sudah melewati jangkauan
-            double diff = fineAngle - refineEnd;
-            if (diff > 0.0) break;
+            if (fineAngle - refineEnd > 0.0) break;
         }
 
-        // ── Terapkan hasil ────────────────────────────────────────────────
-        lastTargetBall  = bestBallIdx;
+        lastTargetBall   = bestBallIdx;
         lastTargetPocket = bestPocketIdx;
         lastHadShot      = true;
         vg.mAimAngle(bestAngle);
