@@ -188,7 +188,7 @@ static std::string ReadNSString(ptr str) {
 }
 
 // Set true by AutoPlay when scanning — shows CALCULATING overlay
-static bool g_autoPlayCalculating = false;
+static std::atomic<bool> g_autoPlayCalculating{false};
 
 // Game state flags — set by DrawESP (inside sigsetjmp), read by DrawMenu (outside)
 static bool g_espStateReady = false;
@@ -313,11 +313,13 @@ INLINE void DrawESP(ImDrawList* draw) {
             AutoAim::Update();
         }
 
+        if (!gPrediction) return;
+
         auto stateId = gameStateManager.getCurrentStateId();
-        if (stateId == 4) gPrediction->determineShotResult(false);
+        if (stateId == 4 && !g_aimThreadRunning.load()) gPrediction->determineShotResult(false);
 
         // Enemy Line: gambar prediksi tembakan lawan saat giliran lawan (state 7)
-        if (stateId == 7 && persistent_bool[O("bESP_EnemyLine")]) {
+        if (stateId == 7 && persistent_bool[O("bESP_EnemyLine")] && !g_aimThreadRunning.load()) {
             gPrediction->determineShotResult(false);
             float lineThick = (float)persistent_int[O("iLineThickness")];
             if (lineThick < 1.f) lineThick = 1.f;
@@ -351,7 +353,7 @@ INLINE void DrawESP(ImDrawList* draw) {
             }
         }
 
-        if (persistent_bool[O("bESP_DrawPredictionLine")]) {
+        if (persistent_bool[O("bESP_DrawPredictionLine")] && !g_aimThreadRunning.load()) {
             for (int i = 0; i < gPrediction->guiData.ballsCount; i++) {
                 auto& ball = gPrediction->guiData.balls[i];
 
@@ -368,7 +370,7 @@ INLINE void DrawESP(ImDrawList* draw) {
             }
         }
 
-        if (persistent_bool[O("bESP_DrawPredictionLine")]) {
+        if (persistent_bool[O("bESP_DrawPredictionLine")] && !g_aimThreadRunning.load()) {
             for (int i = 0; i < gPrediction->guiData.ballsCount; i++) {
                 auto& ball = gPrediction->guiData.balls[i];
 

@@ -6,8 +6,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 namespace AutoAim {
-    bool bActive      = false;
-    bool bAimed       = false;
+    bool bActive                  = false;
+    std::atomic<bool> bAimed{false};
     int  aimedBallIdx = -1;   // ball index that was aimed at (for overlay)
 
     static constexpr double ANGLE_STEP = MIN_ANGLE_STEP_RADIANS;
