@@ -234,12 +234,10 @@ INLINE void DrawAutoQueue() {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - g_aqCountdownStart).count();
         int remaining_ms = 8000 - (int)elapsed;
 
-      // if (remaining_ms <= 0) {
-           // if (sharedMenuManager.getMenuStateId() == 13) PopMenuState(13);
-            //StartLastMatch();
-           // g_aqCounting = false;
-          //  return;
-       // }
+        if (remaining_ms <= 0) {
+            AutoQueue::TryStartMatch();
+            return;
+        }
 
         std::string count_str = std::to_string((remaining_ms / 1000) + 1);
 
@@ -325,7 +323,7 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         if (persistent_bool[O("bAutoPlay")]) {
             DrawToggleButton(false);
-      //      AutoPlay::Update();
+            AutoPlay::Update();
         }
         //if (persistent_bool[O("bAutoAim")]) AutoAim::AIM();
 
@@ -499,6 +497,9 @@ static float g_sideBtnsY      = 0.0f;
 static float g_toggleRotAngle = 0.0f;
 // Set true by AutoPlay when in SLOW scan state — shows CALCULATING overlay
 static bool  g_autoPlayCalculating = false;
+
+#include "game/inc/AutoPlay.h"
+#include "game/inc/AutoQueue.h"
 
 // ── svConfig ──────────────────────────────────────────────────────────────────
 static void svConfig_Save() {
@@ -880,6 +881,8 @@ static void DrawContentArea(float winW, float winH) {
 
 INLINE void DrawMenu(ImGuiIO& io) {
     if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
+        buttonClicker.Update();
+
         if (is_segv_handler_active()) {
             jump_buffer_active = 1;
             if (!sigsetjmp(jump_buffer, 1)) DrawESP(GetBackgroundDrawList());
@@ -963,8 +966,8 @@ static void DrawToggleButton(bool cancelMode) {
         bool clicked = InvisibleButton(O("##TglBtnHit"), size);
 
         // Pick texture based on state
-        GLuint tex = cancelMode ? queue_cancel_tex : play_off_tex;
-               //    : (AutoPlay::bAutoPlaying ? play_on_tex : play_off_tex);
+        GLuint tex = cancelMode ? queue_cancel_tex
+                                : (AutoPlay::bAutoPlaying ? play_on_tex : play_off_tex);
 
         float r = size.x * 0.5f;
         ImDrawList* dl = GetWindowDrawList();
@@ -984,8 +987,8 @@ static void DrawToggleButton(bool cancelMode) {
                 persistent_bool[O("bAutoQueue")] = false;
                 g_aqCounting = false;
             } else {
-             //   AutoPlay::bAutoPlaying = !AutoPlay::bAutoPlaying;
-              //  if (AutoPlay::bAutoPlaying) AutoPlay::ClearState();
+                AutoPlay::bAutoPlaying = !AutoPlay::bAutoPlaying;
+                if (AutoPlay::bAutoPlaying) AutoPlay::ClearState();
             }
         }
     }
