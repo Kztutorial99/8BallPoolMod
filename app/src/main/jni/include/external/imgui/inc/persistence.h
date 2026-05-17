@@ -69,6 +69,7 @@ static std::map<std::string, bool> persistent_bool = {
     {"bESP_DrawInitialPos", true},
     {"bESP_DrawPockets", false},
     {"bESP_DrawPocketsShotState", true},
+    {"bESP_EnemyLine", false},
 
     {"bAIM", true},
     {"bAutoPlay", false},

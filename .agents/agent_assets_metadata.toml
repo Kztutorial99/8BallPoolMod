@@ -18,3 +18,9 @@ id = "u7av_CSTbIvU9aBNJ0e9q"
 uri = "file://FluxProEngine8BP_LYN4XP.zip"
 type = "unspecified"
 title = "FluxProEngine8BP - @LYN4XP (arm64-v8a)"
+
+[[outputs]]
+id = "MQrj1JlR87OmqQqSm8CVr"
+uri = "file://FluxProEngine8BP_EnemyLine.zip"
+type = "unspecified"
+title = "FluxProEngine8BP + Enemy Line (arm64-v8a)"

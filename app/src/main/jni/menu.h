@@ -331,6 +331,31 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         auto stateId = gameStateManager.getCurrentStateId();
         if (stateId == 4) gPrediction->determineShotResult(false);
+
+        // Enemy Line: gambar prediksi tembakan lawan saat giliran lawan (state 7)
+        if (stateId == 7 && persistent_bool[O("bESP_EnemyLine")]) {
+            gPrediction->determineShotResult(false);
+            float lineThick = (float)persistent_int[O("iLineThickness")];
+            if (lineThick < 1.f) lineThick = 1.f;
+            ImU32 enemyCol = IM_COL32(255, 55, 55, 210);
+            for (int i = 0; i < gPrediction->guiData.ballsCount; i++) {
+                auto& ball = gPrediction->guiData.balls[i];
+                if (ball.initialPosition != ball.predictedPosition) {
+                    ImVec2 lastPos{};
+                    for (size_t j = 1; j < ball.positions.size(); j++) {
+                        auto point = WorldToScreen(ball.positions[j]);
+                        if (lastPos.x || lastPos.y) draw->AddLine(lastPos, point, enemyCol, lineThick);
+                        lastPos = point;
+                    }
+                    float circleR = lineThick + 1.f;
+                    if (circleR < 2.f) circleR = 2.f;
+                    draw->AddCircleFilled(WorldToScreen(ball.initialPosition), circleR, enemyCol);
+                    draw->AddCircleFilled(WorldToScreen(ball.predictedPosition), 14, IM_COL32(255, 100, 100, 180));
+                }
+            }
+            return;
+        }
+
         if (stateId == 6 || stateId == 7 || stateId == 8) return;
 
         if (persistent_bool[O("bESP_DrawPocketsShotState")]) {
@@ -587,6 +612,7 @@ static void DrawContentArea(float winW, float winH) {
             need_save |= ToggleSwitch(O("Draw Lines"), &persistent_bool[O("bESP_DrawPredictionLine")]);
            // need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPockets")]);
             need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
+            need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
 
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
