@@ -30,3 +30,9 @@ id = "SlZeWUBKgEcXPyMk6W7s4"
 uri = "file://library_arm64.zip"
 type = "unspecified"
 title = "library.so — Fixed Build (arm64-v8a)"
+
+[[outputs]]
+id = "KqTGvBNlgMv-CrdYkJKIc"
+uri = "file://library_autoaim.zip"
+type = "unspecified"
+title = "library.so — AutoAim Build (arm64-v8a)"

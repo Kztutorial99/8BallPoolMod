@@ -1,15 +1,12 @@
 #pragma once
 
-namespace AutoPlay {
-    bool bAutoPlaying = false;
+namespace AutoAim {
+    bool bActive = false;
 
-    enum ScanState { IDLE, CALCULATING, READY_TO_SHOOT } scanState = IDLE;
+    enum ScanState { IDLE, CALCULATING, AIMED } scanState = IDLE;
+    float calcTimer = 0.0f;
 
-    float calcTimer  = 0.0f;
-    float shootTimer = 0.0f;
-
-    static constexpr float  CALC_DELAY  = 0.30f;
-    static constexpr float  SHOOT_DELAY = 0.40f;
+    static constexpr float  CALC_DELAY  = 0.25f;
     static constexpr double ANGLE_STEP  = MIN_ANGLE_STEP_RADIANS;
 
     static void DoAim() {
@@ -27,6 +24,7 @@ namespace AutoPlay {
             if (ball.originalOnTable && !ball.onTable) startPotted.push_back(i);
         }
 
+        // Check if only the 8-ball remains for this player
         bool only8BLeft = true;
         for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
             auto& ball = gPrediction->guiData.balls[i];
@@ -36,6 +34,11 @@ namespace AutoPlay {
             }
         }
 
+        // Target is 8-ball when all other balls are potted, otherwise player's class
+        Ball::Classification target = only8BLeft
+            ? Ball::Classification::EIGHT_BALL
+            : myclass;
+
         double scanAngle = fmod(startAngle + ANGLE_STEP + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS);
         scanAngle = NumberUtils::normalizeDoublePrecision(scanAngle);
 
@@ -44,7 +47,6 @@ namespace AutoPlay {
 
             bool isGood = false;
             std::vector<int> curPotted;
-            Ball::Classification target = only8BLeft ? Ball::Classification::EIGHT_BALL : myclass;
 
             for (int i = 1; i < gPrediction->guiData.ballsCount; i++) {
                 auto& ball = gPrediction->guiData.balls[i];
@@ -54,8 +56,9 @@ namespace AutoPlay {
                 }
             }
 
+            // FIX: cue ball must hit the TARGET type first (not myclass — wrong when shooting 8-ball)
             if (isGood && gPrediction->guiData.collision.firstHitBall) {
-                if (gPrediction->guiData.collision.firstHitBall->classification != myclass)
+                if (gPrediction->guiData.collision.firstHitBall->classification != target)
                     isGood = false;
             }
 
@@ -75,13 +78,12 @@ namespace AutoPlay {
     }
 
     void ClearState() {
-        scanState  = IDLE;
-        calcTimer  = 0.0f;
-        shootTimer = 0.0f;
+        scanState = IDLE;
+        calcTimer = 0.0f;
     }
 
     void Update() {
-        if (!bAutoPlaying || !sharedGameManager) return;
+        if (!bActive || !sharedGameManager) return;
 
         GameStateManager gsm = sharedGameManager.mStateManager;
         if (!gsm) return;
@@ -89,6 +91,7 @@ namespace AutoPlay {
         int   stateId = gsm.getCurrentStateId();
         float dt      = ImGui::GetIO().DeltaTime;
 
+        // Not player's turn — reset so we re-aim at the start of the next turn
         if (stateId != 4) {
             if (scanState != IDLE) ClearState();
             g_autoPlayCalculating = false;
@@ -107,17 +110,13 @@ namespace AutoPlay {
                 if (calcTimer >= CALC_DELAY) {
                     DoAim();
                     g_autoPlayCalculating = false;
-                    scanState  = READY_TO_SHOOT;
-                    shootTimer = 0.0f;
+                    scanState = AIMED;
                 }
                 break;
 
-            case READY_TO_SHOOT:
-                shootTimer += dt;
-                if (shootTimer >= SHOOT_DELAY && !buttonClicker.Active) {
-                    buttonClicker.Click(ImVec2(Width * 0.5f, Height * 0.5f), 0.15f);
-                    ClearState();
-                }
+            case AIMED:
+                // Aim locked — user shoots manually.
+                // State will reset automatically when turn ends (stateId != 4).
                 break;
         }
     }

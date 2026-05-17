@@ -173,11 +173,6 @@ static bool ToggleSwitch(const char* label, bool* v) {
     return pressed;
 }
 
-// File-scope so DrawToggleButton cancel can also reset countdown
-static bool g_aqCounting = false;
-static std::chrono::steady_clock::time_point g_aqLastCall;
-static std::chrono::steady_clock::time_point g_aqCountdownStart;
-
 // Reads an IL2CPP/Unity NSString (UTF-16 internal buffer at offset 0x14, length at 0x10)
 static std::string ReadNSString(ptr str) {
     if (!str) return "null";
@@ -198,11 +193,9 @@ static bool g_autoPlayCalculating = false;
 // Game state flags — set by DrawESP (inside sigsetjmp), read by DrawMenu (outside)
 static bool g_espStateReady = false;
 static bool g_espIsInGame   = false;
-static bool g_espIsInQueue  = false;
 
 #include "mod/ButtonClicker.h"
 #include "game/inc/AutoPlay.h"
-#include "game/inc/AutoQueue.h"
 
 
 static bool IsExpired() {
@@ -244,55 +237,7 @@ INLINE void DrawExpired(ImGuiIO& io) {
     PopStyleColor();
 }
 
-INLINE void DrawAutoQueue() {
-    if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
-        auto now = std::chrono::steady_clock::now();
-
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - g_aqLastCall).count() > 500)
-            g_aqCounting = false;
-        g_aqLastCall = now;
-
-        if (!g_aqCounting) {
-            g_aqCounting = true;
-            g_aqCountdownStart = now;
-        }
-
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - g_aqCountdownStart).count();
-        int remaining_ms = 8000 - (int)elapsed;
-
-        if (remaining_ms <= 0) {
-            AutoQueue::TryStartMatch();
-            return;
-        }
-
-        std::string count_str = std::to_string((remaining_ms / 1000) + 1);
-
-        // Minimal auto-sized window, transparent bg — we draw our own rounded rect
-        SetNextWindowPos(ImVec2(Width * 0.5f, Height * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1.f));
-        PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 20.0f));
-        PushStyleVar(ImGuiStyleVar_WindowRounding, 24.0f);
-
-        if (Begin(O("##AutoQueueCD"), nullptr,
-                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings |
-                  ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImDrawList* dl  = GetWindowDrawList();
-            ImVec2      wp  = GetWindowPos();
-            ImVec2      ws  = GetWindowSize();
-            dl->AddRectFilled(wp, ImVec2(wp.x + ws.x, wp.y + ws.y), IM_COL32(20, 20, 28, 0), 24.0f);
-
-            SetWindowFontScale(3.5f);
-            TextColored(ImVec4(0.2f, 0.55f, 1.0f, 1.0f), "%s", count_str.c_str());
-            SetWindowFontScale(1.0f);
-        }
-        End();
-        PopStyleVar(2);
-        PopStyleColor();
-    }
-}
-
-static void DrawToggleButton(bool cancelMode); // forward declaration — defined after DrawFloatingButton
+static void DrawToggleButton(); // forward declaration — defined after DrawFloatingButton
 
 INLINE void DrawESP(ImDrawList* draw) {
     if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
@@ -318,9 +263,8 @@ INLINE void DrawESP(ImDrawList* draw) {
         if (!mainStateManager) return;
 
         // Export game state for DrawMenu (used outside sigsetjmp guard)
-        g_espIsInGame    = mainStateManager.isInGame();
-        g_espIsInQueue   = sharedMenuManager.isInQueue();
-        g_espStateReady  = true;
+        g_espIsInGame   = mainStateManager.isInGame();
+        g_espStateReady = true;
 
         if (!g_espIsInGame) return;
 
@@ -346,10 +290,9 @@ INLINE void DrawESP(ImDrawList* draw) {
         GameStateManager gameStateManager = sharedGameManager.mStateManager;
         if (!gameStateManager) return;
 
-        if (persistent_bool[O("bAutoPlay")]) {
-            AutoPlay::Update();
+        if (persistent_bool[O("bAutoAim")]) {
+            AutoAim::Update();
         }
-        //if (persistent_bool[O("bAutoAim")]) AutoAim::AIM();
 
         auto stateId = gameStateManager.getCurrentStateId();
         if (stateId == 4) gPrediction->determineShotResult(false);
@@ -424,7 +367,6 @@ INLINE void DrawESP(ImDrawList* draw) {
 static void DrawSidebar(float sidebarW) {
     static GLuint draw_icon_tex = LoadTextureFromMemory(draw_icon_png, draw_icon_png_len);
     static GLuint play_icon_tex = LoadTextureFromMemory(play_icon_png, play_icon_png_len);
-    static GLuint q_icon_tex    = LoadTextureFromMemory(q_icon_png,    q_icon_png_len);
     static GLuint user_icon_tex = LoadTextureFromMemory(user_icon_png, user_icon_png_len);
 
     ImGuiContext& g  = *GImGui;
@@ -434,7 +376,7 @@ static void DrawSidebar(float sidebarW) {
     float closeSize = 35.0f;
     float closeBtnW = 70.0f;
     float tabsW     = sidebarW - closeBtnW;
-    float btnW      = tabsW / 4.0f;
+    float btnW      = tabsW / 3.0f;
     float marginB   = 12.0f;
 
     // Split channels: 0 = background (drawn last, appears behind), 1 = buttons (drawn first)
@@ -444,13 +386,11 @@ static void DrawSidebar(float sidebarW) {
     // Draw tab buttons — let ImGui lay them out naturally
     BeginGroup();
     SetCursorPos(ImVec2(0.0f, 0.0f));
-    if (SidebarButton(O("Draw"),  draw_icon_tex, g_menu.currentTab == 0, btnW)) g_menu.currentTab = 0;
+    if (SidebarButton(O("Draw"), draw_icon_tex, g_menu.currentTab == 0, btnW)) g_menu.currentTab = 0;
     SameLine(0, 0);
-    if (SidebarButton(O("Play"),  play_icon_tex, g_menu.currentTab == 1, btnW)) g_menu.currentTab = 1;
+    if (SidebarButton(O("Aim"),  play_icon_tex, g_menu.currentTab == 1, btnW)) g_menu.currentTab = 1;
     SameLine(0, 0);
-    if (SidebarButton(O("Queue"), q_icon_tex,    g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
-    SameLine(0, 0);
-    if (SidebarButton(O("User"),  user_icon_tex, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
+    if (SidebarButton(O("User"), user_icon_tex, g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
     EndGroup();
 
     // Measure actual rendered height — this is the true wrap_content
@@ -671,159 +611,17 @@ static void DrawContentArea(float winW, float winH) {
         
         case 1: {
             Dummy(ImVec2(0, 10));
-            need_save |= ToggleSwitch(O("Enable AutoPlay"), &persistent_bool[O("bAutoPlay")]);
-            
-            //need_save |= ToggleSwitch(O("Auto Aiming"), &persistent_bool[O("bAutoAim")]);
-            
+            need_save |= ToggleSwitch(O("Enable AutoAim"), &persistent_bool[O("bAutoAim")]);
+
             Dummy(ImVec2(0, 20));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("Auto play will automatically"));
-            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("aim and shoot for you"));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("Auto Aim will find the best"));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("angle each turn. You shoot"));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("manually. Tap the Aim button"));
+            TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("to toggle on/off anytime."));
             break;
         }
         
         case 2: {
-            Dummy(ImVec2(0, 10));
-            need_save |= ToggleSwitch(O("Enable AutoQueue"), &persistent_bool[O("bAutoQueue")]);
-            Dummy(ImVec2(0, 20));
-            
-            TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Mode"));
-            Dummy(ImVec2(0, 8));
-            PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-            PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(15, 12));
-            PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-            PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.16f, 0.16f, 0.20f, 1.0f));
-            SetNextItemWidth(GetContentRegionAvail().x);
-            need_save |= Combo("##mode", &persistent_int["iAutoQueue_Mode"], "Last Selected\0Smart\0Fix Table\0");
-            PopStyleColor(2);
-            PopStyleVar(2);
-            
-            if (persistent_int["iAutoQueue_Mode"] == 1) {
-                Dummy(ImVec2(0, 15));
-                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Bet Percent"));
-                Dummy(ImVec2(0, 8));
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.12f, 0.45f, 0.95f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.55f, 1.0f, 1.0f));
-                SetNextItemWidth(GetContentRegionAvail().x);
-                need_save |= SliderInt("##betpercent", &persistent_int["iAutoQueue_BetPercent"], 1, 100, "%d%%");
-                PopStyleColor(3);
-                PopStyleVar(2);
-
-                // ── Smart mode live preview ────────────────────────────────
-                Dummy(ImVec2(0, 14));
-
-                int64_t coins     = AutoQueue::GetCoins();
-                int     betPct    = persistent_int["iAutoQueue_BetPercent"];
-                if (betPct < 1) betPct = 20;
-                int64_t targetBet = coins * betPct / 100;
-                int     smartIdx  = AutoQueue::PickSmartTable(coins, betPct);
-
-                // Coin balance row
-                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), O("Balance:"));
-                SameLine();
-                if (coins > 0) {
-                    TextColored(ImVec4(0.95f, 0.85f, 0.30f, 1.0f), "%s",
-                        AutoQueue::FormatCoins(coins).c_str());
-                } else {
-                    TextColored(ImVec4(0.6f, 0.3f, 0.3f, 1.0f), O("Not in game"));
-                }
-
-                Dummy(ImVec2(0, 4));
-
-                // Target bet row
-                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), O("Target Bet:"));
-                SameLine();
-                TextColored(ImVec4(0.85f, 0.85f, 0.90f, 1.0f), "%s",
-                    AutoQueue::FormatCoins(targetBet).c_str());
-
-                Dummy(ImVec2(0, 4));
-
-                // Recommended table row
-                TextColored(ImVec4(0.55f, 0.55f, 0.65f, 1.0f), O("Recommended:"));
-                SameLine();
-                TextColored(ImVec4(0.25f, 0.65f, 1.0f, 1.0f), "%s  (%s entry)",
-                    AutoQueue::TABLE_LABELS[smartIdx],
-                    AutoQueue::FormatCoins(AutoQueue::TABLE_ENTRY_FEES[smartIdx]).c_str());
-            }
-
-            if (persistent_int["iAutoQueue_Mode"] == 2) {
-                Dummy(ImVec2(0, 15));
-                TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Select Table"));
-                Dummy(ImVec2(0, 8));
-
-                struct TableEntry { const char* label; ImU32 bg; ImU32 bgHov; };
-                static const TableEntry tables[17] = {
-                    { "100",   IM_COL32( 55,  90, 200, 255), IM_COL32( 75, 110, 220, 255) }, // M1  Blue
-                    { "200",   IM_COL32( 40, 150,  65, 255), IM_COL32( 55, 170,  80, 255) }, // M2  Green
-                    { "1k",    IM_COL32( 55,  90, 200, 255), IM_COL32( 75, 110, 220, 255) }, // M3  Blue
-                    { "2.5k",  IM_COL32(130,  25,  25, 255), IM_COL32(155,  40,  40, 255) }, // M4  Dark Red
-                    { "10k",   IM_COL32( 35,  35,  38, 255), IM_COL32( 55,  55,  60, 255) }, // M5  Black
-                    { "50k",   IM_COL32(110,   0,   0, 255), IM_COL32(135,  15,  15, 255) }, // M6  Maroon
-                    { "100k",  IM_COL32(140, 140, 145, 255), IM_COL32(160, 160, 165, 255) }, // M7  Light Grey
-                    { "500k",  IM_COL32(185, 160,   0, 255), IM_COL32(210, 185,  10, 255) }, // M8  Yellow
-                    { "1M",    IM_COL32( 20,  45, 130, 255), IM_COL32( 35,  60, 155, 255) }, // M9  Dark Blue
-                    { "2M",    IM_COL32(190,  90,  15, 255), IM_COL32(215, 110,  30, 255) }, // M10 Dark Orange
-                    { "5M",    IM_COL32(  0, 148, 110, 255), IM_COL32( 15, 170, 128, 255) }, // M11 Emerald
-                    { "8M",    IM_COL32(165,  65,  65, 255), IM_COL32(185,  85,  85, 255) }, // M12 Light Maroon
-                    { "10M",   IM_COL32( 18,  90,  35, 255), IM_COL32( 30, 112,  50, 255) }, // M13 Dark Green
-                    { "20M",   IM_COL32(100, 100, 110, 255), IM_COL32(120, 120, 130, 255) }, // M14 Grey
-                    { "30M",   IM_COL32(130,  15,  35, 255), IM_COL32(155,  30,  50, 255) }, // M15 Red Maroon
-                    { "50M",   IM_COL32(  0, 148, 110, 255), IM_COL32( 15, 170, 128, 255) }, // M16 Emerald
-                    { "200M",  IM_COL32( 20,  45, 130, 255), IM_COL32( 35,  60, 155, 255) }, // M17 Dark Blue
-                };
-
-                int& selected = persistent_int["iAutoQueue_FixTable"];
-                float avail   = GetContentRegionAvail().x;
-                int   cols    = 4;
-                float gap     = 8.0f;
-                float btnW    = (avail - gap * (cols - 1)) / cols;
-                float btnH    = 42.0f;
-
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 6));
-
-                for (int i = 0; i < 17; i++) {
-                    if (i % cols != 0) SameLine(0, gap);
-
-                    bool isSel = (selected == i);
-                    ImU32 bgCol = isSel ? tables[i].bgHov : tables[i].bg;
-
-                    PushStyleColor(ImGuiCol_Button,        (ImU32)bgCol);
-                    PushStyleColor(ImGuiCol_ButtonHovered, (ImU32)tables[i].bgHov);
-                    PushStyleColor(ImGuiCol_ButtonActive,  (ImU32)tables[i].bgHov);
-                    PushStyleColor(ImGuiCol_Text,          isSel ? IM_COL32(255,255,255,255) : IM_COL32(220,220,220,200));
-
-                    char btnId[32];
-                    snprintf(btnId, sizeof(btnId), "%s##ft%d", tables[i].label, i);
-                    if (Button(btnId, ImVec2(btnW, btnH))) {
-                        selected = i;
-                        need_save = true;
-                    }
-
-                    // Selected indicator: white outline
-                    if (isSel) {
-                        ImVec2 p = GetItemRectMin();
-                        ImVec2 q = GetItemRectMax();
-                        GetWindowDrawList()->AddRect(p, q, IM_COL32(255,255,255,200), 10.0f, 0, 2.0f);
-                    }
-
-                    PopStyleColor(4);
-                }
-
-                PopStyleVar(2);
-            }
-
-            if (persistent_int["iAutoQueue_Mode"] == 0) {
-                Dummy(ImVec2(0, 15));
-                TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("You will be auto queued to"));
-                TextColored(ImVec4(0.5f, 0.5f, 0.55f, 1.0f), O("the last game mode you played"));
-            }
-            break;
-        }
-
-        case 3: {
             // ── helpers ──────────────────────────────────────────────────────
             auto DrawSectionHeader = [&](const char* title) {
                 Dummy(ImVec2(0, 14));
@@ -940,16 +738,11 @@ INLINE void DrawMenu(ImGuiIO& io) {
         }
 
         // ── ImGui overlay windows — OUTSIDE sigsetjmp guard ─────────────────
-        // DrawAutoQueue and DrawToggleButton open ImGui::Begin/End windows.
-        // Calling them outside the sigsetjmp ensures the window stack stays
+        // DrawToggleButton opens an ImGui::Begin/End window.
+        // Calling it outside the sigsetjmp ensures the window stack stays
         // clean even if DrawESP crashes mid-frame.
-        if (g_espStateReady) {
-            if (persistent_bool[O("bAutoQueue")]) {
-                if (!g_espIsInGame && !g_espIsInQueue) DrawAutoQueue();
-                DrawToggleButton(true);
-            } else if (persistent_bool[O("bAutoPlay")] && g_espIsInGame) {
-                DrawToggleButton(false);
-            }
+        if (g_espStateReady && persistent_bool[O("bAutoAim")] && g_espIsInGame) {
+            DrawToggleButton();
         }
 
         float targetAlpha = g_menu.isOpen ? 1.0f : 0.0f;
@@ -990,14 +783,12 @@ INLINE void DrawMenu(ImGuiIO& io) {
     }
 }
 
-// Moved from AutoPlay namespace — plays/pauses autoplay (cancelMode=false)
-// or cancels autoqueue (cancelMode=true)
-static void DrawToggleButton(bool cancelMode) {
+// Toggle button shown in-game — tap once to enable/disable AutoAim (aim stays on until tapped again)
+static void DrawToggleButton() {
     ImGuiIO& io = GetIO();
 
-    static GLuint play_on_tex       = LoadTextureFromMemory(play_on_png,       play_on_png_len);
-    static GLuint play_off_tex      = LoadTextureFromMemory(play_off_png,       play_off_png_len);
-    static GLuint queue_cancel_tex  = LoadTextureFromMemory(play_on_png,   play_on_png_len);
+    static GLuint play_on_tex  = LoadTextureFromMemory(play_on_png,  play_on_png_len);
+    static GLuint play_off_tex = LoadTextureFromMemory(play_off_png, play_off_png_len);
 
     float button_size   = 130.f;
     float winPadX       = GetStyle().WindowPadding.x;
@@ -1028,9 +819,7 @@ static void DrawToggleButton(bool cancelMode) {
 
         bool clicked = InvisibleButton(O("##TglBtnHit"), size);
 
-        // Pick texture based on state
-        GLuint tex = cancelMode ? queue_cancel_tex
-                                : (AutoPlay::bAutoPlaying ? play_on_tex : play_off_tex);
+        GLuint tex = AutoAim::bActive ? play_on_tex : play_off_tex;
 
         float r = size.x * 0.5f;
         ImDrawList* dl = GetWindowDrawList();
@@ -1046,13 +835,8 @@ static void DrawToggleButton(bool cancelMode) {
         }
 
         if (clicked) {
-            if (cancelMode) {
-                persistent_bool[O("bAutoQueue")] = false;
-                g_aqCounting = false;
-            } else {
-                AutoPlay::bAutoPlaying = !AutoPlay::bAutoPlaying;
-                if (AutoPlay::bAutoPlaying) AutoPlay::ClearState();
-            }
+            AutoAim::bActive = !AutoAim::bActive;
+            if (AutoAim::bActive) AutoAim::ClearState();
         }
     }
     End();
