@@ -65,7 +65,8 @@ namespace DumpOffset {
                      const char* cls, const char* name, uintptr_t off,
                      const char* note = "") {
         (void)cls;
-        s << "    " << std::left << std::setw(8) << type
+        // setw(14) agar tipe panjang (VisualCue, StateManager, dst) tidak menempel ke nama
+        s << "    " << std::left << std::setw(14) << type
           << std::setw(28) << name
           << "; // " << hexOff(off);
         if (note && note[0]) s << "  -- " << note;
@@ -90,9 +91,7 @@ namespace DumpOffset {
         // Safe read: tidak pakai isInstanceOf, cukup cek range alamat
         uintptr_t gm = SafeGetGM();
         s << "// sharedGameManager    : " << hex(gm) << "\n";
-        if (gm && libmain) {
-            s << "// sharedGameManager-libmain : +" << hex(gm - libmain) << "\n";
-        }
+        // Catatan: GM adalah heap object, bukan offset libmain — tidak ditampilkan
 
         // gPrediction — pointer ke static object, selalu valid jika non-null
         {
@@ -267,13 +266,26 @@ namespace DumpOffset {
             if (DmpAddrSafe(sm)) {
                 uintptr_t stateStack = DmpRd64(sm + 0x8);
                 if (DmpAddrSafe(stateStack)) {
-                    uintptr_t count = DmpRd64(stateStack + 0x8);
-                    uintptr_t data  = DmpRd64(stateStack + 0x18);
-                    if (count > 0 && DmpAddrSafe(data)) {
-                        uintptr_t lastState = DmpRd64(data + (count - 1) * 8);
-                        int stateId = DmpAddrSafe(lastState) ? (int)DmpRd32(lastState) : -1;
-                        s << "// CurrentStateId       : " << stateId
-                          << "  (4=my turn, 7=opp turn, 10=ended)\n";
+                    // Baca count sebagai 32-bit dan validasi range wajar (1-32)
+                    uint32_t count32 = DmpRd32(stateStack + 0x8);
+                    uintptr_t data   = DmpRd64(stateStack + 0x18);
+                    if (count32 > 0 && count32 < 32 && DmpAddrSafe(data)) {
+                        uintptr_t lastState = DmpRd64(data + (count32 - 1) * 8);
+                        if (DmpAddrSafe(lastState)) {
+                            // State ID bisa di offset berbeda tergantung vtable layout
+                            // Coba +0x10 (setelah vtable 8 + base member 8)
+                            int stateId = (int)DmpRd32(lastState + 0x10);
+                            s << "// StateManager ptr     : " << hex(sm) << "\n";
+                            s << "// StateStack count     : " << count32 << "\n";
+                            s << "// CurrentState ptr     : " << hex(lastState) << "\n";
+                            s << "// CurrentStateId       : " << stateId
+                              << "  (4=my turn, 7=opp turn, 10=ended)\n";
+                        } else {
+                            s << "// CurrentState ptr     : (null/invalid)\n";
+                        }
+                    } else {
+                        s << "// StateStack count     : " << count32
+                          << "  (tidak wajar — game mungkin di menu)\n";
                     }
                 }
             }
