@@ -665,7 +665,7 @@ static void DrawContentArea(float winW, float winH) {
         O("8 Ball"),
         O("9 Ball"),
         O("Info"),
-        O("Dump Lib"),
+        O("Dump Offset"),
         O("Search Offset")
     };
 
@@ -1107,184 +1107,77 @@ static void DrawContentArea(float winW, float winH) {
         }
 
         case 4: {
-            // ── DUMP LIB (ELF Symbol Scanner) ────────────────────────────
-            using namespace DumpOffset;
-            ImDrawList* dld = GetWindowDrawList();
+            // ── DUMP OFFSET ───────────────────────────────────────────────
+            Dummy(ImVec2(0, 10));
 
-            // Auto-load daftar library saat pertama kali masuk tab
-            static bool s_dumpTabInit = false;
-            if (!s_dumpTabInit) {
-                s_dumpTabInit = true;
-                if (!s_libsLoaded) ScanLibraries();
-            }
+            float halfW = (GetContentRegionAvail().x - 8.0f) * 0.5f;
 
-            Dummy(ImVec2(0, 8));
-
-            // ── Section: Library selector ─────────────────────────────────
+            // Tombol Scan + Copy (satu baris)
             {
-                float sW = GetContentRegionAvail().x;
-                ImVec2 sPos = GetCursorScreenPos();
-                dld->AddRectFilled(sPos, ImVec2(sPos.x + sW, sPos.y + 18.0f),
-                    IM_COL32(20, 30, 55, 200), 6.0f);
-                Dummy(ImVec2(0, 3));
-                SetCursorPosX(GetCursorPosX() + 8.0f);
-                TextColored(ImVec4(0.55f, 0.65f, 0.85f, 1.0f), O("Library"));
-                Dummy(ImVec2(0, 6));
-            }
-
-            // Tombol per-library (scrollable horizontal wrap)
-            if (!s_libs.empty()) {
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6.0f, 6.0f));
-                float avW = GetContentRegionAvail().x;
-                float curX = 0.0f;
-                for (int i = 0; i < (int)s_libs.size(); i++) {
-                    bool sel = (i == s_selLib);
-                    ImVec4 btnCol = sel
-                        ? ImVec4(0.72f, 0.10f, 0.10f, 1.0f)   // merah = selected
-                        : ImVec4(0.12f, 0.18f, 0.32f, 1.0f);  // gelap = normal
-                    ImVec4 btnHov = sel
-                        ? ImVec4(0.85f, 0.18f, 0.18f, 1.0f)
-                        : ImVec4(0.18f, 0.26f, 0.46f, 1.0f);
-                    PushStyleColor(ImGuiCol_Button,        btnCol);
-                    PushStyleColor(ImGuiCol_ButtonHovered, btnHov);
-                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(btnCol.x*0.75f, btnCol.y*0.75f, btnCol.z*0.75f, 1.0f));
-                    PushID(i);
-                    ImVec2 ts = CalcTextSize(s_libs[i].shortName);
-                    float bW = ts.x + 20.0f;
-                    if (curX + bW > avW && curX > 0.0f) { curX = 0.0f; }
-                    else if (curX > 0.0f) { SameLine(0, 6.0f); }
-                    if (Button(s_libs[i].shortName, ImVec2(bW, 30.0f))) {
-                        s_selLib = i;
-                        s_dumpReady = false;
-                        s_symbols.clear();
-                        s_dumpText.clear();
-                        s_saveStatus[0] = '\0';
-                    }
-                    curX += bW + 6.0f;
-                    PopID();
-                    PopStyleColor(3);
-                }
-                PopStyleVar(2);
-            } else {
-                TextColored(ImVec4(0.55f, 0.35f, 0.35f, 1.0f), O("(belum ada library — tekan Refresh)"));
-            }
-
-            Dummy(ImVec2(0, 8));
-
-            // ── Info library yang dipilih ──────────────────────────────────
-            if (!s_libs.empty() && s_selLib < (int)s_libs.size()) {
-                const LibInfo& li = s_libs[s_selLib];
-                float infoW = GetContentRegionAvail().x;
-                ImVec2 infoPos = GetCursorScreenPos();
-                dld->AddRectFilled(infoPos, ImVec2(infoPos.x + infoW, infoPos.y + 52.0f),
-                    IM_COL32(8, 14, 28, 230), 8.0f);
-                dld->AddRect(infoPos, ImVec2(infoPos.x + infoW, infoPos.y + 52.0f),
-                    IM_COL32(30, 55, 110, 180), 8.0f, 0, 1.0f);
-                Dummy(ImVec2(0, 6));
-                SetCursorPosX(GetCursorPosX() + 10.0f);
-                char baseBuf[48];
-                snprintf(baseBuf, sizeof(baseBuf), "Base: 0x%lX", (unsigned long)li.base);
-                TextColored(ImVec4(0.25f, 0.90f, 0.55f, 1.0f), "%s", baseBuf);
-                SetCursorPosX(GetCursorPosX() + 10.0f);
-                char pathBuf[270];
-                snprintf(pathBuf, sizeof(pathBuf), "%s.so  [%s]",
-                    li.shortName,
-                    li.fullPath[0] ? li.fullPath : "path unknown");
-                TextColored(ImVec4(0.45f, 0.52f, 0.70f, 1.0f), "%s", pathBuf);
-                Dummy(ImVec2(0, 6));
-            }
-
-            Dummy(ImVec2(0, 8));
-
-            // ── Tombol: Refresh Libs | Scan Symbols | Dump to File ─────────
-            {
-                float thirdW = (GetContentRegionAvail().x - 12.0f) / 3.0f;
-
-                // Refresh
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.18f, 0.18f, 0.28f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.28f, 0.42f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.12f, 0.12f, 0.20f, 1.0f));
-                if (Button(O("Refresh Libs"), ImVec2(thirdW, 42.0f))) {
-                    RefreshLibs();
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.35f, 0.80f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.45f, 1.00f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.28f, 0.65f, 1.0f));
+                if (Button(DumpOffset::s_scanning ? O("Scanning...") : O("Scan Offset"),
+                           ImVec2(halfW, 48.0f))) {
+                    if (!DumpOffset::s_scanning) DumpOffset::RunScan();
                 }
                 PopStyleColor(3); PopStyleVar();
 
-                SameLine(0, 6.0f);
+                SameLine(0, 8.0f);
 
-                // Scan Symbols
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.32f, 0.72f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.42f, 0.90f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.24f, 0.56f, 1.0f));
-                const char* scanLabel = s_scanning ? O("Scanning...") : O("Scan Symbols");
-                if (Button(scanLabel, ImVec2(thirdW, 42.0f))) {
-                    if (!s_scanning && !s_libs.empty()) RunScan();
-                }
-                PopStyleColor(3); PopStyleVar();
-
-                SameLine(0, 6.0f);
-
-                // Dump to File
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.08f, 0.42f, 0.18f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.58f, 0.26f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.06f, 0.30f, 0.12f, 1.0f));
-                if (Button(O("Dump to File"), ImVec2(thirdW, 42.0f))) {
-                    SaveToFile();
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.06f, 0.28f, 0.13f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.42f, 0.20f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.05f, 0.20f, 0.09f, 1.0f));
+                if (Button(O("Copy"), ImVec2(halfW, 48.0f))) {
+                    if (DumpOffset::s_dumpReady && !DumpOffset::s_dumpText.empty())
+                        SetClipboardText(DumpOffset::s_dumpText.c_str());
                 }
                 PopStyleColor(3); PopStyleVar();
             }
 
             Dummy(ImVec2(0, 6));
 
-            // ── Status bar ─────────────────────────────────────────────────
-            if (s_saveStatus[0] != '\0') {
-                float sw = GetContentRegionAvail().x;
-                ImVec2 sp = GetCursorScreenPos();
-                bool isErr = strstr(s_saveStatus, "Gagal") || strstr(s_saveStatus, "tidak");
-                ImU32 bgCol = isErr ? IM_COL32(60,15,15,200) : IM_COL32(10,45,20,200);
-                dld->AddRectFilled(sp, ImVec2(sp.x + sw, sp.y + GImGui->FontSize + 10.0f),
-                    bgCol, 6.0f);
-                Dummy(ImVec2(0, 4));
-                SetCursorPosX(GetCursorPosX() + 8.0f);
-                ImVec4 stCol = isErr
-                    ? ImVec4(1.0f, 0.35f, 0.35f, 1.0f)
-                    : ImVec4(0.20f, 0.95f, 0.50f, 1.0f);
-                TextColored(stCol, "%s", s_saveStatus);
-                Dummy(ImVec2(0, 6));
+            // Tombol Save to File
+            {
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                PushStyleColor(ImGuiCol_Button,        ImVec4(0.30f, 0.18f, 0.04f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.46f, 0.28f, 0.08f, 1.0f));
+                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.22f, 0.12f, 0.03f, 1.0f));
+                if (Button(O("Save to File"), ImVec2(GetContentRegionAvail().x, 40.0f)))
+                    DumpOffset::SaveToFile();
+                PopStyleColor(3); PopStyleVar();
             }
 
-            Dummy(ImVec2(0, 4));
+            // Status save
+            if (DumpOffset::s_saveStatus[0] != '\0') {
+                Dummy(ImVec2(0, 4));
+                TextColored(ImVec4(0.25f, 1.0f, 0.50f, 0.95f), "%s", DumpOffset::s_saveStatus);
+            }
 
-            // ── Preview symbol dump ────────────────────────────────────────
-            if (s_dumpReady && !s_dumpText.empty()) {
-                float previewH = GetContentRegionAvail().y - 4.0f;
-                PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.04f, 0.06f, 0.10f, 1.0f));
+            Dummy(ImVec2(0, 8));
+
+            // Preview hasil dump
+            if (DumpOffset::s_dumpReady && !DumpOffset::s_dumpText.empty()) {
+                TextColored(ImVec4(0.45f, 0.55f, 0.70f, 1.0f), O("Preview:"));
+                Dummy(ImVec2(0, 4));
+                float previewH = GetContentRegionAvail().y - 6.0f;
+                PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.06f, 0.09f, 1.0f));
                 PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
-                if (BeginChild(O("##dumpSym"), ImVec2(0, previewH), true)) {
-                    PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.85f, 0.55f, 1.0f));
-                    TextUnformatted(s_dumpText.c_str());
+                if (BeginChild(O("##dumpPreview"), ImVec2(0, previewH), true)) {
+                    PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.88f, 0.58f, 1.0f));
+                    TextUnformatted(DumpOffset::s_dumpText.c_str());
                     PopStyleColor();
                 }
                 EndChild();
                 PopStyleVar(); PopStyleColor();
-            } else if (!s_scanning) {
-                float remH = GetContentRegionAvail().y;
-                float placY = GetCursorPosY() + remH * 0.35f;
-                SetCursorPosY(placY);
-                const char* hint = O("Pilih library, lalu tekan Scan Symbols");
-                float tw = CalcTextSize(hint).x;
-                SetCursorPosX(GetCursorPosX() + (GetContentRegionAvail().x - tw) * 0.5f);
-                TextColored(ImVec4(0.30f, 0.36f, 0.50f, 0.70f), "%s", hint);
-            } else {
-                float remH = GetContentRegionAvail().y;
-                SetCursorPosY(GetCursorPosY() + remH * 0.4f);
-                const char* hint = O("Sedang scanning...");
-                float tw = CalcTextSize(hint).x;
-                SetCursorPosX(GetCursorPosX() + (GetContentRegionAvail().x - tw) * 0.5f);
-                TextColored(ImVec4(0.90f, 0.75f, 0.10f, 0.90f), "%s", hint);
+            } else if (!DumpOffset::s_scanning) {
+                Dummy(ImVec2(0, 24));
+                float tw = CalcTextSize(O("Tekan Scan Offset untuk mulai")).x;
+                float avail = GetContentRegionAvail().x;
+                SetCursorPosX(GetCursorPosX() + (avail - tw) * 0.5f);
+                TextColored(ImVec4(0.32f, 0.38f, 0.52f, 0.75f), O("Tekan Scan Offset untuk mulai"));
             }
 
             break;
