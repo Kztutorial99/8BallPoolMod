@@ -1324,25 +1324,26 @@ static void DrawContentArea(float winW, float winH) {
             PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
 
             if (BeginChild(O("##searchScroll"), ImVec2(0, tableH), false)) {
-                // Lebar kolom — tambah kolom "Live" saat validator aktif
-                // Tanpa validator: Class | Field | Offset | Type | Note | [Copy]
-                // Dengan validator: Class | Field | Offset | Type | Live | [Copy]
-                float cClass  = avail * 0.18f;
-                float cField  = avail * 0.26f;
+                // Lebar kolom — seimbang agar semua terlihat di layar kecil
+                // Class | Field | Offset | Type | Note/Live | [C][H]
+                // [C] = Copy full entry   [H] = Copy hex offset only
+                float cClass  = avail * 0.17f;
+                float cField  = avail * 0.23f;
                 float cOffset = avail * 0.12f;
-                float cType   = avail * 0.12f;
-                float cExtra  = avail * 0.22f; // note atau live value
-                float cCopy   = avail * 0.10f;
+                float cType   = avail * 0.11f;
+                float cExtra  = avail * 0.24f; // note atau live value
+                float cBtns   = avail * 0.13f; // kedua tombol C + H
 
                 // Header kolom
                 {
                     PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.65f, 0.85f, 1.0f));
                     Text(O("Class"));
-                    SameLine(cClass);          Text(O("Field"));
-                    SameLine(cClass + cField); Text(O("Offset"));
-                    SameLine(cClass + cField + cOffset); Text(O("Type"));
-                    SameLine(cClass + cField + cOffset + cType);
-                    Text(s_validatorOn ? O("Live Value") : O("Note"));
+                    SameLine(cClass);                               Text(O("Field"));
+                    SameLine(cClass + cField);                      Text(O("Offset"));
+                    SameLine(cClass + cField + cOffset);            Text(O("Type"));
+                    SameLine(cClass + cField + cOffset + cType);    Text(s_validatorOn ? O("Live") : O("Note"));
+                    SameLine(cClass + cField + cOffset + cType + cExtra);
+                    TextDisabled(O("[C][H]"));
                     PopStyleColor();
                     Separator();
                     Dummy(ImVec2(0, 2));
@@ -1375,9 +1376,18 @@ static void DrawContentArea(float winW, float winH) {
                         // Class (biru)
                         TextColored(ImVec4(0.40f, 0.72f, 1.00f, 1.0f), "%s", fe.e->className);
 
-                        // Field (putih)
+                        // Field (putih) + tooltip note lengkap saat hover
                         SameLine(cClass);
                         TextColored(ImVec4(0.88f, 0.88f, 0.94f, 1.0f), "%s", fe.e->fieldName);
+                        if (IsItemHovered() && fe.e->note && fe.e->note[0]) {
+                            BeginTooltip();
+                            TextColored(ImVec4(0.40f, 0.72f, 1.00f, 1.0f), "%s::%s", fe.e->className, fe.e->fieldName);
+                            TextColored(ImVec4(0.30f, 1.00f, 0.50f, 1.0f), "%s", fe.hexOffset);
+                            SameLine(); TextColored(ImVec4(1.00f, 0.72f, 0.28f, 1.0f), "  %s", fe.e->type);
+                            Separator();
+                            TextUnformatted(fe.e->note);
+                            EndTooltip();
+                        }
 
                         // Offset (hijau)
                         SameLine(cClass + cField);
@@ -1387,7 +1397,7 @@ static void DrawContentArea(float winW, float winH) {
                         SameLine(cClass + cField + cOffset);
                         TextColored(ImVec4(1.00f, 0.72f, 0.28f, 1.0f), "%s", fe.e->type);
 
-                        // Live Value atau Note
+                        // Live Value atau Note (dibatasi lebar cExtra)
                         SameLine(cClass + cField + cOffset + cType);
                         if (s_validatorOn) {
                             if (fe.liveValid && fe.liveValue[0]) {
@@ -1398,19 +1408,53 @@ static void DrawContentArea(float winW, float winH) {
                                 TextColored(ImVec4(0.30f, 0.35f, 0.45f, 0.70f), O("---"));
                             }
                         } else {
-                            TextColored(ImVec4(0.50f, 0.56f, 0.68f, 0.85f), "%s", fe.e->note);
+                            // Potong note jika terlalu panjang, tampilkan "..." di akhir
+                            const char* note = fe.e->note;
+                            float notePixW = cExtra - 6.0f;
+                            if (CalcTextSize(note).x > notePixW) {
+                                // Cari panjang yang muat + "..."
+                                char noteBuf[64];
+                                int n = 0;
+                                while (note[n] && CalcTextSize(note, note + n + 1).x < notePixW - CalcTextSize("..").x)
+                                    n++;
+                                snprintf(noteBuf, sizeof(noteBuf), "%.*s..", n, note);
+                                TextColored(ImVec4(0.50f, 0.56f, 0.68f, 0.85f), "%s", noteBuf);
+                                if (IsItemHovered()) {
+                                    BeginTooltip(); TextUnformatted(note); EndTooltip();
+                                }
+                            } else {
+                                TextColored(ImVec4(0.50f, 0.56f, 0.68f, 0.85f), "%s", note);
+                            }
                         }
 
-                        // Tombol Copy per baris
-                        SameLine(avail - cCopy);
-                        PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
-                        PushStyleColor(ImGuiCol_Button,        ImVec4(0.06f, 0.20f, 0.48f, 0.85f));
-                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.32f, 0.78f, 1.00f));
-                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.05f, 0.16f, 0.38f, 1.00f));
-                        if (SmallButton(O("Copy"))) {
+                        // ── Tombol [C] Copy full + [H] Copy hex ──────────────────
+                        float btnX = cClass + cField + cOffset + cType + cExtra;
+                        float halfBtn = (cBtns - 4.0f) * 0.5f;
+
+                        // [C] copy full entry
+                        SameLine(btnX);
+                        PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+                        PushStyleColor(ImGuiCol_Button,        ImVec4(0.06f, 0.20f, 0.48f, 0.90f));
+                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.36f, 0.82f, 1.00f));
+                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.05f, 0.15f, 0.36f, 1.00f));
+                        if (SmallButton(O("C##c"))) {
                             SetClipboardText(EntryToString(fe).c_str());
                             SetCopyStatus("Disalin!");
                         }
+                        if (IsItemHovered()) { BeginTooltip(); TextUnformatted(O("Copy baris lengkap")); EndTooltip(); }
+                        PopStyleColor(3); PopStyleVar();
+
+                        // [H] copy hex offset only
+                        SameLine(btnX + halfBtn + 4.0f);
+                        PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+                        PushStyleColor(ImGuiCol_Button,        ImVec4(0.28f, 0.14f, 0.04f, 0.90f));
+                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.55f, 0.30f, 0.06f, 1.00f));
+                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.20f, 0.10f, 0.02f, 1.00f));
+                        if (SmallButton(O("H##h"))) {
+                            SetClipboardText(fe.hexOffset);
+                            SetCopyStatus(fe.hexOffset);
+                        }
+                        if (IsItemHovered()) { BeginTooltip(); TextUnformatted(O("Copy hex offset saja")); EndTooltip(); }
                         PopStyleColor(3); PopStyleVar();
 
                         PopID();
