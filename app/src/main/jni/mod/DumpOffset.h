@@ -1,354 +1,305 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <sstream>
-#include <iomanip>
 #include <fstream>
-#include <cmath>
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
 #include <sys/stat.h>
+#include <elf.h>
 
-// ── Dump Offset ────────────────────────────────────────────────────────────────
-// Kumpulkan semua offset class + runtime address game 8BP.
-// Hasil bisa di-copy ke clipboard atau disimpan ke file dump.cs
-//
-// SAFETY: semua akses memori game (game objects) menggunakan safe read helper
-// untuk mencegah SIGSEGV / force close saat game tidak sedang dalam match.
+// ── Dump Lib ──────────────────────────────────────────────────────────────────
+// Scan library yang ter-load oleh proses game lalu dump ELF symbol table-nya.
+// Pendekatan ini TIDAK mengakses game objects sama sekali sehingga aman dipakai
+// kapan pun — baik dalam match maupun di lobby.
 // ─────────────────────────────────────────────────────────────────────────────
 
 namespace DumpOffset {
 
-    // ── State UI ──────────────────────────────────────────────────────────────
-    static std::string s_dumpText;
-    static bool        s_dumpReady  = false;
-    static bool        s_scanning   = false;
-    static char        s_saveStatus[128] = {};
+    // ── Data per library ──────────────────────────────────────────────────────
+    struct LibInfo {
+        char     shortName[64];   // "libmain"
+        char     fullPath[256];   // "/data/.../libmain.so"
+        uintptr_t base;           // base address dari /proc/self/maps
+    };
 
-    // ── Safe memory read helpers ──────────────────────────────────────────────
-    // Tidak pernah crash — return 0 jika alamat tidak aman
-    static inline bool DmpAddrSafe(uintptr_t a) {
-        return a > 0x1000UL && a < 0x7FFFFFFFFFFFULL;
-    }
-    static inline uintptr_t DmpRd64(uintptr_t a) {
-        return DmpAddrSafe(a) ? *(uintptr_t*)a : 0UL;
-    }
-    static inline uint32_t DmpRd32(uintptr_t a) {
-        return DmpAddrSafe(a) ? *(uint32_t*)a : 0U;
-    }
-    static inline double DmpRdDbl(uintptr_t a) {
-        if (!DmpAddrSafe(a)) return 0.0;
-        double v = *(double*)a;
-        return (std::isnan(v) || std::isinf(v)) ? 0.0 : v;
-    }
+    // ── State ─────────────────────────────────────────────────────────────────
+    static std::vector<LibInfo>    s_libs;
+    static int                     s_selLib      = 0;
+    static std::vector<std::string> s_symbols;
+    static std::string             s_dumpText;
+    static bool                    s_dumpReady   = false;
+    static bool                    s_scanning    = false;
+    static char                    s_saveStatus[128] = {};
+    static bool                    s_libsLoaded  = false;
 
-    // ── Safe pointer ke sharedGameManager ─────────────────────────────────────
-    // TIDAK menggunakan operator bool() / isInstanceOf() karena keduanya
-    // melakukan raw memory read tanpa safety guard → penyebab crash #1
-    static inline uintptr_t SafeGetGM() {
-        uintptr_t inst = sharedGameManager.instance;
-        return DmpAddrSafe(inst) ? inst : 0UL;
+    // ── Safe range check (agar baca ELF tidak SIGSEGV) ───────────────────────
+    static inline bool AddrOk(uintptr_t a, uintptr_t base, size_t span) {
+        return a >= base && a < base + span;
     }
 
-    // ── Helper format hex ─────────────────────────────────────────────────────
-    static std::string hex(uintptr_t v) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "0x%lX", (unsigned long)v);
-        return buf;
-    }
-    static std::string hexOff(uintptr_t v) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "0x%03lX", (unsigned long)v);
-        return buf;
-    }
-
-    // ── Buat baris dump ──────────────────────────────────────────────────────
-    static void Line(std::ostringstream& s, const char* type,
-                     const char* cls, const char* name, uintptr_t off,
-                     const char* note = "") {
-        (void)cls;
-        s << "    " << std::left << std::setw(8) << type
-          << std::setw(28) << name
-          << "; // " << hexOff(off);
-        if (note && note[0]) s << "  -- " << note;
-        s << "\n";
+    // ── Ambil short name dari path ────────────────────────────────────────────
+    static void MakeShortName(const char* path, char* out, int outLen) {
+        const char* slash = strrchr(path, '/');
+        const char* name  = slash ? slash + 1 : path;
+        const char* dot   = strrchr(name, '.');
+        int len = dot ? (int)(dot - name) : (int)strlen(name);
+        if (len >= outLen) len = outLen - 1;
+        memcpy(out, name, len);
+        out[len] = '\0';
     }
 
-    // ── Generate dump teks lengkap ────────────────────────────────────────────
-    static std::string Generate() {
-        std::ostringstream s;
+    // ── Scan /proc/self/maps untuk daftar .so yang sedang ter-load ───────────
+    static void ScanLibraries() {
+        s_libs.clear();
+        s_libsLoaded = false;
 
-        s << "// ================================================================\n";
-        s << "// Flux Pro Engine v2.0 -- Memory Dump\n";
-        s << "// Game     : 8 Ball Pool (com.miniclip.eightballpool)\n";
-        s << "// Arch     : arm64-v8a\n";
-        s << "// Build    : " << __DATE__ << " " << __TIME__ << "\n";
-        s << "// ================================================================\n\n";
+        FILE* f = fopen("/proc/self/maps", "r");
+        if (!f) return;
 
-        // ── Runtime Addresses ─────────────────────────────────────────────────
-        s << "// -- Runtime Addresses ------------------------------------------\n";
-        s << "// libmain base          : " << hex(libmain) << "\n";
+        char line[512];
+        while (fgets(line, sizeof(line), f)) {
+            // Hanya baris yang punya path .so dan permission 'r-xp'
+            if (!strstr(line, ".so") || !strstr(line, "r-xp")) continue;
 
-        // Safe read: tidak pakai isInstanceOf, cukup cek range alamat
-        uintptr_t gm = SafeGetGM();
-        s << "// sharedGameManager    : " << hex(gm) << "\n";
-        if (gm && libmain) {
-            s << "// sharedGameManager-libmain : +" << hex(gm - libmain) << "\n";
-        }
+            uintptr_t addrStart = 0;
+            char perms[8] = {};
+            unsigned long offset = 0;
+            unsigned int dev_major = 0, dev_minor = 0;
+            unsigned long inode = 0;
+            char path[256] = {};
 
-        // gPrediction — pointer ke static object, selalu valid jika non-null
-        {
-            uintptr_t pred = gPrediction ? (uintptr_t)gPrediction : 0;
-            s << "// gPrediction          : " << hex(pred) << "\n";
-        }
-
-        // _rules — SAFE: gunakan DmpRd64, bukan _rules() yang raw
-        if (gm) {
-            uintptr_t rules = DmpRd64(gm + 0x3E0);
-            s << "// _rules ptr           : " << hex(rules) << "\n";
-            if (DmpAddrSafe(rules)) {
-                // Safe read field-by-field, bukan via getPocketNominationMode()
-                int  nomMode   = (int)DmpRd32(rules + 0x68);
-                uint nomPocket = DmpRd32(rules + 0x118);
-                s << "// nominationMode       : " << nomMode
-                  << "  (0=none, 1=8ball only, 2=all shots)\n";
-                s << "// nominatedPocket      : " << nomPocket << "\n";
-            } else {
-                s << "// _rules not available (game not in match)\n";
+            int n = sscanf(line, "%lx-%*lx %7s %lx %x:%x %lu %255s",
+                           &addrStart, perms, &offset, &dev_major, &dev_minor, &inode, path);
+            if (n < 7 || path[0] == '\0') continue;
+            if (!strstr(path, ".so"))     continue;
+            // Hanya sertakan library yang kemungkinan relevan
+            // (skip libs sistem yang terlalu banyak)
+            const char* fn = strrchr(path, '/');
+            if (!fn) continue;
+            fn++;
+            // Masukkan semua .so — user bisa pilih mana yg mau di-dump
+            // Hindari duplikat (ambil mapping pertama = base)
+            bool dup = false;
+            for (auto& ex : s_libs) {
+                if (strcmp(ex.fullPath, path) == 0) { dup = true; break; }
             }
+            if (dup) continue;
+
+            LibInfo li{};
+            li.base = addrStart;
+            strncpy(li.fullPath, path, sizeof(li.fullPath) - 1);
+            MakeShortName(path, li.shortName, sizeof(li.shortName));
+            s_libs.push_back(li);
+
+            if ((int)s_libs.size() >= 64) break; // cukup 64 lib
+        }
+        fclose(f);
+        s_libsLoaded = true;
+        // Clamp selection
+        if (s_selLib >= (int)s_libs.size()) s_selLib = 0;
+    }
+
+    // ── Hitung ukuran mapping library di memori ───────────────────────────────
+    static size_t GetLibraryMappedSize(uintptr_t base) {
+        size_t total = 0;
+        FILE* f = fopen("/proc/self/maps", "r");
+        if (!f) return 0x4000000; // default 64 MB fallback
+
+        char line[512];
+        while (fgets(line, sizeof(line), f)) {
+            uintptr_t s = 0, e = 0;
+            char path[256] = {};
+            sscanf(line, "%lx-%lx %*s %*s %*s %*s %255s", &s, &e, path);
+            // Temukan semua segment yang termasuk library ini
+            // Cukup ambil range terbesar dari base
+            if (s >= base && (e - base) > total) {
+                total = e - base;
+            }
+        }
+        fclose(f);
+        return total > 0 ? total : 0x4000000;
+    }
+
+    // ── Scan ELF symbol table dari library yang dipilih ───────────────────────
+    static void ScanSymbols() {
+        s_symbols.clear();
+        s_dumpReady = false;
+        s_dumpText.clear();
+
+        if (s_libs.empty() || s_selLib < 0 || s_selLib >= (int)s_libs.size()) {
+            s_saveStatus[0] = '\0';
+            snprintf(s_saveStatus, sizeof(s_saveStatus), "Pilih library dulu!");
+            return;
+        }
+
+        const LibInfo& lib = s_libs[s_selLib];
+        uintptr_t base = lib.base;
+        size_t    span = GetLibraryMappedSize(base);
+
+        // Validasi ELF magic di base address
+        if (!AddrOk(base, base, span) || span < sizeof(Elf64_Ehdr)) return;
+        Elf64_Ehdr* ehdr = (Elf64_Ehdr*)base;
+        if (ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
+            ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
+            ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
+            ehdr->e_ident[EI_MAG3] != ELFMAG3) {
+            snprintf(s_saveStatus, sizeof(s_saveStatus), "ELF magic tidak valid!");
+            return;
+        }
+
+        // Cari PT_DYNAMIC segment
+        Elf64_Phdr* phdr = nullptr;
+        if (AddrOk(base + ehdr->e_phoff, base, span)) {
+            phdr = (Elf64_Phdr*)(base + ehdr->e_phoff);
         } else {
-            s << "// sharedGameManager not available (game not in match)\n";
+            snprintf(s_saveStatus, sizeof(s_saveStatus), "PHDR tidak aman!");
+            return;
         }
-        s << "\n";
 
-        // ── GameManager Offsets ───────────────────────────────────────────────
-        s << "// -- struct GameManager (game/GameManager.h) --------------------\n";
-        s << "struct GameManager {\n";
-        Line(s, "ptr",          "GameManager", "_rules",                0x3e0, "Ruleset*");
-        Line(s, "Table",        "GameManager", "mTable",                0x3e8);
-        Line(s, "VisualCue",    "GameManager", "mVisualCue",            0x4b8);
-        Line(s, "VEnglishCtrl", "GameManager", "mVisualEnglishControl", 0x4c8);
-        Line(s, "StateManager", "GameManager", "mStateManager",         0x508);
-        Line(s, "int",          "GameManager", "mGameMode",             0x5c0);
-        s << "};\n\n";
-
-        // ── Ruleset Offsets ───────────────────────────────────────────────────
-        s << "// -- struct Ruleset (game/Ruleset.h) ----------------------------\n";
-        s << "struct Ruleset {\n";
-        Line(s, "int",    "Ruleset", "field_0x0",              0x00);
-        Line(s, "int",    "Ruleset", "field_0x4",              0x04);
-        Line(s, "string", "Ruleset", "field_0x8",              0x08);
-        Line(s, "int",    "Ruleset", "field_0x20",             0x20);
-        Line(s, "map",    "Ruleset", "field_0x28",             0x28, "map<type_index, IRule*>");
-        Line(s, "vector", "Ruleset", "field_0x40",             0x40, "vector<FoulReason>");
-        Line(s, "bool",   "Ruleset", "field_0x58",             0x58);
-        Line(s, "double", "Ruleset", "field_0x60",             0x60);
-        Line(s, "int",    "Ruleset", "pocketNominationMode",   0x68, "0=none,1=8ball,2=all");
-        Line(s, "void*",  "Ruleset", "field_0x70",             0x70);
-        Line(s, "void*",  "Ruleset", "field_0x78",             0x78);
-        Line(s, "int",    "Ruleset", "field_0x80",             0x80);
-        Line(s, "void*",  "Ruleset", "field_0x88",             0x88);
-        Line(s, "int",    "Ruleset", "field_0x90",             0x90);
-        Line(s, "vector", "Ruleset", "field_0x98",             0x98, "vector<BallClassification>");
-        Line(s, "vector", "Ruleset", "field_0xB0",             0xB0, "vector<BallClassification>");
-        Line(s, "vector", "Ruleset", "classificationVector",   0xC8, "player classification");
-        Line(s, "vector", "Ruleset", "field_0xE0",             0xE0, "vector<PoolPlayer*>");
-        Line(s, "int",    "Ruleset", "field_0xF8",             0xF8);
-        Line(s, "int",    "Ruleset", "field_0xFC",             0xFC);
-        Line(s, "int",    "Ruleset", "field_0x100",            0x100);
-        Line(s, "int",    "Ruleset", "field_0x104",            0x104);
-        Line(s, "bool",   "Ruleset", "field_0x108",            0x108);
-        Line(s, "int",    "Ruleset", "field_0x10C",            0x10C);
-        Line(s, "char",   "Ruleset", "field_0x110",            0x110);
-        Line(s, "char",   "Ruleset", "field_0x111",            0x111);
-        Line(s, "bool",   "Ruleset", "field_0x112",            0x112);
-        Line(s, "bool",   "Ruleset", "field_0x113",            0x113);
-        Line(s, "bool",   "Ruleset", "field_0x114",            0x114);
-        Line(s, "uint",   "Ruleset", "nominatedPocket",        0x118, "pocket nomination index");
-        Line(s, "int",    "Ruleset", "field_0x11C",            0x11C);
-        Line(s, "char",   "Ruleset", "field_0x120",            0x120);
-        Line(s, "int",    "Ruleset", "field_0x124",            0x124);
-        Line(s, "bool",   "Ruleset", "field_0x128",            0x128);
-        Line(s, "int",    "Ruleset", "field_0x12C",            0x12C);
-        s << "};\n\n";
-
-        // ── VisualCue / VisualGuide ───────────────────────────────────────────
-        s << "// -- struct VisualCue (game/VisualCue.h) ------------------------\n";
-        s << "struct VisualCue {\n";
-        Line(s, "VisualGuide", "VisualCue", "mVisualGuide", 0x3a8);
-        Line(s, "double",      "VisualCue", "mPower",       0x3b0);
-        s << "};\n";
-        s << "struct VisualGuide {\n";
-        Line(s, "double", "VisualGuide", "mAimAngle",       0x28, "shot angle (radians)");
-        Line(s, "ptr",    "VisualGuide", "mClassification", 0xa0);
-        s << "};\n\n";
-
-        // ── Ball Offsets ──────────────────────────────────────────────────────
-        s << "// -- struct Ball (game/Ball.h) -----------------------------------\n";
-        s << "struct Ball {\n";
-        Line(s, "Vec2d",  "Ball", "position",       0x20, "world position");
-        Line(s, "Vec2d",  "Ball", "velocity",       0x30);
-        Line(s, "double", "Ball", "radius",         0x40);
-        Line(s, "Vec3d",  "Ball", "spin",           0x48);
-        Line(s, "double", "Ball", "mass",           0x60);
-        Line(s, "double", "Ball", "volume",         0x68);
-        Line(s, "int",    "Ball", "classification", 0xa0, "0=cue,1=solid,2=stripe,3=9ball,4=8ball");
-        Line(s, "int",    "Ball", "state",          0xa4, "1=table,2=pocket,3=unknown,4=potted");
-        s << "};\n\n";
-
-        // ── Table Offsets ─────────────────────────────────────────────────────
-        s << "// -- struct Table (game/Table.h) ---------------------------------\n";
-        s << "struct Table {\n";
-        Line(s, "TableProps", "Table", "mTableProperties",    0x3b0);
-        Line(s, "FrictionP",  "Table", "_frictionProperties", 0x3c0);
-        Line(s, "PNSArray*",  "Table", "mBalls",              0x450, "all balls");
-        Line(s, "Vec4d",      "Table", "mCollisionBounds",    0x588, "x,y,w,h");
-        s << "};\n\n";
-
-        // ── Game Constants ────────────────────────────────────────────────────
-        s << "// -- Game Constants ----------------------------------------------\n";
-        s << "// TABLE_WIDTH           = " << TABLE_WIDTH            << "\n";
-        s << "// TABLE_HEIGHT          = " << TABLE_HEIGHT           << "\n";
-        s << "// BALL_RADIUS           = " << BALL_RADIUS            << "\n";
-        s << "// POCKET_RADIUS         = " << POCKET_RADIUS          << "\n";
-        s << "// TABLE_POCKETS_COUNT   = " << TABLE_POCKETS_COUNT    << "\n";
-        s << "// MAX_BALLS_COUNT       = " << MAX_BALLS_COUNT        << "\n";
-        s << "// MAX_ANGLE_RADIANS     = " << MAX_ANGLE_RADIANS      << "\n";
-        s << "// MIN_ANGLE_STEP_RAD    = " << MIN_ANGLE_STEP_RADIANS << "\n";
-
-        // Safe read konstanta dari libmain
-        if (DmpAddrSafe(libmain)) {
-            double spin     = DmpRdDbl(libmain + 0x4E49418);
-            double maxPower = DmpRdDbl(libmain + 0x4E49410);
-            s << "// CUE_SPIN              = " << spin     << "  (libmain+0x4E49418)\n";
-            s << "// CUE_MAX_POWER         = " << maxPower << "  (libmain+0x4E49410)\n";
-        }
-        s << "\n";
-
-        // ── Pocket World Positions ────────────────────────────────────────────
-        s << "// -- Pocket World Positions --------------------------------------\n";
-        const char* pNames[6] = {
-            "Top-Left","Top-Center","Top-Right",
-            "Bot-Right","Bot-Center","Bot-Left"
-        };
-        const double px[6] = {
-            -TABLE_HALF_WIDTH,  0.0,              TABLE_HALF_WIDTH,
-             TABLE_HALF_WIDTH,  0.0,             -TABLE_HALF_WIDTH
-        };
-        const double py[6] = {
-             TABLE_HALF_HEIGHT, TABLE_HALF_HEIGHT, TABLE_HALF_HEIGHT,
-            -TABLE_HALF_HEIGHT,-TABLE_HALF_HEIGHT,-TABLE_HALF_HEIGHT
-        };
-        for (int i = 0; i < 6; i++) {
-            char buf[80];
-            snprintf(buf, sizeof(buf), "// Pocket[%d] %-12s : world(%.1f, %.1f)",
-                     i, pNames[i], px[i], py[i]);
-            s << buf << "\n";
-        }
-        s << "\n";
-
-        // ── Runtime Live Values (jika sedang dalam match) ─────────────────────
-        s << "// -- Live Runtime Values (in-match only) ------------------------\n";
-        if (gm) {
-            // Table pointer
-            uintptr_t tbl = DmpRd64(gm + 0x3E8);
-            s << "// Table ptr            : " << hex(tbl) << "\n";
-
-            // VisualCue → AimAngle dan Power
-            uintptr_t vc  = DmpRd64(gm + 0x4B8);
-            if (DmpAddrSafe(vc)) {
-                uintptr_t vg  = DmpRd64(vc + 0x3A8);
-                double angle  = DmpAddrSafe(vg) ? DmpRdDbl(vg + 0x28) : 0.0;
-                double power  = DmpRdDbl(vc + 0x3B0);
-                s << "// AimAngle (rad)       : " << angle << "\n";
-                s << "// ShotPower            : " << power << "\n";
+        uintptr_t dynAddr = 0;
+        size_t    dynSize = 0;
+        for (int i = 0; i < (int)ehdr->e_phnum; i++) {
+            if (!AddrOk((uintptr_t)&phdr[i], base, span)) break;
+            if (phdr[i].p_type == PT_DYNAMIC) {
+                dynAddr = base + phdr[i].p_vaddr;
+                dynSize = phdr[i].p_filesz;
+                break;
             }
+        }
+        if (!dynAddr || !AddrOk(dynAddr, base, span)) {
+            snprintf(s_saveStatus, sizeof(s_saveStatus), "Tidak ada PT_DYNAMIC!");
+            return;
+        }
 
-            // StateManager → current state ID
-            uintptr_t sm = DmpRd64(gm + 0x508);
-            if (DmpAddrSafe(sm)) {
-                uintptr_t stateStack = DmpRd64(sm + 0x8);
-                if (DmpAddrSafe(stateStack)) {
-                    uintptr_t count = DmpRd64(stateStack + 0x8);
-                    uintptr_t data  = DmpRd64(stateStack + 0x18);
-                    if (count > 0 && DmpAddrSafe(data)) {
-                        uintptr_t lastState = DmpRd64(data + (count - 1) * 8);
-                        int stateId = DmpAddrSafe(lastState) ? (int)DmpRd32(lastState) : -1;
-                        s << "// CurrentStateId       : " << stateId
-                          << "  (4=my turn, 7=opp turn, 10=ended)\n";
-                    }
-                }
+        // Parse PT_DYNAMIC untuk DT_SYMTAB, DT_STRTAB, DT_STRSZ
+        Elf64_Dyn* dyn    = (Elf64_Dyn*)dynAddr;
+        uintptr_t symtab  = 0;
+        uintptr_t strtab  = 0;
+        size_t    strsz   = 0;
+        size_t    syment  = sizeof(Elf64_Sym);
+
+        for (int i = 0; ; i++) {
+            uintptr_t dynEntry = dynAddr + i * sizeof(Elf64_Dyn);
+            if (!AddrOk(dynEntry + sizeof(Elf64_Dyn), base, span)) break;
+            Elf64_Dyn* d = (Elf64_Dyn*)dynEntry;
+            if (d->d_tag == DT_NULL) break;
+            if (d->d_tag == DT_SYMTAB)  symtab = base + d->d_un.d_ptr;
+            if (d->d_tag == DT_STRTAB)  strtab = base + d->d_un.d_ptr;
+            if (d->d_tag == DT_STRSZ)   strsz  = d->d_un.d_val;
+            if (d->d_tag == DT_SYMENT)  syment = d->d_un.d_val;
+        }
+
+        if (!symtab || !strtab || !strsz) {
+            snprintf(s_saveStatus, sizeof(s_saveStatus), "DT_SYMTAB/STRTAB tidak ada!");
+            return;
+        }
+        if (!AddrOk(symtab, base, span) || !AddrOk(strtab, base, span)) {
+            snprintf(s_saveStatus, sizeof(s_saveStatus), "SYMTAB addr tidak aman!");
+            return;
+        }
+
+        // Hitung jumlah simbol: symtab berjalan sampai strtab
+        size_t maxSyms = (strtab > symtab) ? (strtab - symtab) / syment : 0;
+        if (maxSyms > 65536) maxSyms = 65536;
+
+        // Kumpulkan simbol
+        std::ostringstream ss;
+        ss << "// ================================================================\n";
+        ss << "// Flux Pro Engine v2.0 -- ELF Symbol Dump\n";
+        ss << "// Library  : " << lib.shortName << "\n";
+        ss << "// Path     : " << lib.fullPath  << "\n";
+        char hexbuf[32];
+        snprintf(hexbuf, sizeof(hexbuf), "0x%lX", (unsigned long)lib.base);
+        ss << "// Base     : " << hexbuf        << "\n";
+        ss << "// Arch     : arm64-v8a / ELF64\n";
+        ss << "// Build    : " << __DATE__ << " " << __TIME__ << "\n";
+        ss << "// ================================================================\n\n";
+
+        int found = 0;
+        for (size_t i = 1; i < maxSyms; i++) {
+            uintptr_t symAddr = symtab + i * syment;
+            if (!AddrOk(symAddr + sizeof(Elf64_Sym), base, span)) break;
+
+            Elf64_Sym* sym = (Elf64_Sym*)symAddr;
+            if (sym->st_name == 0) continue;
+
+            uintptr_t nameAddr = strtab + sym->st_name;
+            if (!AddrOk(nameAddr, base, span)) continue;
+
+            const char* name = (const char*)nameAddr;
+            // Validasi string: ASCII printable
+            bool ok = true;
+            int  len = 0;
+            while (len < 256) {
+                if (!AddrOk(nameAddr + len, base, span)) { ok = false; break; }
+                char c = name[len];
+                if (c == 0) break;
+                if ((unsigned char)c < 0x20) { ok = false; break; }
+                len++;
             }
+            if (!ok || len == 0) continue;
 
-            // GameMode
-            int gameMode = (int)DmpRd32(gm + 0x5C0);
-            s << "// mGameMode            : " << gameMode << "\n";
-        } else {
-            s << "// (game not in match — launch scan during active game for live values)\n";
+            uintptr_t rva = (sym->st_value > 0) ? sym->st_value : 0;
+            char linebuf[384];
+            snprintf(linebuf, sizeof(linebuf), "// [%5zu] +0x%08lX  %s\n",
+                     i, (unsigned long)rva, name);
+            ss << linebuf;
+            s_symbols.push_back(name);
+            found++;
         }
-        s << "\n";
 
-        // ── Known Hook Offsets (relative ke libmain) ─────────────────────────
-        s << "// -- Known Hook Offsets (relative to libmain) -------------------\n";
-        s << "// setActiveVisualCue    : libmain + 0x2D911E0\n";
-        s << "// isBallBallCollision   : libmain + 0x2B1B158\n";
-        s << "// willCollideWithTable  : libmain + 0x3606C80\n";
-        s << "// (eglSwapBuffers hooked via xhook, no static offset)\n";
-        s << "\n";
-
-        // ── Global Pointers ───────────────────────────────────────────────────
-        s << "// -- Global Pointers (libmain + offset) -------------------------\n";
-        struct { const char* name; uintptr_t off; } gPtrs[] = {
-            { "sharedDirector",    0x4F06288 },
-            { "sharedUserInfo",    0x4E9FEB8 },
-            { "sharedMainManager", 0x4DDE3E0 },
-            { "sharedMenuManager", 0x4DFE838 },
-        };
-        for (auto& gp : gPtrs) {
-            uintptr_t addr = DmpAddrSafe(libmain) ? libmain + gp.off : 0;
-            uintptr_t val  = DmpRd64(addr);
-            char buf[128];
-            snprintf(buf, sizeof(buf), "// %-22s : libmain+0x%lX  =>  %s\n",
-                     gp.name, (unsigned long)gp.off, val ? hex(val).c_str() : "0x0 (null)");
-            s << buf;
-        }
-        s << "\n";
-
-        s << "// ================================================================\n";
-        s << "// END OF DUMP\n";
-        s << "// ================================================================\n";
-
-        return s.str();
+        ss << "\n// Total: " << found << " symbols\n";
+        s_dumpText = ss.str();
+        s_dumpReady = true;
+        snprintf(s_saveStatus, sizeof(s_saveStatus), "Found %d symbols", found);
     }
 
-    // ── Jalankan scan ─────────────────────────────────────────────────────────
-    // Aman dipanggil dari render thread — semua akses memori sudah di-guard
+    // ── Entry point: scan libs lalu langsung scan symbols ─────────────────────
     static void RunScan() {
         if (s_scanning) return;
-        s_scanning   = true;
-        s_dumpReady  = false;
+        s_scanning = true;
+        s_dumpReady = false;
         s_saveStatus[0] = '\0';
-        s_dumpText   = Generate();
-        s_dumpReady  = true;
-        s_scanning   = false;
+        if (!s_libsLoaded) ScanLibraries();
+        ScanSymbols();
+        s_scanning = false;
+    }
+
+    // ── Refresh daftar library saja (tanpa scan symbol) ───────────────────────
+    static void RefreshLibs() {
+        s_libsLoaded = false;
+        s_symbols.clear();
+        s_dumpText.clear();
+        s_dumpReady = false;
+        ScanLibraries();
     }
 
     // ── Simpan dump ke file ───────────────────────────────────────────────────
     static void SaveToFile() {
         if (!s_dumpReady || s_dumpText.empty()) {
-            snprintf(s_saveStatus, sizeof(s_saveStatus), "Jalankan Scan dulu!");
+            snprintf(s_saveStatus, sizeof(s_saveStatus), "Scan dulu sebelum save!");
             return;
         }
 
-        const char* paths[] = {
+        const char* dirs[] = {
             "/storage/emulated/0/Android/data/com.miniclip.eightballpool/files/Dump",
             "/data/data/com.miniclip.eightballpool/files/Dump",
             "/storage/emulated/0/Download",
             "/sdcard/Download",
         };
 
-        for (auto& dir : paths) {
+        char fname[64] = "dump_lib";
+        if (!s_libs.empty() && s_selLib < (int)s_libs.size()) {
+            snprintf(fname, sizeof(fname), "dump_%s", s_libs[s_selLib].shortName);
+        }
+
+        for (auto& dir : dirs) {
             create_directory_recursive(dir);
-            char fpath[256];
-            snprintf(fpath, sizeof(fpath), "%s/dump.cs", dir);
+            char fpath[320];
+            snprintf(fpath, sizeof(fpath), "%s/%s.txt", dir, fname);
             std::ofstream ofs(fpath, std::ios::out | std::ios::trunc);
             if (ofs.is_open()) {
                 ofs << s_dumpText;
