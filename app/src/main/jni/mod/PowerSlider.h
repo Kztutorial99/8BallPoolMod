@@ -119,11 +119,11 @@ struct PowerSlider {
 
                 NativeTouchesMove(this->TouchIndex, this->CurrentPos.x, this->CurrentPos.y);
             } else {
-                return Cancel();
-                // Ensure we hit the target exactly
+                // Drag selesai — pindah ke fase ENDING untuk release tembakan
                 this->CurrentPos = this->TargetPos;
                 NativeTouchesMove(this->TouchIndex, this->CurrentPos.x, this->CurrentPos.y);
                 this->state = ENDING;
+                this->HoldTime = 0.f;
             }
 
             if (dynamic_bool["DebugTouch"]) {

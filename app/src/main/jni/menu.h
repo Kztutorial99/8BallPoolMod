@@ -771,14 +771,10 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 6));
             };
 
-            ModeSwitch8(O("Aim Break"),       AimMode::EIGHTBALL_BREAK);
-            ModeSwitch8(O("Aim Predict"),     AimMode::EIGHTBALL_PREDICT);
-            ModeSwitch8(O("Aim Lock 8 Ball"), AimMode::EIGHTBALL_8LOCK);
+            ModeSwitch8(O("Aim Break"),             AimMode::EIGHTBALL_BREAK);
+            ModeSwitch8(O("Aim Predict Auto Shoot"), AimMode::EIGHTBALL_PREDICT);
+            ModeSwitch8(O("Aim Lock 8 Ball"),        AimMode::EIGHTBALL_8LOCK);
 
-            Dummy(ImVec2(0, 6));
-            TextColored(ImVec4(0.45f, 0.50f, 0.65f, 0.90f), O("-- Enhancement --"));
-            Dummy(ImVec2(0, 6));
-            if (ToggleSwitch(O("Auto Shoot"), &AutoShoot::bEnabled)) need_save = true;
             Dummy(ImVec2(0, 4));
 
             // ── Pocket Info (read-only, selalu otomatis) ──────────────────
@@ -943,13 +939,9 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 8));
             };
 
-            ModeSwitch9(O("Aim Ghost 90% Win"), AimMode::NINEBALL_BREAK);
-            ModeSwitch9(O("Aim Predict"),       AimMode::NINEBALL_PREDICT);
+            ModeSwitch9(O("Aim Ghost 90% Win"),      AimMode::NINEBALL_BREAK);
+            ModeSwitch9(O("Aim Predict Auto Shoot"), AimMode::NINEBALL_PREDICT);
 
-            Dummy(ImVec2(0, 6));
-            TextColored(ImVec4(0.45f, 0.50f, 0.65f, 0.90f), O("-- Enhancement --"));
-            Dummy(ImVec2(0, 6));
-            if (ToggleSwitch(O("Auto Shoot"), &AutoShoot::bEnabled)) need_save = true;
             Dummy(ImVec2(0, 4));
 
             break;
@@ -1148,6 +1140,11 @@ INLINE void DrawMenu(ImGuiIO& io) {
         buttonClicker.Update();
         powerSlider.Update();
         AutoAim::Update();
+
+        // Auto Shoot aktif otomatis saat mode Aim Predict (8 Ball / 9 Ball)
+        AutoShoot::bEnabled = persistent_bool[O("bAutoAim")] &&
+            (g_aimMode == AimMode::EIGHTBALL_PREDICT ||
+             g_aimMode == AimMode::NINEBALL_PREDICT);
         AutoShoot::Update();
         PocketSelector::Update();  // proses tap pocket dari input thread
 

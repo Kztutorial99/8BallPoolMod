@@ -36,7 +36,7 @@ namespace AutoShoot {
 
     // Delay (detik) antara aim selesai → tembak,
     // agar game sempat update angle/power sebelum swipe dilakukan
-    static constexpr float AIM_TO_SHOOT_DELAY   = 0.45f;
+    static constexpr float AIM_TO_SHOOT_DELAY   = 0.20f;
 
     // Cooldown (detik) setelah tembakan untuk mencegah double-shoot
     static constexpr float COOLDOWN_AFTER_SHOT  = 2.8f;
@@ -123,8 +123,8 @@ namespace AutoShoot {
         // ── TEMBAK ────────────────────────────────────────────────────────
         ImVec4 rect = GetPowerGaugeRect();
 
-        // DragTime 0.7s ke max power, HoldTime 0.35s tahan sebelum release
-        powerSlider.SimulateDrag(rect, 0.f, 0.7f, 0.35f);
+        // DragTime 0.5s ke max power, HoldTime 0.15s tahan sebelum release
+        powerSlider.SimulateDrag(rect, 0.f, 0.5f, 0.15f);
 
         s_waitingToShoot = false;
         s_aimDelay       = 0.f;
