@@ -136,12 +136,9 @@ struct PowerSlider {
         if (this->state == ENDING) {
             this->HoldTime += dt;
             if (this->HoldTime >= this->HoldDuration) {
-                if (IsShotValid()) {
-                    this->End();
-                } else {
-                    LOGI("Shot invalid before release. Canceling.");
-                    this->Cancel();
-                }
+                // Selalu lepas di posisi power penuh — game akan tembak saat NativeTouchesEnd
+                // Tidak pakai IsShotValid() karena game ubah state saat gauge aktif (state != 4)
+                this->End();
             }
         }
 

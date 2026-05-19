@@ -316,10 +316,6 @@ INLINE void DrawESP(ImDrawList* draw) {
         GameStateManager gameStateManager = sharedGameManager.mStateManager;
         if (!gameStateManager) return;
 
-        if (persistent_bool[O("bAutoAim")]) {
-            AutoAim::Update();
-        }
-
         if (!gPrediction) return;
 
         auto stateId = gameStateManager.getCurrentStateId();
