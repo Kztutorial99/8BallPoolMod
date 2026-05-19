@@ -191,6 +191,8 @@
   /home/runner/workspace/app/src/main/jni/game/inc/AimLock8Ball.h \
   /home/runner/workspace/app/src/main/jni/game/inc/Aim9Ball.h \
   /home/runner/workspace/app/src/main/jni/game/inc/Aim9BallBreak.h \
+  /home/runner/workspace/app/src/main/jni/game/inc/AutoPower.h \
+  /home/runner/workspace/app/src/main/jni/game/inc/AutoEnglish.h \
   /home/runner/workspace/app/src/main/jni/mod/kill.h \
   /home/runner/workspace/app/src/main/jni/include/syscall.h
 
@@ -575,6 +577,10 @@
 /home/runner/workspace/app/src/main/jni/game/inc/Aim9Ball.h:
 
 /home/runner/workspace/app/src/main/jni/game/inc/Aim9BallBreak.h:
+
+/home/runner/workspace/app/src/main/jni/game/inc/AutoPower.h:
+
+/home/runner/workspace/app/src/main/jni/game/inc/AutoEnglish.h:
 
 /home/runner/workspace/app/src/main/jni/mod/kill.h:
 
