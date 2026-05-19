@@ -15,8 +15,6 @@ using namespace std;
 #include "imgui/inc/8bp.h"
 #include "mod/keylogin.h"
 #include "mod/PocketSelector.h"
-#include "mod/DumpOffset.h"
-#include "mod/OffsetSearch.h"
 #include "oxorany/oxorany.h"
 
 #include <EGL/egl.h>
@@ -207,8 +205,6 @@ static int g_selectedPocket8 = -1;
 #include "game/inc/AimLock8Ball.h"
 #include "game/inc/Aim9Ball.h"
 #include "game/inc/Aim9BallBreak.h"
-#include "game/inc/AutoPower.h"
-#include "game/inc/AutoEnglish.h"
 #include "game/inc/AutoShoot.h"
 #include <thread>
 #include <atomic>
@@ -324,32 +320,6 @@ INLINE void DrawESP(ImDrawList* draw) {
             AutoAim::Update();
         }
 
-        // ── Auto Power & Auto English — dipanggil setelah aim selesai ────────
-        if (AutoAim::bAimed.load()) {
-            if (persistent_bool[O("bAutoPower")]) {
-                if (g_aimMode == AimMode::EIGHTBALL_BREAK || g_aimMode == AimMode::NINEBALL_BREAK) {
-                    AutoPower::ApplyBreak();
-                } else if (g_aimMode == AimMode::NINEBALL_PREDICT) {
-                    AutoPower::Apply9Ball(Aim9Ball::lastTargetBall, Aim9Ball::lastTargetPocket);
-                } else if (g_aimMode == AimMode::EIGHTBALL_8LOCK) {
-                    AutoPower::Apply(8, AimLock8Ball::lastTargetPocket);
-                } else {
-                    AutoPower::Apply(AimLockTarget::lastTargetBall, AimLockTarget::lastTargetPocket);
-                }
-            }
-            if (persistent_bool[O("bAutoEnglish")]) {
-                if (g_aimMode == AimMode::EIGHTBALL_BREAK || g_aimMode == AimMode::NINEBALL_BREAK) {
-                    AutoEnglish::ApplyBreak();
-                } else if (g_aimMode == AimMode::EIGHTBALL_8LOCK) {
-                    AutoEnglish::Apply8Lock();
-                } else if (g_aimMode == AimMode::NINEBALL_PREDICT) {
-                    AutoEnglish::Apply(Aim9Ball::lastTargetBall);
-                } else {
-                    AutoEnglish::Apply(AimLockTarget::lastTargetBall);
-                }
-            }
-        }
-
         if (!gPrediction) return;
 
         auto stateId = gameStateManager.getCurrentStateId();
@@ -435,7 +405,7 @@ static void DrawSidebar(float sidebarW) {
     float closeSize = 35.0f;
     float closeBtnW = 70.0f;
     float tabsW     = sidebarW - closeBtnW;
-    float btnW      = tabsW / 6.0f;
+    float btnW      = tabsW / 4.0f;
     float marginB   = 12.0f;
 
     dl->ChannelsSplit(2);
@@ -450,10 +420,6 @@ static void DrawSidebar(float sidebarW) {
     if (SidebarButton(O("9 Ball"), q_icon_tex,    g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
     SameLine(0, 0);
     if (SidebarButton(O("Info"),   user_icon_tex, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
-    SameLine(0, 0);
-    if (SidebarButton(O("Dump"),   draw_icon_tex, g_menu.currentTab == 4, btnW)) g_menu.currentTab = 4;
-    SameLine(0, 0);
-    if (SidebarButton(O("Search"), draw_icon_tex, g_menu.currentTab == 5, btnW)) g_menu.currentTab = 5;
     EndGroup();
 
     // Measure actual rendered height — this is the true wrap_content
@@ -693,9 +659,7 @@ static void DrawContentArea(float winW, float winH) {
         O("Draw Settings"),
         O("8 Ball"),
         O("9 Ball"),
-        O("Info"),
-        O("Dump Offset"),
-        O("Search Offset")
+        O("Info")
     };
 
     // --- CENTRARE TITLU TAB ---
@@ -814,10 +778,6 @@ static void DrawContentArea(float winW, float winH) {
             Dummy(ImVec2(0, 6));
             TextColored(ImVec4(0.45f, 0.50f, 0.65f, 0.90f), O("-- Enhancement --"));
             Dummy(ImVec2(0, 6));
-            if (ToggleSwitch(O("Auto Power"), &persistent_bool[O("bAutoPower")])) need_save = true;
-            Dummy(ImVec2(0, 4));
-            if (ToggleSwitch(O("Auto English"), &persistent_bool[O("bAutoEnglish")])) need_save = true;
-            Dummy(ImVec2(0, 4));
             if (ToggleSwitch(O("Auto Shoot"), &AutoShoot::bEnabled)) need_save = true;
             Dummy(ImVec2(0, 4));
 
@@ -989,10 +949,6 @@ static void DrawContentArea(float winW, float winH) {
             Dummy(ImVec2(0, 6));
             TextColored(ImVec4(0.45f, 0.50f, 0.65f, 0.90f), O("-- Enhancement --"));
             Dummy(ImVec2(0, 6));
-            if (ToggleSwitch(O("Auto Power"), &persistent_bool[O("bAutoPower")])) need_save = true;
-            Dummy(ImVec2(0, 4));
-            if (ToggleSwitch(O("Auto English"), &persistent_bool[O("bAutoEnglish")])) need_save = true;
-            Dummy(ImVec2(0, 4));
             if (ToggleSwitch(O("Auto Shoot"), &AutoShoot::bEnabled)) need_save = true;
             Dummy(ImVec2(0, 4));
 
@@ -1155,367 +1111,6 @@ static void DrawContentArea(float winW, float winH) {
             break;
         }
 
-        case 4: {
-            // ── DUMP OFFSET ───────────────────────────────────────────────
-            Dummy(ImVec2(0, 10));
-
-            float halfW = (GetContentRegionAvail().x - 8.0f) * 0.5f;
-
-            // Tombol Scan + Copy (satu baris)
-            {
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.35f, 0.80f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.45f, 1.00f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.28f, 0.65f, 1.0f));
-                if (Button(DumpOffset::s_scanning ? O("Scanning...") : O("Scan Offset"),
-                           ImVec2(halfW, 48.0f))) {
-                    if (!DumpOffset::s_scanning) DumpOffset::RunScan();
-                }
-                PopStyleColor(3); PopStyleVar();
-
-                SameLine(0, 8.0f);
-
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.06f, 0.28f, 0.13f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.42f, 0.20f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.05f, 0.20f, 0.09f, 1.0f));
-                if (Button(O("Copy"), ImVec2(halfW, 48.0f))) {
-                    if (DumpOffset::s_dumpReady && !DumpOffset::s_dumpText.empty())
-                        SetClipboardText(DumpOffset::s_dumpText.c_str());
-                }
-                PopStyleColor(3); PopStyleVar();
-            }
-
-            Dummy(ImVec2(0, 6));
-
-            // Tombol Save to File
-            {
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.30f, 0.18f, 0.04f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.46f, 0.28f, 0.08f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.22f, 0.12f, 0.03f, 1.0f));
-                if (Button(O("Save to File"), ImVec2(GetContentRegionAvail().x, 40.0f)))
-                    DumpOffset::SaveToFile();
-                PopStyleColor(3); PopStyleVar();
-            }
-
-            // Status save
-            if (DumpOffset::s_saveStatus[0] != '\0') {
-                Dummy(ImVec2(0, 4));
-                TextColored(ImVec4(0.25f, 1.0f, 0.50f, 0.95f), "%s", DumpOffset::s_saveStatus);
-            }
-
-            Dummy(ImVec2(0, 8));
-
-            // Preview hasil dump
-            if (DumpOffset::s_dumpReady && !DumpOffset::s_dumpText.empty()) {
-                TextColored(ImVec4(0.45f, 0.55f, 0.70f, 1.0f), O("Preview:"));
-                Dummy(ImVec2(0, 4));
-                float previewH = GetContentRegionAvail().y - 6.0f;
-                PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.06f, 0.09f, 1.0f));
-                PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
-                if (BeginChild(O("##dumpPreview"), ImVec2(0, previewH), true)) {
-                    PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.88f, 0.58f, 1.0f));
-                    TextUnformatted(DumpOffset::s_dumpText.c_str());
-                    PopStyleColor();
-                }
-                EndChild();
-                PopStyleVar(); PopStyleColor();
-            } else if (!DumpOffset::s_scanning) {
-                Dummy(ImVec2(0, 24));
-                float tw = CalcTextSize(O("Tekan Scan Offset untuk mulai")).x;
-                float avail = GetContentRegionAvail().x;
-                SetCursorPosX(GetCursorPosX() + (avail - tw) * 0.5f);
-                TextColored(ImVec4(0.32f, 0.38f, 0.52f, 0.75f), O("Tekan Scan Offset untuk mulai"));
-            }
-
-            break;
-        }
-
-        case 5: {
-            // ── OFFSET SEARCH + LIVE VALIDATOR ────────────────────────────────
-            using namespace OffsetSearch;
-
-            // Refresh nilai live setiap frame jika validator aktif
-            static int s_liveRefreshFrame = 0;
-            if (s_validatorOn) {
-                s_liveRefreshFrame++;
-                if (s_liveRefreshFrame >= 30) { // refresh ~2x/detik di 60fps
-                    s_liveRefreshFrame = 0;
-                    RefreshLiveValues();
-                }
-            }
-
-            float avail = GetContentRegionAvail().x;
-            Dummy(ImVec2(0, 8));
-
-            // ── Header + counter ──────────────────────────────────────────────
-            TextColored(ImVec4(0.45f, 0.70f, 1.0f, 1.0f), O("Search Offsets"));
-            SameLine();
-            TextColored(ImVec4(0.30f, 0.38f, 0.52f, 0.80f),
-                        O("  DB: %d  |  Hasil: %d"), DB_SIZE, (int)s_results.size());
-            Dummy(ImVec2(0, 6));
-
-            // ── Search Input ──────────────────────────────────────────────────
-            SetNextItemWidth(avail);
-            PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-            PushStyleColor(ImGuiCol_FrameBg,        ImVec4(0.07f, 0.10f, 0.18f, 1.0f));
-            PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.10f, 0.16f, 0.28f, 1.0f));
-            PushStyleColor(ImGuiCol_FrameBgActive,  ImVec4(0.12f, 0.20f, 0.35f, 1.0f));
-            bool changed = InputText(O("##offsetSearch"), s_searchBuf, sizeof(s_searchBuf));
-            PopStyleColor(3); PopStyleVar();
-
-            if (changed || memcmp(s_searchBuf, s_lastQuery, sizeof(s_searchBuf)) != 0) {
-                memcpy(s_lastQuery, s_searchBuf, sizeof(s_searchBuf));
-                RunSearch();
-                if (s_validatorOn) RefreshLiveValues();
-            }
-
-            Dummy(ImVec2(0, 6));
-
-            // ── Baris tombol: Copy All | Clear | Live Validator ───────────────
-            {
-                float thirdW = (avail - 16.0f) / 3.0f;
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-
-                // Copy All
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.06f, 0.28f, 0.13f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.42f, 0.20f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.05f, 0.20f, 0.09f, 1.0f));
-                if (Button(O("Copy All"), ImVec2(thirdW, 42.0f))) {
-                    if (!s_results.empty()) {
-                        std::string all = BuildAllResultsText();
-                        SetClipboardText(all.c_str());
-                        SetCopyStatus("Disalin!");
-                    } else {
-                        SetCopyStatus("Tidak ada hasil!");
-                    }
-                }
-                PopStyleColor(3);
-
-                SameLine(0, 8.0f);
-
-                // Clear
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.28f, 0.10f, 0.10f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.42f, 0.15f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.20f, 0.06f, 0.06f, 1.0f));
-                if (Button(O("Clear"), ImVec2(thirdW, 42.0f))) {
-                    memset(s_searchBuf, 0, sizeof(s_searchBuf));
-                    memset(s_lastQuery, 1, sizeof(s_lastQuery));
-                }
-                PopStyleColor(3);
-
-                SameLine(0, 8.0f);
-
-                // Live Validator toggle
-                bool valOn = s_validatorOn;
-                if (valOn) {
-                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.40f, 0.70f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.55f, 0.90f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.30f, 0.55f, 1.0f));
-                } else {
-                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.12f, 0.16f, 0.26f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.24f, 0.40f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.12f, 0.20f, 1.0f));
-                }
-                if (Button(valOn ? O("Validator ON") : O("Validator OFF"), ImVec2(thirdW, 42.0f))) {
-                    s_validatorOn = !s_validatorOn;
-                    if (s_validatorOn) RefreshLiveValues();
-                    s_liveRefreshFrame = 0;
-                }
-                PopStyleColor(3);
-                PopStyleVar();
-            }
-
-            // ── Copy status toast ─────────────────────────────────────────────
-            if (s_copyStatusTimer > 0.0f) {
-                s_copyStatusTimer -= GetIO().DeltaTime;
-                Dummy(ImVec2(0, 3));
-                TextColored(ImVec4(0.25f, 1.0f, 0.50f, ImSaturate(s_copyStatusTimer)),
-                            "%s", s_copyStatus);
-            } else {
-                Dummy(ImVec2(0, 3));
-                Dummy(ImVec2(0, GetTextLineHeight()));
-            }
-
-            // ── Base Pointer Status (hanya jika validator ON) ─────────────────
-            if (s_validatorOn) {
-                Dummy(ImVec2(0, 4));
-                BaseStatus bases[6];
-                GetBaseStatuses(bases);
-
-                PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.08f, 0.14f, 1.0f));
-                PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
-                if (BeginChild(O("##basePtrs"), ImVec2(0, 38.0f), false)) {
-                    SetCursorPosY(GetCursorPosY() + 6.0f);
-                    for (int b = 0; b < 6; b++) {
-                        if (b > 0) SameLine(0, 12.0f);
-                        bool ok = IsAddrSafe(bases[b].addr);
-                        ImU32 dot = ok ? IM_COL32(30, 220, 80, 255) : IM_COL32(220, 50, 50, 255);
-                        ImVec2 p = GetCursorScreenPos();
-                        p.y += GetTextLineHeight() * 0.5f - 4.0f;
-                        GetWindowDrawList()->AddCircleFilled(ImVec2(p.x + 5.0f, p.y + 4.0f), 4.5f, dot);
-                        SetCursorPosX(GetCursorPosX() + 14.0f);
-                        TextColored(ok ? ImVec4(0.35f, 0.95f, 0.50f, 1.0f)
-                                       : ImVec4(0.80f, 0.30f, 0.30f, 0.85f),
-                                    "%s", bases[b].name);
-                    }
-                }
-                EndChild();
-                PopStyleVar(); PopStyleColor();
-            }
-
-            Dummy(ImVec2(0, 4));
-
-            // ── Tabel hasil ───────────────────────────────────────────────────
-            float tableH = GetContentRegionAvail().y - 4.0f;
-            PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.04f, 0.06f, 0.10f, 1.0f));
-            PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
-
-            if (BeginChild(O("##searchScroll"), ImVec2(0, tableH), false)) {
-                // Lebar kolom — seimbang agar semua terlihat di layar kecil
-                // Class | Field | Offset | Type | Note/Live | [C][H]
-                // [C] = Copy full entry   [H] = Copy hex offset only
-                float cClass  = avail * 0.17f;
-                float cField  = avail * 0.23f;
-                float cOffset = avail * 0.12f;
-                float cType   = avail * 0.11f;
-                float cExtra  = avail * 0.24f; // note atau live value
-                float cBtns   = avail * 0.13f; // kedua tombol C + H
-
-                // Header kolom
-                {
-                    PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.65f, 0.85f, 1.0f));
-                    Text(O("Class"));
-                    SameLine(cClass);                               Text(O("Field"));
-                    SameLine(cClass + cField);                      Text(O("Offset"));
-                    SameLine(cClass + cField + cOffset);            Text(O("Type"));
-                    SameLine(cClass + cField + cOffset + cType);    Text(s_validatorOn ? O("Live") : O("Note"));
-                    SameLine(cClass + cField + cOffset + cType + cExtra);
-                    TextDisabled(O("[C][H]"));
-                    PopStyleColor();
-                    Separator();
-                    Dummy(ImVec2(0, 2));
-                }
-
-                if (s_results.empty()) {
-                    Dummy(ImVec2(0, 20));
-                    float tw = CalcTextSize(s_searchBuf[0]
-                        ? O("Tidak ada hasil ditemukan")
-                        : O("Ketik sesuatu untuk mencari...")).x;
-                    SetCursorPosX(GetCursorPosX() + (avail - tw) * 0.5f);
-                    TextColored(ImVec4(0.32f, 0.38f, 0.52f, 0.70f),
-                                s_searchBuf[0]
-                                    ? O("Tidak ada hasil ditemukan")
-                                    : O("Ketik sesuatu untuk mencari..."));
-                } else {
-                    for (int i = 0; i < (int)s_results.size(); i++) {
-                        FilteredEntry& fe = s_results[i];
-                        PushID(i);
-
-                        // Row background selang-seling
-                        float rowH = GetTextLineHeightWithSpacing() + 8.0f;
-                        if (i % 2 == 0) {
-                            ImVec2 rMin = GetCursorScreenPos();
-                            GetWindowDrawList()->AddRectFilled(
-                                rMin, ImVec2(rMin.x + avail, rMin.y + rowH),
-                                IM_COL32(18, 30, 55, 180));
-                        }
-
-                        // Class (biru)
-                        TextColored(ImVec4(0.40f, 0.72f, 1.00f, 1.0f), "%s", fe.e->className);
-
-                        // Field (putih) + tooltip note lengkap saat hover
-                        SameLine(cClass);
-                        TextColored(ImVec4(0.88f, 0.88f, 0.94f, 1.0f), "%s", fe.e->fieldName);
-                        if (IsItemHovered() && fe.e->note && fe.e->note[0]) {
-                            BeginTooltip();
-                            TextColored(ImVec4(0.40f, 0.72f, 1.00f, 1.0f), "%s::%s", fe.e->className, fe.e->fieldName);
-                            TextColored(ImVec4(0.30f, 1.00f, 0.50f, 1.0f), "%s", fe.hexOffset);
-                            SameLine(); TextColored(ImVec4(1.00f, 0.72f, 0.28f, 1.0f), "  %s", fe.e->type);
-                            Separator();
-                            TextUnformatted(fe.e->note);
-                            EndTooltip();
-                        }
-
-                        // Offset (hijau)
-                        SameLine(cClass + cField);
-                        TextColored(ImVec4(0.30f, 1.00f, 0.50f, 1.0f), "%s", fe.hexOffset);
-
-                        // Type (oranye)
-                        SameLine(cClass + cField + cOffset);
-                        TextColored(ImVec4(1.00f, 0.72f, 0.28f, 1.0f), "%s", fe.e->type);
-
-                        // Live Value atau Note (dibatasi lebar cExtra)
-                        SameLine(cClass + cField + cOffset + cType);
-                        if (s_validatorOn) {
-                            if (fe.liveValid && fe.liveValue[0]) {
-                                TextColored(ImVec4(0.20f, 1.00f, 0.70f, 1.0f), "%s", fe.liveValue);
-                            } else if (fe.liveValue[0]) {
-                                TextColored(ImVec4(0.60f, 0.35f, 0.35f, 0.90f), "%s", fe.liveValue);
-                            } else {
-                                TextColored(ImVec4(0.30f, 0.35f, 0.45f, 0.70f), O("---"));
-                            }
-                        } else {
-                            // Potong note jika terlalu panjang, tampilkan "..." di akhir
-                            const char* note = fe.e->note;
-                            float notePixW = cExtra - 6.0f;
-                            if (CalcTextSize(note).x > notePixW) {
-                                // Cari panjang yang muat + "..."
-                                char noteBuf[64];
-                                int n = 0;
-                                while (note[n] && CalcTextSize(note, note + n + 1).x < notePixW - CalcTextSize("..").x)
-                                    n++;
-                                snprintf(noteBuf, sizeof(noteBuf), "%.*s..", n, note);
-                                TextColored(ImVec4(0.50f, 0.56f, 0.68f, 0.85f), "%s", noteBuf);
-                                if (IsItemHovered()) {
-                                    BeginTooltip(); TextUnformatted(note); EndTooltip();
-                                }
-                            } else {
-                                TextColored(ImVec4(0.50f, 0.56f, 0.68f, 0.85f), "%s", note);
-                            }
-                        }
-
-                        // ── Tombol [C] Copy full + [H] Copy hex ──────────────────
-                        float btnX = cClass + cField + cOffset + cType + cExtra;
-                        float halfBtn = (cBtns - 4.0f) * 0.5f;
-
-                        // [C] copy full entry
-                        SameLine(btnX);
-                        PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-                        PushStyleColor(ImGuiCol_Button,        ImVec4(0.06f, 0.20f, 0.48f, 0.90f));
-                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.36f, 0.82f, 1.00f));
-                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.05f, 0.15f, 0.36f, 1.00f));
-                        if (SmallButton(O("C##c"))) {
-                            SetClipboardText(EntryToString(fe).c_str());
-                            SetCopyStatus("Disalin!");
-                        }
-                        if (IsItemHovered()) { BeginTooltip(); TextUnformatted(O("Copy baris lengkap")); EndTooltip(); }
-                        PopStyleColor(3); PopStyleVar();
-
-                        // [H] copy hex offset only
-                        SameLine(btnX + halfBtn + 4.0f);
-                        PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-                        PushStyleColor(ImGuiCol_Button,        ImVec4(0.28f, 0.14f, 0.04f, 0.90f));
-                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.55f, 0.30f, 0.06f, 1.00f));
-                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.20f, 0.10f, 0.02f, 1.00f));
-                        if (SmallButton(O("H##h"))) {
-                            SetClipboardText(fe.hexOffset);
-                            SetCopyStatus(fe.hexOffset);
-                        }
-                        if (IsItemHovered()) { BeginTooltip(); TextUnformatted(O("Copy hex offset saja")); EndTooltip(); }
-                        PopStyleColor(3); PopStyleVar();
-
-                        PopID();
-                        Dummy(ImVec2(0, 2));
-                    }
-                }
-            }
-            EndChild();
-            PopStyleVar(); PopStyleColor();
-
-            break;
-        }
     }
     
     if (need_save) save_persistence();
