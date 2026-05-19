@@ -1,10 +1,12 @@
-./obj/local/arm64-v8a/objs/rary/include/external/dlfcn/dlfcn.o: \
-  include/external/dlfcn/dlfcn.cpp include/external/dlfcn/dlfcn.hpp \
+/home/runner/workspace/app/src/main/jni/obj/local/arm64-v8a/objs/rary/include/external/dlfcn/dlfcn.o: \
+  /home/runner/workspace/app/src/main/jni/include/external/dlfcn/dlfcn.cpp \
+  /home/runner/workspace/app/src/main/jni/include/external/dlfcn/dlfcn.hpp \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string.h \
-  include/obfuscation.h include/external/obfy/instr.h \
+  /home/runner/workspace/app/src/main/jni/include/obfuscation.h \
+  /home/runner/workspace/app/src/main/jni/include/external/obfy/instr.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string_view \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__string \
@@ -70,9 +72,10 @@
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdarg \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bsd_locale_fallbacks.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bitset \
-  include/external/oxorany/oxorany.h include/random_names.h
+  /home/runner/workspace/app/src/main/jni/include/external/oxorany/oxorany.h \
+  /home/runner/workspace/app/src/main/jni/include/random_names.h
 
-include/external/dlfcn/dlfcn.hpp:
+/home/runner/workspace/app/src/main/jni/include/external/dlfcn/dlfcn.hpp:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h:
 
@@ -82,9 +85,9 @@ include/external/dlfcn/dlfcn.hpp:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string.h:
 
-include/obfuscation.h:
+/home/runner/workspace/app/src/main/jni/include/obfuscation.h:
 
-include/external/obfy/instr.h:
+/home/runner/workspace/app/src/main/jni/include/external/obfy/instr.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string:
 
@@ -216,6 +219,6 @@ include/external/obfy/instr.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bitset:
 
-include/external/oxorany/oxorany.h:
+/home/runner/workspace/app/src/main/jni/include/external/oxorany/oxorany.h:
 
-include/random_names.h:
+/home/runner/workspace/app/src/main/jni/include/random_names.h:

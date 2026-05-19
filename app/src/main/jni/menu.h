@@ -24,12 +24,14 @@ using namespace std;
 #include <ctime>
 
 struct MenuState {
-    bool isOpen = false;
-    int currentTab = 0;
+    bool isOpen      = false;
+    bool isMinimized = false;   // true = tampilkan mini bar, bukan full menu
+    int  currentTab  = 0;
     float sidebarWidth = 750.0f;
     float animProgress = 0.0f;
-    float menuAlpha = 0.0f;
-    float menuScale = 0.9f;
+    float menuAlpha    = 0.0f;
+    float menuScale    = 0.9f;
+    float miniBarY     = 10.0f; // posisi Y mini bar (draggable)
     ImVec4 accentColor = ImVec4(0.35f, 0.65f, 0.95f, 1.0f);
 };
 static MenuState g_menu;
@@ -122,9 +124,9 @@ static bool SidebarButton(const char* label, int iconType, bool selected, float 
     const ImGuiStyle& style = g.Style;
     const ImGuiID id = window->GetID(label);
 
-    float iconSize = 42.0f;
-    float vPad     = 11.0f;
-    float btnH     = vPad + iconSize + 5.0f + g.FontSize * 0.88f + vPad;
+    float iconSize = 40.0f;
+    float vPad     = 12.0f;
+    float btnH     = vPad + iconSize + 5.0f + g.FontSize * 0.86f + vPad;
 
     ImVec2 pos  = window->DC.CursorPos;
     ImVec2 size = ImVec2(width, btnH);
@@ -137,29 +139,49 @@ static bool SidebarButton(const char* label, int iconType, bool selected, float 
     bool pressed = ButtonBehavior(bb, id, &hovered, &held);
 
     ImDrawList* dl = window->DrawList;
+    float t = (float)GetTime();
 
-    // Hover feedback
-    if (hovered && !selected) {
-        dl->AddRectFilled(
-            ImVec2(bb.Min.x + 5.0f, bb.Min.y + 3.0f),
-            ImVec2(bb.Max.x - 5.0f, bb.Max.y - 3.0f),
-            IM_COL32(255, 255, 255, 16), 14.0f);
-    }
-
-    float iconBgR = iconSize * 0.5f + 8.0f;
+    float iconBgR = iconSize * 0.5f + 7.0f;
     ImVec2 iconCenter = ImVec2(
         bb.Min.x + width * 0.5f,
         bb.Min.y + vPad + iconSize * 0.5f
     );
 
-    // Selected: rounded pill with gradient
     if (selected) {
+        // ── Glass pill background ─────────────────────────────────────────
         ImVec2 pMin = ImVec2(iconCenter.x - iconBgR, iconCenter.y - iconBgR);
         ImVec2 pMax = ImVec2(iconCenter.x + iconBgR, iconCenter.y + iconBgR);
+        float pr = 14.0f;
+        // Soft outer glow
+        dl->AddRectFilled(
+            ImVec2(pMin.x - 3, pMin.y - 3), ImVec2(pMax.x + 3, pMax.y + 3),
+            IM_COL32(60, 130, 255, 22), pr + 4.0f);
+        // Glass body — multi-layer
         dl->AddRectFilledMultiColor(pMin, pMax,
-            IM_COL32(22, 95, 218, 235), IM_COL32(32, 125, 248, 235),
-            IM_COL32(24, 108, 230, 235), IM_COL32(18, 85, 205, 235));
-        dl->AddRect(pMin, pMax, IM_COL32(90, 170, 255, 80), 14.0f, 0, 1.0f);
+            IM_COL32(28, 80, 200, 200), IM_COL32(38, 100, 225, 200),
+            IM_COL32(22, 72, 190, 200), IM_COL32(18, 65, 175, 200));
+        // Glass top gloss
+        dl->AddRectFilledMultiColor(
+            pMin, ImVec2(pMax.x, pMin.y + (pMax.y - pMin.y) * 0.45f),
+            IM_COL32(255,255,255,28), IM_COL32(255,255,255,28),
+            IM_COL32(255,255,255, 4), IM_COL32(255,255,255, 4));
+        // Crisp glass border
+        dl->AddRect(pMin, pMax, IM_COL32(120, 180, 255, 70), pr, 0, 1.0f);
+        // Top-left inner highlight
+        dl->AddRect(
+            ImVec2(pMin.x + 1, pMin.y + 1),
+            ImVec2(pMax.x - 1, pMax.y - 1),
+            IM_COL32(200, 225, 255, 18), pr - 1.0f, 0, 0.6f);
+    } else if (hovered) {
+        // Subtle hover glass overlay
+        dl->AddRectFilled(
+            ImVec2(bb.Min.x + 6.0f, bb.Min.y + 4.0f),
+            ImVec2(bb.Max.x - 6.0f, bb.Max.y - 4.0f),
+            IM_COL32(255, 255, 255, 12), 14.0f);
+        dl->AddRect(
+            ImVec2(bb.Min.x + 6.0f, bb.Min.y + 4.0f),
+            ImVec2(bb.Max.x - 6.0f, bb.Max.y - 4.0f),
+            IM_COL32(160, 200, 255, 25), 14.0f, 0, 0.8f);
     }
 
     // Vector icon
@@ -172,15 +194,16 @@ static bool SidebarButton(const char* label, int iconType, bool selected, float 
         bb.Min.y + vPad + iconSize + 5.0f
     );
     ImU32 textCol = selected
-        ? IM_COL32(225, 238, 255, 255)
-        : IM_COL32(110, 125, 155, 210);
+        ? IM_COL32(220, 235, 255, 255)
+        : IM_COL32(100, 118, 150, 200);
     dl->AddText(textPos, textCol, label);
 
-    // Active dot
+    // Active indicator dot — soft glow
     if (selected) {
-        dl->AddCircleFilled(
-            ImVec2(bb.Min.x + width * 0.5f, bb.Max.y - 4.0f),
-            2.5f, IM_COL32(110, 185, 255, 210));
+        float dotX = bb.Min.x + width * 0.5f;
+        float dotY = bb.Max.y - 5.0f;
+        dl->AddCircleFilled(ImVec2(dotX, dotY), 5.0f, IM_COL32(80, 160, 255, 40));
+        dl->AddCircleFilled(ImVec2(dotX, dotY), 2.8f, IM_COL32(140, 200, 255, 220));
     }
 
     return pressed;
@@ -552,44 +575,78 @@ static void DrawSidebar(float sidebarW) {
     // Measure actual rendered height — this is the true wrap_content
     float sidebarH = GetItemRectMax().y - wp.y;
 
-    // Now draw background on channel 0 (behind the buttons)
+    // ── Glass sidebar background (channel 0, drawn behind buttons) ───────
     dl->ChannelsSetCurrent(0);
-    dl->AddRectFilledMultiColor(wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH),
-        IM_COL32(8, 22, 52, 255), IM_COL32(12, 32, 75, 255),
-        IM_COL32(12, 32, 75, 255), IM_COL32(8, 22, 52, 255));
+    // Base glass layer — deep navy, semi-transparent
+    dl->AddRectFilledMultiColor(
+        wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH),
+        IM_COL32( 8, 16, 44, 245), IM_COL32(12, 22, 58, 245),
+        IM_COL32(10, 20, 52, 245), IM_COL32( 7, 14, 40, 245));
+    // Top gloss sheen — white highlight fading down
+    dl->AddRectFilledMultiColor(
+        wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH * 0.38f),
+        IM_COL32(255,255,255,18), IM_COL32(255,255,255,18),
+        IM_COL32(255,255,255, 0), IM_COL32(255,255,255, 0));
+    // Bottom subtle gradient darkening
+    dl->AddRectFilledMultiColor(
+        ImVec2(wp.x, wp.y + sidebarH * 0.62f),
+        ImVec2(wp.x + sidebarW, wp.y + sidebarH),
+        IM_COL32(0,0,0, 0), IM_COL32(0,0,0, 0),
+        IM_COL32(0,0,0,40), IM_COL32(0,0,0,40));
     dl->ChannelsMerge();
 
-    // Vertical separator between Queue and close strip
+    // Bottom separator — glass edge with glow
+    float sepBotY = wp.y + sidebarH - 1.0f;
+    dl->AddRectFilledMultiColor(
+        ImVec2(wp.x,                    sepBotY),
+        ImVec2(wp.x + sidebarW * 0.4f, sepBotY + 1.2f),
+        IM_COL32(60,130,255, 0), IM_COL32(60,130,255,90),
+        IM_COL32(60,130,255,90), IM_COL32(60,130,255, 0));
+    dl->AddRectFilledMultiColor(
+        ImVec2(wp.x + sidebarW * 0.4f, sepBotY),
+        ImVec2(wp.x + sidebarW,        sepBotY + 1.2f),
+        IM_COL32(60,130,255,90), IM_COL32(60,130,255, 0),
+        IM_COL32(60,130,255, 0), IM_COL32(60,130,255,90));
+
+    // Vertical separator before minimize btn — thin glowing line
     float sepX       = wp.x + sidebarW - closeBtnW;
     float sepCenterY = wp.y + sidebarH * 0.5f;
-    float sepHalfH   = sidebarH * 0.28f;
-    dl->AddLine(
-        ImVec2(sepX, sepCenterY - sepHalfH),
-        ImVec2(sepX, sepCenterY + sepHalfH),
-        IM_COL32(40, 100, 220, 180), 1.5f
-    );
+    float sepHalfH   = sidebarH * 0.30f;
+    dl->AddRectFilledMultiColor(
+        ImVec2(sepX - 0.5f, sepCenterY - sepHalfH),
+        ImVec2(sepX + 0.5f, sepCenterY),
+        IM_COL32(80,150,255, 0), IM_COL32(80,150,255, 0),
+        IM_COL32(80,150,255,120), IM_COL32(80,150,255,120));
+    dl->AddRectFilledMultiColor(
+        ImVec2(sepX - 0.5f, sepCenterY),
+        ImVec2(sepX + 0.5f, sepCenterY + sepHalfH),
+        IM_COL32(80,150,255,120), IM_COL32(80,150,255,120),
+        IM_COL32(80,150,255, 0), IM_COL32(80,150,255, 0));
 
-    // Close (X) button — truly centered in the measured sidebarH
+    // ── Minimize (—) button — collapses menu to mini bar ─────────────────
     float closePosX = (sidebarW - closeBtnW) + (closeBtnW - closeSize) * 0.5f;
     float closePosY = (sidebarH - closeSize) * 0.5f;
     SetCursorPos(ImVec2(closePosX, closePosY));
     {
         ImGuiWindow* win = GetCurrentWindow();
-        ImGuiID closeId  = win->GetID(O("##CloseMenu"));
+        ImGuiID closeId  = win->GetID(O("##MinimizeMenu"));
         ImVec2 closePos  = win->DC.CursorPos;
         ImRect closeBb(closePos, closePos + ImVec2(closeSize, closeSize));
         ItemSize(ImVec2(closeSize, closeSize), g.Style.FramePadding.y);
         ItemAdd(closeBb, closeId);
         bool closeHovered = false, closeHeld = false;
         bool closePressed = ButtonBehavior(closeBb, closeId, &closeHovered, &closeHeld);
-        if (closePressed) g_menu.isOpen = false;
+        if (closePressed) {
+            g_menu.isMinimized = true;   // minimize, bukan close
+            g_menu.isOpen      = false;
+        }
 
         float xCX = closeBb.Min.x + closeSize * 0.5f;
         float xCY = closeBb.Min.y + closeSize * 0.5f;
         float xH  = closeSize * 0.32f;
-        ImU32 xCol = closeHovered ? IM_COL32(255, 255, 255, 240) : IM_COL32(160, 160, 170, 200);
-        dl->AddLine(ImVec2(xCX - xH, xCY - xH), ImVec2(xCX + xH, xCY + xH), xCol, 2.2f);
-        dl->AddLine(ImVec2(xCX + xH, xCY - xH), ImVec2(xCX - xH, xCY + xH), xCol, 2.2f);
+        ImU32 xCol = closeHovered ? IM_COL32(255, 220, 80, 240) : IM_COL32(160, 160, 170, 200);
+        // Draw (—) minus/minimize icon
+        dl->AddLine(ImVec2(xCX - xH, xCY), ImVec2(xCX + xH, xCY), xCol, 2.8f);
     }
 
     // Bottom margin — cursor pushed past the true sidebar height
@@ -642,7 +699,6 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
         case AimMode::EIGHTBALL_POCKET_LOCK: strcpy(modeName,"PKT"); modeColor=ImVec4(1.0f, 0.75f,0.10f,1.0f); break;
         case AimMode::NINEBALL_PREDICT:      strcpy(modeName,"9BP"); modeColor=ImVec4(0.15f,0.85f,0.55f,1.0f); break;
         case AimMode::NINEBALL_BREAK:    strcpy(modeName,"9GW"); modeColor=ImVec4(1.0f, 0.82f,0.05f,1.0f); break;
-        case AimMode::EIGHTBALL_SAFETY:  strcpy(modeName,"SFT"); modeColor=ImVec4(0.10f,0.88f,0.72f,1.0f); break;
         default: break;
     }
 
@@ -699,13 +755,6 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
         case AimMode::NINEBALL_BREAK:
             if (Aim9BallBreak::lastBestCount > 0)
                 snprintf(row2, sizeof(row2), "%d balls", Aim9BallBreak::lastBestCount);
-            break;
-        case AimMode::EIGHTBALL_SAFETY:
-            if (!isAimed || !AimSafety::lastHadShot)
-                snprintf(row2, sizeof(row2), "No safety found");
-            else
-                snprintf(row2, sizeof(row2), "Blocked %d  Pkt %d",
-                    AimSafety::lastBlockedCount, AimSafety::lastTargetPocket);
             break;
         default: break;
     }
@@ -787,13 +836,31 @@ static void DrawContentArea(float winW, float winH) {
     float startY   = GetCursorPosY();
     float contentW = winW;
 
-    // Desenăm fundalul zonei de conținut sub sidebar
+    // ── Glass content area background ────────────────────────────────────
+    // Deep navy base
     dl->AddRectFilledMultiColor(
         ImVec2(wp.x, wp.y + startY),
         ImVec2(wp.x + contentW, wp.y + winH),
-        IM_COL32(10, 18, 40, 255), IM_COL32(10, 18, 40, 255),
-        IM_COL32(14, 26, 58, 255), IM_COL32(14, 26, 58, 255)
-    );
+        IM_COL32( 6, 12, 32, 252), IM_COL32( 6, 12, 32, 252),
+        IM_COL32(10, 18, 46, 252), IM_COL32(10, 18, 46, 252));
+    // Left subtle blue edge glow
+    dl->AddRectFilledMultiColor(
+        ImVec2(wp.x, wp.y + startY),
+        ImVec2(wp.x + 2.0f, wp.y + winH),
+        IM_COL32(40,100,255,60), IM_COL32(40,100,255,60),
+        IM_COL32(40,100,255,15), IM_COL32(40,100,255,15));
+    // Right subtle edge glow
+    dl->AddRectFilledMultiColor(
+        ImVec2(wp.x + contentW - 2.0f, wp.y + startY),
+        ImVec2(wp.x + contentW,        wp.y + winH),
+        IM_COL32(40,100,255,60), IM_COL32(40,100,255,60),
+        IM_COL32(40,100,255,15), IM_COL32(40,100,255,15));
+    // Bottom vignette
+    dl->AddRectFilledMultiColor(
+        ImVec2(wp.x, wp.y + winH * 0.75f),
+        ImVec2(wp.x + contentW, wp.y + winH),
+        IM_COL32(0,0,0, 0), IM_COL32(0,0,0, 0),
+        IM_COL32(0,0,0,55), IM_COL32(0,0,0,55));
     
     static const char* const tabTitles[] = {
         "Draw",
@@ -942,7 +1009,6 @@ static void DrawContentArea(float winW, float winH) {
             ModeSwitch8(O("Aim Predict"),       AimMode::EIGHTBALL_PREDICT);
             ModeSwitch8(O("Aim Lock 8 Ball"),   AimMode::EIGHTBALL_8LOCK);
             ModeSwitch8(O("Aim Lock Pocket"),   AimMode::EIGHTBALL_POCKET_LOCK);
-            ModeSwitch8(O("Safety Shot"),       AimMode::EIGHTBALL_SAFETY);
 
             Dummy(ImVec2(0, 4));
 
@@ -1401,50 +1467,6 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 4));
             };
 
-            // ── Kartu @LYN4XP (hero card) ─────────────────────────────────────
-            {
-                static const char* NAME_STR = "@LYN4XP";
-                static const char* LINK_STR = "t.me/Lyn4xp";
-                float cardW = GetContentRegionAvail().x;
-                float cardH = 88.0f;
-                ImVec2 cPos = GetCursorScreenPos();
-
-                // Background gelap gradient
-                dl3->AddRectFilledMultiColor(
-                    cPos, ImVec2(cPos.x + cardW, cPos.y + cardH),
-                    IM_COL32(5, 20, 12, 240), IM_COL32(8, 28, 18, 240),
-                    IM_COL32(6, 24, 14, 240), IM_COL32(4, 18, 10, 240));
-                // Border hijau neon static
-                dl3->AddRect(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH),
-                    IM_COL32(12, 240, 115, 200), 14.0f, 0, 1.8f);
-
-                // @LYN4XP — centered, font besar, pakai AddText langsung (tidak manipulasi cursor)
-                float bigFs = GImGui->FontSize * 1.55f;
-                float nameW = GImGui->Font->CalcTextSizeA(bigFs, FLT_MAX, 0.0f, NAME_STR, nullptr, nullptr).x;
-                float nameX = cPos.x + (cardW - nameW) * 0.5f;
-                float nameY = cPos.y + 13.0f;
-                dl3->AddText(GImGui->Font, bigFs,
-                    ImVec2(nameX + 2.0f, nameY + 2.0f), IM_COL32(0, 60, 20, 140), NAME_STR);
-                dl3->AddText(GImGui->Font, bigFs,
-                    ImVec2(nameX, nameY), IM_COL32(20, 242, 115, 255), NAME_STR);
-
-                // t.me/Lyn4xp — centered, font normal
-                float linkW = GImGui->Font->CalcTextSizeA(GImGui->FontSize, FLT_MAX, 0.0f, LINK_STR, nullptr, nullptr).x;
-                float linkX = cPos.x + (cardW - linkW) * 0.5f;
-                float linkY = nameY + bigFs + 5.0f;
-                dl3->AddText(GImGui->Font, GImGui->FontSize,
-                    ImVec2(linkX, linkY), IM_COL32(64, 192, 115, 204), LINK_STR);
-
-                // Tanda Telegram kecil di pojok kiri bawah
-                static const char* TG_LABEL = "Telegram";
-                float tgY = cPos.y + cardH - GImGui->FontSize - 7.0f;
-                dl3->AddText(GImGui->Font, GImGui->FontSize * 0.82f,
-                    ImVec2(cPos.x + 10.0f, tgY), IM_COL32(64, 148, 220, 170), TG_LABEL);
-
-                // Reserve ruang card dengan Dummy — tidak ada cursor manipulation
-                Dummy(ImVec2(cardW, cardH + 6.0f));
-            }
-
             // ── Mod Info ─────────────────────────────────────────────────────
             DrawSecHdr("Mod Info", ImVec4(0.30f, 0.65f, 1.0f, 0.85f));
             {
@@ -1469,16 +1491,6 @@ static void DrawContentArea(float winW, float winH) {
                 } else {
                     DrawInfoRow("Expires", "EXPIRED", ImVec4(1.0f, 0.25f, 0.25f, 1.0f));
                 }
-            }
-
-            // ── Contact ───────────────────────────────────────────────────────
-            DrawSecHdr("Contact", ImVec4(0.35f, 0.75f, 1.0f, 0.85f));
-            {
-                static const char* TG_USER = "@LYN4XP";
-                static const char* TG_LINK = "t.me/Lyn4xp";
-                DrawInfoRow("Telegram", TG_USER, ImVec4(0.40f, 0.82f, 1.0f, 1.0f));
-                DrawInfoRow("Channel",  TG_LINK, ImVec4(0.28f, 0.70f, 0.95f, 1.0f));
-                DrawInfoRow("Updates",  TG_LINK, ImVec4(0.55f, 0.85f, 1.0f, 0.85f));
             }
 
             // ── Device Info ───────────────────────────────────────────────────
@@ -1531,14 +1543,115 @@ static void DrawContentArea(float winW, float winH) {
     PopStyleColor();
 }
 
-INLINE void DrawMenu(ImGuiIO& io) {
-    if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
-        // Auto-open menu saat pertama kali bypass login
-        if (DEBUG_BYPASS_LOGIN) {
-            static bool s_autoOpened = false;
-            if (!s_autoOpened) { g_menu.isOpen = true; s_autoOpened = true; }
+// ── Mini Bar — tampil saat menu di-minimize ──────────────────────────────────
+static void DrawMinimizedBar(ImGuiIO& io) {
+    float barW = 310.0f;
+    float barH = 48.0f;
+    float miniX = io.DisplaySize.x * 0.5f - barW * 0.5f;
+    static bool miniDragging = false;
+
+    SetNextWindowSize(ImVec2(barW, barH), ImGuiCond_Always);
+    SetNextWindowPos(ImVec2(miniX, g_menu.miniBarY), ImGuiCond_Always);
+    PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 0));
+    PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+    if (Begin(O("##MiniBar"), nullptr,
+              ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings |
+              ImGuiWindowFlags_NoMove)) {
+
+        ImDrawList* dl = GetWindowDrawList();
+        ImVec2 p = GetWindowPos();
+
+        // ── Background pill ───────────────────────────────────────────────
+        dl->AddRectFilled(p, ImVec2(p.x + barW, p.y + barH),
+            IM_COL32(8, 18, 46, 238), barH * 0.5f);
+        dl->AddRect(p, ImVec2(p.x + barW, p.y + barH),
+            IM_COL32(40, 100, 220, 170), barH * 0.5f, 0, 1.6f);
+        // Left accent glow
+        dl->AddRectFilled(
+            ImVec2(p.x, p.y + barH * 0.25f),
+            ImVec2(p.x + 3.0f, p.y + barH * 0.75f),
+            IM_COL32(60, 140, 255, 210), 2.0f);
+
+        // ── Drag handle (left portion) ────────────────────────────────────
+        SetCursorPos(ImVec2(0, 0));
+        InvisibleButton(O("##MiniDrag"), ImVec2(barW - 76.0f, barH));
+        if (IsItemActive() && IsMouseDragging(ImGuiMouseButton_Left)) {
+            miniDragging = true;
+            g_menu.miniBarY += io.MouseDelta.y;
+            g_menu.miniBarY = ImClamp(g_menu.miniBarY, 0.0f, io.DisplaySize.y - barH);
+        }
+        if (!IsItemActive()) miniDragging = false;
+
+        // ── Status dot ───────────────────────────────────────────────────
+        dl->AddCircleFilled(ImVec2(p.x + 18.0f, p.y + barH * 0.5f),
+            5.5f, IM_COL32(40, 200, 100, 220));
+
+        // ── "FLUX MOD" label ─────────────────────────────────────────────
+        float fs = GImGui->FontSize * 0.88f;
+        dl->AddText(GImGui->Font, fs,
+            ImVec2(p.x + 32.0f, p.y + (barH - fs) * 0.5f),
+            IM_COL32(180, 210, 255, 230), "FLUX MOD");
+
+        // ── Active mode badge (center) ────────────────────────────────────
+        const char* modeStr = nullptr;
+        switch (g_aimMode) {
+            case AimMode::EIGHTBALL_PREDICT:     modeStr = "8BP"; break;
+            case AimMode::EIGHTBALL_BREAK:       modeStr = "8BK"; break;
+            case AimMode::EIGHTBALL_8LOCK:       modeStr = "LK8"; break;
+            case AimMode::EIGHTBALL_POCKET_LOCK: modeStr = "PKT"; break;
+            case AimMode::NINEBALL_PREDICT:      modeStr = "9BP"; break;
+            case AimMode::NINEBALL_BREAK:        modeStr = "9GW"; break;
+            default: break;
+        }
+        if (modeStr) {
+            float mfs = GImGui->FontSize * 0.80f;
+            float mw = GImGui->Font->CalcTextSizeA(mfs, FLT_MAX, 0.0f, modeStr, nullptr, nullptr).x;
+            float mx = p.x + (barW - 76.0f) * 0.5f + 30.0f - mw * 0.5f;
+            float my = p.y + (barH - mfs) * 0.5f;
+            // badge bg
+            dl->AddRectFilled(
+                ImVec2(mx - 8.0f, my - 3.0f),
+                ImVec2(mx + mw + 8.0f, my + mfs + 3.0f),
+                IM_COL32(20, 60, 140, 200), 6.0f);
+            dl->AddText(GImGui->Font, mfs, ImVec2(mx, my),
+                IM_COL32(100, 200, 255, 230), modeStr);
         }
 
+        // ── Restore button (▲) ────────────────────────────────────────────
+        SameLine(0, 0);
+        SetCursorPos(ImVec2(barW - 74.0f, 0));
+        bool restHov = false;
+        if (InvisibleButton(O("##MiniRestore"), ImVec2(74.0f, barH))) {
+            g_menu.isMinimized = false;
+            g_menu.isOpen      = true;
+        }
+        restHov = IsItemHovered();
+
+        float rx = p.x + barW - 37.0f;
+        float ry = p.y + barH * 0.5f;
+        float rR = 17.0f;
+        dl->AddCircleFilled(ImVec2(rx, ry), rR,
+            restHov ? IM_COL32(30, 90, 210, 230) : IM_COL32(16, 48, 120, 210));
+        dl->AddCircle(ImVec2(rx, ry), rR,
+            restHov ? IM_COL32(90, 170, 255, 200) : IM_COL32(50, 110, 220, 150), 0, 1.5f);
+        // Up-arrow icon
+        float ah = rR * 0.38f, aw = rR * 0.48f;
+        dl->AddTriangleFilled(
+            ImVec2(rx, ry - ah),
+            ImVec2(rx - aw, ry + ah * 0.6f),
+            ImVec2(rx + aw, ry + ah * 0.6f),
+            restHov ? IM_COL32(200, 230, 255, 255) : IM_COL32(150, 200, 255, 220));
+    }
+    End();
+    PopStyleVar(2);
+    PopStyleColor();
+}
+
+INLINE void DrawMenu(ImGuiIO& io) {
+    if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
         // Restore state dari persistent storage saat pertama kali jalan
         {
             static bool s_stateRestored = false;
@@ -1546,15 +1659,6 @@ INLINE void DrawMenu(ImGuiIO& io) {
                 AutoAim::bActive = persistent_bool[O("bAutoAim")];
                 s_stateRestored  = true;
             }
-        }
-
-        // Auto-open menu ketika match dimulai (transisi tidak-ingame → ingame)
-        {
-            static bool s_wasInGame = false;
-            if (g_espIsInGame && !s_wasInGame) {
-                g_menu.isOpen = true;
-            }
-            s_wasInGame = g_espIsInGame;
         }
 
         buttonClicker.Update();
@@ -1571,11 +1675,35 @@ INLINE void DrawMenu(ImGuiIO& io) {
             jump_buffer_active = 0;
         }
 
-        if (g_espStateReady && persistent_bool[O("bAutoAim")] && g_espIsInGame) {
+        // ── Gate: semua UI hanya aktif saat sedang di dalam match ─────────
+        static bool s_wasInGame = false;
+        if (!g_espIsInGame) {
+            // Keluar dari match → force tutup semua UI + reset tracker
+            g_menu.isOpen      = false;
+            g_menu.isMinimized = false;
+            g_menu.menuAlpha   = 0.0f;
+            s_wasInGame        = false;  // reset agar match berikutnya auto-open lagi
+            return;
+        }
+
+        // Auto-open menu setiap kali pertama masuk match (transisi out-of-game → in-game)
+        if (!s_wasInGame) {
+            g_menu.isOpen      = true;
+            g_menu.isMinimized = false;
+        }
+        s_wasInGame = true;
+
+        if (g_espStateReady && persistent_bool[O("bAutoAim")]) {
             DrawToggleButton();
         }
 
-        float targetAlpha = g_menu.isOpen ? 1.0f : 0.0f;
+        // ── Mini bar mode ─────────────────────────────────────────────────
+        if (g_menu.isMinimized) {
+            DrawMinimizedBar(io);
+            return;
+        }
+
+        // ── Full menu ─────────────────────────────────────────────────────
         if (g_menu.isOpen) {
             g_menu.menuAlpha += (1.0f - g_menu.menuAlpha) * io.DeltaTime * 12.0f;
         } else {
@@ -1591,20 +1719,63 @@ INLINE void DrawMenu(ImGuiIO& io) {
             SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
             SetNextWindowPos(ImVec2(Width / 2.0f, Height / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
             
-            PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.13f, 0.f));
-            PushStyleVar(ImGuiStyleVar_WindowRounding, 32.0f);
-            PushStyleVar(ImGuiStyleVar_ChildRounding,  22.0f);
-            PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+            // ── Glass window style ────────────────────────────────────────
+            PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.025f, 0.047f, 0.125f, 0.88f));
+            PushStyleVar(ImGuiStyleVar_WindowRounding, 28.0f);
+            PushStyleVar(ImGuiStyleVar_ChildRounding,  20.0f);
+            PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(0, 0));
             PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
             PushStyleVar(ImGuiStyleVar_Alpha, g_menu.menuAlpha);
-            
+
             ImGuiWindowFlags winFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar |
                                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-            
+
             if (Begin(O("##MainMenu"), &g_menu.isOpen, winFlags)) {
                 DrawSidebar(winW);
                 DrawContentArea(winW, winH);
+
+                // ── Glass border overlay (drawn last, on top of all content) ──
+                ImDrawList* bdl = GetWindowDrawList();
+                ImVec2 bPos  = GetWindowPos();
+                ImVec2 bSize = GetWindowSize();
+                ImVec2 bMax  = ImVec2(bPos.x + bSize.x, bPos.y + bSize.y);
+                float  br    = 28.0f;
+
+                // Layer 1 — diffuse outer glow (widest, most transparent)
+                bdl->AddRect(
+                    ImVec2(bPos.x - 3.0f, bPos.y - 3.0f),
+                    ImVec2(bMax.x + 3.0f, bMax.y + 3.0f),
+                    IM_COL32(80, 150, 255, 18), br + 5.0f, 0, 6.0f);
+
+                // Layer 2 — medium glow
+                bdl->AddRect(
+                    ImVec2(bPos.x - 1.0f, bPos.y - 1.0f),
+                    ImVec2(bMax.x + 1.0f, bMax.y + 1.0f),
+                    IM_COL32(100, 165, 255, 38), br + 2.0f, 0, 2.5f);
+
+                // Layer 3 — main crisp glass edge
+                bdl->AddRect(bPos, bMax, IM_COL32(130, 185, 255, 72), br, 0, 1.0f);
+
+                // Layer 4 — inner bright rim (top-left emphasis)
+                bdl->AddRect(
+                    ImVec2(bPos.x + 1.0f, bPos.y + 1.0f),
+                    ImVec2(bMax.x - 1.0f, bMax.y - 1.0f),
+                    IM_COL32(200, 225, 255, 22), br - 1.0f, 0, 0.7f);
+
+                // Top gloss bar — white horizontal sheen
+                bdl->AddRectFilledMultiColor(
+                    ImVec2(bPos.x + 28.0f, bPos.y + 1.0f),
+                    ImVec2(bMax.x - 28.0f, bPos.y + 2.2f),
+                    IM_COL32(255,255,255, 0), IM_COL32(255,255,255,55),
+                    IM_COL32(255,255,255,55), IM_COL32(255,255,255, 0));
+
+                // Bottom dark rim — shadow edge
+                bdl->AddRectFilledMultiColor(
+                    ImVec2(bPos.x + 28.0f, bMax.y - 2.0f),
+                    ImVec2(bMax.x - 28.0f, bMax.y - 0.5f),
+                    IM_COL32(0,0,0, 0), IM_COL32(0,0,0,50),
+                    IM_COL32(0,0,0,50), IM_COL32(0,0,0, 0));
             }
             End();
             
@@ -1749,9 +1920,6 @@ static void DrawToggleButton() {
                         break;
                     case AimMode::NINEBALL_BREAK:
                         Aim9BallBreak::Aim();
-                        break;
-                    case AimMode::EIGHTBALL_SAFETY:
-                        AimSafety::Aim();
                         break;
                     default:
                         AutoAim::TriggerAim();
@@ -2034,7 +2202,8 @@ DEFINES(EGLBoolean, Draw, EGLDisplay dpy, EGLSurface surface) {
     if (IsExpired()) {
         DrawExpired(io);
     } else if ((!g_Token.empty() && !g_Auth.empty() && g_Token == g_Auth) || DEBUG_BYPASS_LOGIN) {
-        DrawFloatingButton(io);
+        // Floating button hanya tampil saat sedang di dalam match (g_espIsInGame dari frame sebelumnya)
+        if (g_espIsInGame) DrawFloatingButton(io);
         DrawMenu(io);
 // "Powered By @Zoroo_God" — Auto-centrat jos
 {

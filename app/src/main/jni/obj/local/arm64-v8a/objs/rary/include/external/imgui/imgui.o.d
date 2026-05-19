@@ -1,26 +1,27 @@
-./obj/local/arm64-v8a/objs/rary/include/external/imgui/imgui.o: \
-  include/external/imgui/imgui.cpp include/external/imgui/src/imgui.cpp \
-  include/external/imgui/src/imgui.h \
+/home/runner/workspace/app/src/main/jni/obj/local/arm64-v8a/objs/rary/include/external/imgui/imgui.o: \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/imgui.cpp \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui.cpp \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/float.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stddef.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string.h \
-  include/external/imgui/src/imgui_internal.h \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_internal.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/math.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits.h \
-  include/external/imgui/src/imstb_textedit.h \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_textedit.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctype.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdint.h \
-  include/external/imgui/src/imgui_draw.cpp \
-  include/external/imgui/src/imstb_rectpack.h \
-  include/external/imgui/src/imstb_truetype.h \
-  include/external/imgui/src/imgui_tables.cpp \
-  include/external/imgui/src/imgui_widgets.cpp \
-  include/external/imgui/src/backends/imgui_impl_android.cpp \
-  include/external/imgui/src/backends/../imgui.h \
-  include/external/imgui/src/backends/imgui_impl_android.h \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_draw.cpp \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_rectpack.h \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_truetype.h \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_tables.cpp \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_widgets.cpp \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_android.cpp \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/../imgui.h \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_android.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctime \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/map \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__tree \
@@ -61,15 +62,15 @@
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__split_buffer \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/vector \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bit_reference \
-  include/external/imgui/src/backends/imgui_impl_opengl3.cpp \
-  include/external/imgui/src/backends/imgui_impl_opengl3.h \
-  include/external/imgui/custom_theme.cpp \
-  include/external/imgui/inc/custom_theme.h \
-  include/external/imgui/inc/../src/imgui.h
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_opengl3.cpp \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_opengl3.h \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/custom_theme.cpp \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/custom_theme.h \
+  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/../src/imgui.h
 
-include/external/imgui/src/imgui.cpp:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui.cpp:
 
-include/external/imgui/src/imgui.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/float.h:
 
@@ -79,7 +80,7 @@ include/external/imgui/src/imgui.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string.h:
 
-include/external/imgui/src/imgui_internal.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_internal.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdio.h:
 
@@ -89,27 +90,27 @@ include/external/imgui/src/imgui_internal.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/limits.h:
 
-include/external/imgui/src/imstb_textedit.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_textedit.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctype.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdint.h:
 
-include/external/imgui/src/imgui_draw.cpp:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_draw.cpp:
 
-include/external/imgui/src/imstb_rectpack.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_rectpack.h:
 
-include/external/imgui/src/imstb_truetype.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_truetype.h:
 
-include/external/imgui/src/imgui_tables.cpp:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_tables.cpp:
 
-include/external/imgui/src/imgui_widgets.cpp:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_widgets.cpp:
 
-include/external/imgui/src/backends/imgui_impl_android.cpp:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_android.cpp:
 
-include/external/imgui/src/backends/../imgui.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/../imgui.h:
 
-include/external/imgui/src/backends/imgui_impl_android.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_android.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctime:
 
@@ -191,12 +192,12 @@ include/external/imgui/src/backends/imgui_impl_android.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bit_reference:
 
-include/external/imgui/src/backends/imgui_impl_opengl3.cpp:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_opengl3.cpp:
 
-include/external/imgui/src/backends/imgui_impl_opengl3.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_opengl3.h:
 
-include/external/imgui/custom_theme.cpp:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/custom_theme.cpp:
 
-include/external/imgui/inc/custom_theme.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/custom_theme.h:
 
-include/external/imgui/inc/../src/imgui.h:
+/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/../src/imgui.h:
