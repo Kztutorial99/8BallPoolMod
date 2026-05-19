@@ -1,16 +1,15 @@
-/home/runner/workspace/app/src/main/jni/obj/local/arm64-v8a/objs/rary/include/external/And64InlineHook/And64InlineHook.o: \
-  /home/runner/workspace/app/src/main/jni/include/external/And64InlineHook/And64InlineHook.cpp \
+./obj/local/arm64-v8a/objs/rary/include/external/And64InlineHook/And64InlineHook.o: \
+  include/external/And64InlineHook/And64InlineHook.cpp \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/inttypes.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdlib.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstring \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h \
-  /home/runner/workspace/app/src/main/jni/include/external/And64InlineHook/And64InlineHook.hpp \
+  include/external/And64InlineHook/And64InlineHook.hpp \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdint \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdint.h \
-  /home/runner/workspace/app/src/main/jni/include/obfuscation.h \
-  /home/runner/workspace/app/src/main/jni/include/external/obfy/instr.h \
+  include/obfuscation.h include/external/obfy/instr.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string_view \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__string \
@@ -73,8 +72,7 @@
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdarg \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bsd_locale_fallbacks.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bitset \
-  /home/runner/workspace/app/src/main/jni/include/external/oxorany/oxorany.h \
-  /home/runner/workspace/app/src/main/jni/include/random_names.h
+  include/external/oxorany/oxorany.h include/random_names.h
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/inttypes.h:
 
@@ -88,15 +86,15 @@
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/errno.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/And64InlineHook/And64InlineHook.hpp:
+include/external/And64InlineHook/And64InlineHook.hpp:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cstdint:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stdint.h:
 
-/home/runner/workspace/app/src/main/jni/include/obfuscation.h:
+include/obfuscation.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/obfy/instr.h:
+include/external/obfy/instr.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string:
 
@@ -222,6 +220,6 @@
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bitset:
 
-/home/runner/workspace/app/src/main/jni/include/external/oxorany/oxorany.h:
+include/external/oxorany/oxorany.h:
 
-/home/runner/workspace/app/src/main/jni/include/random_names.h:
+include/random_names.h:
