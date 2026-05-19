@@ -21,7 +21,7 @@ namespace PocketSelector {
     // Pocket yang dipilih user (-1 = auto / tidak ada)
     static std::atomic<int> selectedPocket{-1};
 
-    // Posisi world masing-masing pocket (6 pocket)
+    // Posisi world masing-masing pocket — FALLBACK hardcoded jika game data belum ada
     static const Vec2d POCKET_WORLD[TABLE_POCKETS_COUNT] = {
         {-TABLE_HALF_WIDTH,  TABLE_HALF_HEIGHT},  // 0: Top-Left
         { 0.0,               TABLE_HALF_HEIGHT},  // 1: Top-Center
@@ -31,6 +31,24 @@ namespace PocketSelector {
         {-TABLE_HALF_WIDTH, -TABLE_HALF_HEIGHT},  // 5: Bot-Left
     };
 
+    // Posisi pocket LIVE dari game (diupdate tiap frame dari DrawESP)
+    static Vec2d  s_livePockets[TABLE_POCKETS_COUNT];
+    static bool   s_livePocketsReady = false;
+
+    // Dipanggil dari DrawESP setiap frame dengan data aktual dari tableProperties.mPockets()
+    static void SetLivePockets(const Vec2d* arr, int count) {
+        if (!arr || count < TABLE_POCKETS_COUNT) return;
+        for (int i = 0; i < TABLE_POCKETS_COUNT; i++) s_livePockets[i] = arr[i];
+        s_livePocketsReady = true;
+    }
+
+    // Kembalikan posisi world pocket ke-i — gunakan live data jika tersedia, fallback ke hardcoded
+    static const Vec2d& WorldAt(int i) {
+        if (s_livePocketsReady && i >= 0 && i < TABLE_POCKETS_COUNT)
+            return s_livePockets[i];
+        return POCKET_WORLD[i];
+    }
+
     static const char* POCKET_NAME[TABLE_POCKETS_COUNT] = {
         "TL", "TC", "TR", "BR", "BC", "BL"
     };
@@ -38,9 +56,9 @@ namespace PocketSelector {
     // Radius deteksi tap dalam pixel — cukup besar untuk pocket icon game
     static constexpr float HIT_RADIUS_PX = 60.0f;
 
-    // Cek apakah (tx, ty) mengenai pocket ke-idx
+    // Cek apakah (tx, ty) mengenai pocket ke-idx — gunakan posisi live dari game
     static bool HitTestPocket(int idx, float tx, float ty) {
-        ImVec2 ps = WorldToScreen(POCKET_WORLD[idx]);
+        ImVec2 ps = WorldToScreen(WorldAt(idx));
         float dx = tx - ps.x;
         float dy = ty - ps.y;
         return (dx * dx + dy * dy) <= (HIT_RADIUS_PX * HIT_RADIUS_PX);

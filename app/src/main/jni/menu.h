@@ -348,6 +348,13 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         auto pockets = tableProperties.mPockets();
 
+        // Feed posisi pocket aktual game ke PocketSelector agar hit-test & circle akurat
+        {
+            Vec2d tmp[TABLE_POCKETS_COUNT];
+            for (int i = 0; i < TABLE_POCKETS_COUNT; i++) tmp[i] = pockets[i];
+            PocketSelector::SetLivePockets(tmp, TABLE_POCKETS_COUNT);
+        }
+
         if (persistent_bool[O("bESP_DrawPockets")]) {
             for (int i = 0; i < 6; i++) {
                 auto screenPos = WorldToScreen(pockets[i]);
@@ -402,7 +409,7 @@ INLINE void DrawESP(ImDrawList* draw) {
         if (persistent_bool[O("bShowPockets")]) {
             int lockedPkt = PocketSelector::Get();
             for (int i = 0; i < 6; i++) {
-                ImVec2 ps = WorldToScreen(PocketSelector::POCKET_WORLD[i]);
+                ImVec2 ps = WorldToScreen(pockets[i]);
                 bool isLocked = (i == lockedPkt);
 
                 float r           = isLocked ? 32.0f : 26.0f;
@@ -741,11 +748,11 @@ static void DrawContentArea(float winW, float winH) {
         IM_COL32(14, 26, 58, 255), IM_COL32(14, 26, 58, 255)
     );
     
-    const char* tabTitles[] = {
-        O("Draw"),
-        O("8 Ball"),
-        O("9 Ball"),
-        O("Info")
+    static const char* const tabTitles[] = {
+        "Draw",
+        "8 Ball",
+        "9 Ball",
+        "Info"
     };
     // Tab accent colors matching each section
     const ImU32 tabAccents[] = {
@@ -1245,6 +1252,8 @@ static void DrawContentArea(float winW, float winH) {
 
             // ── Kartu @LYN4XP (hero card) ─────────────────────────────────────
             {
+                static const char* NAME_STR  = "@LYN4XP";
+                static const char* LINK_STR  = "t.me/Lyn4xp";
                 float t   = (float)GetTime();
                 float cardW = GetContentRegionAvail().x;
                 float cardH = 90.0f;
@@ -1256,38 +1265,28 @@ static void DrawContentArea(float winW, float winH) {
                     IM_COL32(5, 20, 12, 240), IM_COL32(8, 28, 18, 240),
                     IM_COL32(6, 24, 14, 240), IM_COL32(4, 18, 10, 240));
 
-                // Border hijau neon (animated glow)
-                float glowA = 0.55f + 0.35f * sinf(t * 2.8f);
-                float glowA2 = 0.20f + 0.15f * sinf(t * 2.8f + 1.0f);
+                // Border hijau neon (static, no animation to avoid symbol glitches)
                 dl3->AddRect(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH),
-                    ImColor(0.05f, 0.95f, 0.45f, glowA), 14.0f, 0, 1.8f);
-                // Outer soft glow
-                dl3->AddRect(
-                    ImVec2(cPos.x - 2, cPos.y - 2),
-                    ImVec2(cPos.x + cardW + 2, cPos.y + cardH + 2),
-                    ImColor(0.05f, 0.95f, 0.45f, glowA2), 16.0f, 0, 3.5f);
+                    IM_COL32(12, 240, 115, 200), 14.0f, 0, 1.8f);
 
-                // @LYN4XP — centered, scale besar, bold feel
+                // @LYN4XP — centered, scale besar
                 float bigScale = 1.55f;
                 SetWindowFontScale(bigScale);
-                float tw = CalcTextSize(O("@LYN4XP")).x;
+                float tw = CalcTextSize(NAME_STR).x;
                 float tx = cPos.x - GetWindowPos().x + (cardW - tw) * 0.5f;
                 SetCursorPosX(tx);
                 SetCursorPosY(GetCursorPosY() + 12.0f);
-                // Shadow teks
                 ImVec2 tSS = GetCursorScreenPos();
                 dl3->AddText(GImGui->Font, GImGui->FontSize * bigScale,
-                    ImVec2(tSS.x + 2, tSS.y + 2), IM_COL32(0, 60, 20, 140), O("@LYN4XP"));
-                // Teks hijau neon pulse
-                float pulse = 0.80f + 0.20f * sinf(t * 3.5f);
-                TextColored(ImVec4(0.08f, 0.95f + 0.05f * pulse, 0.45f, 1.0f), O("@LYN4XP"));
+                    ImVec2(tSS.x + 2, tSS.y + 2), IM_COL32(0, 60, 20, 140), NAME_STR);
+                TextColored(ImVec4(0.08f, 0.95f, 0.45f, 1.0f), "%s", NAME_STR);
                 SetWindowFontScale(1.0f);
 
-                // t.me/Lyn4xp — centered, kecil
-                float tw2 = CalcTextSize(O("t.me/Lyn4xp")).x;
+                // t.me/Lyn4xp — centered
+                float tw2 = CalcTextSize(LINK_STR).x;
                 float tx2 = cPos.x - GetWindowPos().x + (cardW - tw2) * 0.5f;
                 SetCursorPosX(tx2);
-                TextColored(ImVec4(0.25f, 0.75f, 0.45f, 0.80f), O("t.me/Lyn4xp"));
+                TextColored(ImVec4(0.25f, 0.75f, 0.45f, 0.80f), "%s", LINK_STR);
 
                 // Advance cursor past card
                 SetCursorPosY(GetCursorPosY() + (cardH - (GetCursorPosY() - (cPos.y - GetWindowPos().y))) + 10.0f);
@@ -1295,12 +1294,16 @@ static void DrawContentArea(float winW, float winH) {
             }
 
             // ── Mod Info ─────────────────────────────────────────────────────
-            DrawSecHdr(O("Mod Info"), ImVec4(0.30f, 0.65f, 1.0f, 0.85f));
+            DrawSecHdr("Mod Info", ImVec4(0.30f, 0.65f, 1.0f, 0.85f));
             {
-                DrawInfoRow(O("Engine  "), O("Flux Pro Engine v2.0"),  ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
-                DrawInfoRow(O("Game    "), O("8 Ball Pool"),            ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
-                DrawInfoRow(O("Arch    "), O("arm64-v8a"),              ImVec4(0.55f, 0.85f, 1.0f, 1.0f));
-                DrawInfoRow(O("Build   "), O(__DATE__ " " __TIME__),    ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
+                static const char* ENGINE_VAL = "Flux Pro Engine v2.0";
+                static const char* GAME_VAL   = "8 Ball Pool";
+                static const char* ARCH_VAL   = "arm64-v8a";
+                static const char* BUILD_VAL  = __DATE__ " " __TIME__;
+                DrawInfoRow("Engine",  ENGINE_VAL, ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
+                DrawInfoRow("Game",    GAME_VAL,   ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
+                DrawInfoRow("Arch",    ARCH_VAL,   ImVec4(0.55f, 0.85f, 1.0f, 1.0f));
+                DrawInfoRow("Build",   BUILD_VAL,  ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
 
                 int64_t now_ts = (int64_t)time(nullptr);
                 int64_t diff   = EXPIRY_TS - now_ts;
@@ -1310,14 +1313,14 @@ static void DrawContentArea(float winW, float winH) {
                     int hours = (int)((diff % 86400) / 3600);
                     int mins  = (int)((diff % 3600)  / 60);
                     snprintf(expBuf, sizeof(expBuf), "%dd %dh %dm", days, hours, mins);
-                    DrawInfoRow(O("Expires "), expBuf, ImVec4(0.30f, 1.0f, 0.55f, 1.0f));
+                    DrawInfoRow("Expires", expBuf, ImVec4(0.30f, 1.0f, 0.55f, 1.0f));
                 } else {
-                    DrawInfoRow(O("Expires "), O("EXPIRED"), ImVec4(1.0f, 0.25f, 0.25f, 1.0f));
+                    DrawInfoRow("Expires", "EXPIRED", ImVec4(1.0f, 0.25f, 0.25f, 1.0f));
                 }
             }
 
             // ── Device Info ───────────────────────────────────────────────────
-            DrawSecHdr(O("Device"), ImVec4(0.25f, 0.80f, 0.55f, 0.85f));
+            DrawSecHdr("Device", ImVec4(0.25f, 0.80f, 0.55f, 0.85f));
             {
                 static char s_mfr[PROP_VALUE_MAX] = {};
                 static char s_mdl[PROP_VALUE_MAX] = {};
@@ -1331,15 +1334,16 @@ static void DrawContentArea(float winW, float winH) {
                     __system_property_get("ro.build.version.release",s_and);
                     loaded = true;
                 }
-                DrawInfoRow(O("Maker   "), s_mfr, ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
-                DrawInfoRow(O("Model   "), s_mdl, ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
-                DrawInfoRow(O("ABI     "), s_abi, ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
-                DrawInfoRow(O("Android "), s_and, ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
+                DrawInfoRow("Maker",   s_mfr, ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
+                DrawInfoRow("Model",   s_mdl, ImVec4(0.88f, 0.92f, 1.0f, 1.0f));
+                DrawInfoRow("ABI",     s_abi, ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
+                DrawInfoRow("Android", s_and, ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
             }
 
             // ── Free Beta notice ──────────────────────────────────────────────
             Dummy(ImVec2(0, 10));
             {
+                static const char* BETA_MSG = "FREE BETA -- If you paid, you were SCAMMED.";
                 float nW = GetContentRegionAvail().x;
                 ImVec2 nPos = GetCursorScreenPos();
                 dl3->AddRectFilled(nPos, ImVec2(nPos.x + nW, nPos.y + GImGui->FontSize + 14.0f),
@@ -1347,8 +1351,7 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 5));
                 SetCursorPosX(GetCursorPosX() + 8.0f);
                 PushTextWrapPos(GetCursorPosX() + nW - 16.0f);
-                TextColored(ImVec4(1.0f, 0.38f, 0.38f, 1.0f),
-                    O("FREE BETA — If you paid, you were SCAMMED."));
+                TextColored(ImVec4(1.0f, 0.38f, 0.38f, 1.0f), "%s", BETA_MSG);
                 PopTextWrapPos();
                 Dummy(ImVec2(0, 6));
             }
