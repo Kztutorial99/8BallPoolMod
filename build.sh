@@ -13,7 +13,7 @@ set -e
 # ── Konfigurasi ───────────────────────────────────────────────────────────────
 NDK_VERSION="r25c"
 NDK_DIR="/tmp/android-ndk-${NDK_VERSION}"
-NDK_ZIP="/tmp/ndk.zip"
+NDK_ZIP="/tmp/ndk-${NDK_VERSION}.zip"
 NDK_URL="https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"
 
 SDK_DIR="${HOME}/workspace/.android-sdk"
@@ -66,7 +66,7 @@ fi
 if [ ! -d "${NDK_DIR}/toolchain/llvm-project/libcxxabi" ]; then
     mkdir -p "${NDK_DIR}/toolchain/llvm-project"
     ln -sfn "${NDK_DIR}/sources/cxx-stl/llvm-libc++abi" \
-            "${NDK_DIR}/toolchain/llvm-project/libcxxabi"
+            "${NDK_DIR}/toolchain/llvm-project/libcxxabi" 2>/dev/null || true
 fi
 echo ""
 
@@ -87,6 +87,7 @@ fi
 
 # Install build-tools dan platform jika belum ada
 export ANDROID_HOME="$SDK_DIR"
+export ANDROID_SDK_ROOT="$SDK_DIR"
 if [ ! -d "${SDK_DIR}/build-tools/33.0.2" ] || [ ! -d "${SDK_DIR}/platforms/android-33" ]; then
     echo -e "${YELLOW}      Installing build-tools;33.0.2 + platforms;android-33...${NC}"
     yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
@@ -97,22 +98,47 @@ else
 fi
 
 # Buat local.properties
-echo "sdk.dir=${SDK_DIR}" > "$LOCAL_PROP"
-echo -e "${GREEN}      local.properties updated: sdk.dir=${SDK_DIR}${NC}"
+{
+    echo "sdk.dir=${SDK_DIR}"
+    echo "ndk.dir=${NDK_DIR}"
+} > "$LOCAL_PROP"
+echo -e "${GREEN}      local.properties updated${NC}"
 echo ""
 
-# ── STEP 3: Compile library.so dengan ndk-build ───────────────────────────────
+# ── STEP 3: Detect Java ───────────────────────────────────────────────────────
+if [ -z "$JAVA_HOME" ]; then
+    for candidate in \
+        /usr/lib/jvm/java-17-openjdk-amd64 \
+        /usr/lib/jvm/java-11-openjdk-amd64 \
+        /usr/lib/jvm/java-8-openjdk-amd64 \
+        /usr/lib/jvm/default-java; do
+        if [ -d "$candidate" ]; then
+            export JAVA_HOME="$candidate"
+            break
+        fi
+    done
+fi
+if [ -n "$JAVA_HOME" ]; then
+    echo -e "${GREEN}      JAVA_HOME = ${JAVA_HOME}${NC}"
+else
+    echo -e "${YELLOW}      JAVA_HOME not found — Gradle may fail${NC}"
+fi
+echo ""
+
+# ── STEP 4: Compile library.so dengan ndk-build ───────────────────────────────
 echo -e "${CYAN}[3/5] Compiling library.so (fresh build)...${NC}"
 echo ""
 
-NDK_MODULE_PATH="${NDK_DIR}" \
 "${NDK_DIR}/ndk-build" \
     NDK_PROJECT_PATH="${JNI_DIR}" \
     APP_BUILD_SCRIPT="${JNI_DIR}/Android.mk" \
     NDK_APPLICATION_MK="${JNI_DIR}/Application.mk" \
+    NDK_OUT="${OBJ_DIR}" \
+    NDK_LIBS_OUT="${JNI_DIR}/libs" \
+    APP_ABI="arm64-v8a" \
     -C "${JNI_DIR}" \
     -B \
-    -j4 \
+    -j$(nproc 2>/dev/null || echo 4) \
     2>&1
 
 if [ ! -f "${OUT_SO}" ]; then
@@ -126,7 +152,7 @@ echo ""
 echo -e "${GREEN}      library.so OK  •  Size: ${SIZE}  •  MD5: ${MD5}${NC}"
 echo ""
 
-# ── STEP 4: Copy ke jniLibs ──────────────────────────────────────────────────
+# ── STEP 5: Copy ke jniLibs ──────────────────────────────────────────────────
 echo -e "${CYAN}[4/5] Copying library.so ke jniLibs...${NC}"
 mkdir -p "${JNILIBS_DIR}"
 cp "${OUT_SO}" "${JNILIBS_DIR}/library.so"
@@ -139,8 +165,10 @@ chmod +x "${ROOT_DIR}/gradlew"
 
 cd "${ROOT_DIR}"
 "${ROOT_DIR}/gradlew" assembleDebug \
+    --no-daemon \
     -PANDROID_HOME="${SDK_DIR}" \
-    2>&1 | grep -E "BUILD|FAILED|error:|warning:|Task :|Exception" || true
+    -Pandroid.ndkPath="${NDK_DIR}" \
+    2>&1 | grep -E "BUILD|FAILED|error:|Error|warning:|Task :|Exception|APK|apk" || true
 
 APK_PATH="${ROOT_DIR}/app/build/outputs/apk/debug/app-debug.apk"
 
@@ -167,5 +195,8 @@ else
     echo -e "${RED}╔══════════════════════════════════════════╗${NC}"
     echo -e "${RED}║   BUILD FAILED — APK tidak ditemukan     ║${NC}"
     echo -e "${RED}╚══════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}  Cek log Gradle di atas untuk detail error${NC}"
+    echo -e "${YELLOW}  Jalankan ulang dengan: bash build.sh 2>&1 | tee build.log${NC}"
     exit 1
 fi

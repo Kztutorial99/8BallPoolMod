@@ -36,8 +36,8 @@ struct MenuState {
 };
 static MenuState g_menu;
 
-// Obfuscated expiry date: 13.04.2026 00:00:00 UTC
-static const int64_t EXPIRY_TS = O(1780099200LL);
+// Obfuscated expiry date: 01.01.2027 00:00:00 UTC
+static const int64_t EXPIRY_TS = O(1798761600LL);
 
 static bool DEBUG_BYPASS_LOGIN = true;
 
@@ -207,6 +207,8 @@ static int g_selectedPocket8 = -1;
 #include "game/inc/AimLock8Ball.h"
 #include "game/inc/Aim9Ball.h"
 #include "game/inc/Aim9BallBreak.h"
+#include "game/inc/AutoPower.h"
+#include "game/inc/AutoEnglish.h"
 #include <thread>
 #include <atomic>
 
@@ -319,6 +321,32 @@ INLINE void DrawESP(ImDrawList* draw) {
 
         if (persistent_bool[O("bAutoAim")]) {
             AutoAim::Update();
+        }
+
+        // ── Auto Power & Auto English — dipanggil setelah aim selesai ────────
+        if (AutoAim::bAimed.load()) {
+            if (persistent_bool[O("bAutoPower")]) {
+                if (g_aimMode == AimMode::EIGHTBALL_BREAK || g_aimMode == AimMode::NINEBALL_BREAK) {
+                    AutoPower::ApplyBreak();
+                } else if (g_aimMode == AimMode::NINEBALL_PREDICT) {
+                    AutoPower::Apply9Ball(Aim9Ball::lastTargetBall, Aim9Ball::lastTargetPocket);
+                } else if (g_aimMode == AimMode::EIGHTBALL_8LOCK) {
+                    AutoPower::Apply(8, AimLock8Ball::lastTargetPocket);
+                } else {
+                    AutoPower::Apply(AimLockTarget::lastTargetBall, AimLockTarget::lastTargetPocket);
+                }
+            }
+            if (persistent_bool[O("bAutoEnglish")]) {
+                if (g_aimMode == AimMode::EIGHTBALL_BREAK || g_aimMode == AimMode::NINEBALL_BREAK) {
+                    AutoEnglish::ApplyBreak();
+                } else if (g_aimMode == AimMode::EIGHTBALL_8LOCK) {
+                    AutoEnglish::Apply8Lock();
+                } else if (g_aimMode == AimMode::NINEBALL_PREDICT) {
+                    AutoEnglish::Apply(Aim9Ball::lastTargetBall);
+                } else {
+                    AutoEnglish::Apply(AimLockTarget::lastTargetBall);
+                }
+            }
         }
 
         if (!gPrediction) return;
@@ -782,6 +810,14 @@ static void DrawContentArea(float winW, float winH) {
             ModeSwitch8(O("Aim Predict"),     AimMode::EIGHTBALL_PREDICT);
             ModeSwitch8(O("Aim Lock 8 Ball"), AimMode::EIGHTBALL_8LOCK);
 
+            Dummy(ImVec2(0, 6));
+            TextColored(ImVec4(0.45f, 0.50f, 0.65f, 0.90f), O("-- Enhancement --"));
+            Dummy(ImVec2(0, 6));
+            if (ToggleSwitch(O("Auto Power"), &persistent_bool[O("bAutoPower")])) need_save = true;
+            Dummy(ImVec2(0, 4));
+            if (ToggleSwitch(O("Auto English"), &persistent_bool[O("bAutoEnglish")])) need_save = true;
+            Dummy(ImVec2(0, 4));
+
             // ── Pocket Info (read-only, selalu otomatis) ──────────────────
             if (g_aimMode == AimMode::EIGHTBALL_PREDICT || g_aimMode == AimMode::EIGHTBALL_8LOCK) {
                 Dummy(ImVec2(0, 14));
@@ -946,6 +982,14 @@ static void DrawContentArea(float winW, float winH) {
 
             ModeSwitch9(O("Aim Ghost 90% Win"), AimMode::NINEBALL_BREAK);
             ModeSwitch9(O("Aim Predict"),       AimMode::NINEBALL_PREDICT);
+
+            Dummy(ImVec2(0, 6));
+            TextColored(ImVec4(0.45f, 0.50f, 0.65f, 0.90f), O("-- Enhancement --"));
+            Dummy(ImVec2(0, 6));
+            if (ToggleSwitch(O("Auto Power"), &persistent_bool[O("bAutoPower")])) need_save = true;
+            Dummy(ImVec2(0, 4));
+            if (ToggleSwitch(O("Auto English"), &persistent_bool[O("bAutoEnglish")])) need_save = true;
+            Dummy(ImVec2(0, 4));
 
             break;
         }
