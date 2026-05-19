@@ -57,7 +57,64 @@ static void DrawGradientRect(ImDrawList* dl, ImVec2 p1, ImVec2 p2, ImU32 col1, I
     }
 }
 
-static bool SidebarButton(const char* label, GLuint iconTex, bool selected, float width) {
+// iconType: 0=pencil(Draw) 1=8ball 2=9ball 3=info
+static void DrawTabIcon(ImDrawList* dl, ImVec2 center, float sz, int iconType, bool selected) {
+    ImU32 col  = selected ? IM_COL32(255, 255, 255, 245) : IM_COL32(160, 175, 210, 200);
+    ImU32 col2 = selected ? IM_COL32(160, 210, 255, 200) : IM_COL32(100, 115, 150, 150);
+    float r = sz * 0.42f;
+
+    if (iconType == 0) {
+        // Pencil icon: diagonal body + nib
+        float hw = sz * 0.09f;
+        float plen = sz * 0.38f;
+        ImVec2 pA(center.x - plen * 0.55f, center.y + plen * 0.55f);
+        ImVec2 pB(center.x + plen * 0.45f, center.y - plen * 0.45f);
+        dl->AddLine(pA, pB, col, sz * 0.16f);
+        // nib tip triangle
+        ImVec2 ptip(pA.x - hw * 0.8f, pA.y + hw * 0.8f);
+        dl->AddTriangleFilled(
+            ImVec2(pA.x - hw, pA.y),
+            ImVec2(pA.x, pA.y - hw),
+            ptip, col2);
+        // eraser cap
+        float cx2 = pB.x + hw * 0.7f, cy2 = pB.y - hw * 0.7f;
+        dl->AddRectFilled(
+            ImVec2(cx2 - hw, cy2 - hw * 0.6f),
+            ImVec2(cx2 + hw, cy2 + hw * 0.6f),
+            col2, 1.5f);
+    } else if (iconType == 1) {
+        // 8 Ball: filled circle + "8"
+        dl->AddCircleFilled(center, r, selected ? IM_COL32(30, 30, 40, 230) : IM_COL32(20, 22, 35, 200), 32);
+        dl->AddCircle(center, r, col, 32, selected ? 2.0f : 1.5f);
+        // small white dot
+        dl->AddCircleFilled(ImVec2(center.x + r * 0.28f, center.y - r * 0.28f), r * 0.22f, IM_COL32(255,255,255,180));
+        // "8" text centered
+        const char* t = "8";
+        ImVec2 ts = GImGui->Font->CalcTextSizeA(GImGui->FontSize * 0.82f, FLT_MAX, 0, t);
+        dl->AddText(GImGui->Font, GImGui->FontSize * 0.82f,
+            ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f), col, t);
+    } else if (iconType == 2) {
+        // 9 Ball: circle outline + "9"
+        dl->AddCircle(center, r, col, 32, selected ? 2.2f : 1.8f);
+        dl->AddCircleFilled(center, r * 0.6f, selected ? IM_COL32(40, 60, 100, 180) : IM_COL32(25, 35, 60, 150), 24);
+        const char* t = "9";
+        ImVec2 ts = GImGui->Font->CalcTextSizeA(GImGui->FontSize * 0.82f, FLT_MAX, 0, t);
+        dl->AddText(GImGui->Font, GImGui->FontSize * 0.82f,
+            ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f), col, t);
+    } else {
+        // Info: circle + "i"
+        dl->AddCircle(center, r, col, 32, selected ? 2.2f : 1.8f);
+        // dot above
+        dl->AddCircleFilled(ImVec2(center.x, center.y - r * 0.38f), sz * 0.07f, col);
+        // bar below
+        dl->AddRectFilled(
+            ImVec2(center.x - sz * 0.07f, center.y - r * 0.12f),
+            ImVec2(center.x + sz * 0.07f, center.y + r * 0.50f),
+            col, 2.0f);
+    }
+}
+
+static bool SidebarButton(const char* label, int iconType, bool selected, float width) {
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems) return false;
 
@@ -65,8 +122,8 @@ static bool SidebarButton(const char* label, GLuint iconTex, bool selected, floa
     const ImGuiStyle& style = g.Style;
     const ImGuiID id = window->GetID(label);
 
-    float iconSize = 44.0f;
-    float vPad     = 12.0f;
+    float iconSize = 42.0f;
+    float vPad     = 11.0f;
     float btnH     = vPad + iconSize + 5.0f + g.FontSize * 0.88f + vPad;
 
     ImVec2 pos  = window->DC.CursorPos;
@@ -84,52 +141,46 @@ static bool SidebarButton(const char* label, GLuint iconTex, bool selected, floa
     // Hover feedback
     if (hovered && !selected) {
         dl->AddRectFilled(
-            ImVec2(bb.Min.x + 6.0f, bb.Min.y + 4.0f),
-            ImVec2(bb.Max.x - 6.0f, bb.Max.y - 4.0f),
-            IM_COL32(255, 255, 255, 14), 12.0f);
+            ImVec2(bb.Min.x + 5.0f, bb.Min.y + 3.0f),
+            ImVec2(bb.Max.x - 5.0f, bb.Max.y - 3.0f),
+            IM_COL32(255, 255, 255, 16), 14.0f);
     }
 
-    float iconBgR = iconSize * 0.5f + 7.0f;
+    float iconBgR = iconSize * 0.5f + 8.0f;
     ImVec2 iconCenter = ImVec2(
         bb.Min.x + width * 0.5f,
         bb.Min.y + vPad + iconSize * 0.5f
     );
 
-    // Selected: gradient pill behind icon
+    // Selected: rounded pill with gradient
     if (selected) {
         ImVec2 pMin = ImVec2(iconCenter.x - iconBgR, iconCenter.y - iconBgR);
         ImVec2 pMax = ImVec2(iconCenter.x + iconBgR, iconCenter.y + iconBgR);
         dl->AddRectFilledMultiColor(pMin, pMax,
-            IM_COL32(18, 90, 210, 240), IM_COL32(28, 120, 240, 240),
-            IM_COL32(20, 100, 225, 240), IM_COL32(15, 80, 195, 240));
-        // Subtle border glow
-        dl->AddRect(pMin, pMax, IM_COL32(80, 160, 255, 90), 12.0f, 0, 1.2f);
+            IM_COL32(22, 95, 218, 235), IM_COL32(32, 125, 248, 235),
+            IM_COL32(24, 108, 230, 235), IM_COL32(18, 85, 205, 235));
+        dl->AddRect(pMin, pMax, IM_COL32(90, 170, 255, 80), 14.0f, 0, 1.0f);
     }
 
-    // Draw icon texture
-    if (iconTex) {
-        ImU32 tint = selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 210, 230, 190);
-        ImVec2 iconMin = ImVec2(iconCenter.x - iconSize * 0.5f, iconCenter.y - iconSize * 0.5f);
-        ImVec2 iconMax = ImVec2(iconCenter.x + iconSize * 0.5f, iconCenter.y + iconSize * 0.5f);
-        dl->AddImage((void*)(intptr_t)iconTex, iconMin, iconMax, ImVec2(0,0), ImVec2(1,1), tint);
-    }
+    // Vector icon
+    DrawTabIcon(dl, iconCenter, iconSize, iconType, selected);
 
-    // Draw label centered below icon — slightly smaller font feel via direct text
+    // Label
     ImVec2 labelSize = CalcTextSize(label);
     ImVec2 textPos = ImVec2(
         bb.Min.x + (width - labelSize.x) * 0.5f,
         bb.Min.y + vPad + iconSize + 5.0f
     );
     ImU32 textCol = selected
-        ? IM_COL32(230, 240, 255, 255)
-        : IM_COL32(120, 130, 155, 210);
+        ? IM_COL32(225, 238, 255, 255)
+        : IM_COL32(110, 125, 155, 210);
     dl->AddText(textPos, textCol, label);
 
-    // Active indicator dot under label
+    // Active dot
     if (selected) {
         dl->AddCircleFilled(
             ImVec2(bb.Min.x + width * 0.5f, bb.Max.y - 4.0f),
-            2.5f, IM_COL32(100, 180, 255, 200));
+            2.5f, IM_COL32(110, 185, 255, 210));
     }
 
     return pressed;
@@ -471,11 +522,6 @@ INLINE void DrawESP(ImDrawList* draw) {
 }
 
 static void DrawSidebar(float sidebarW) {
-    static GLuint draw_icon_tex = LoadTextureFromMemory(draw_icon_png, draw_icon_png_len);
-    static GLuint play_icon_tex = LoadTextureFromMemory(play_icon_png, play_icon_png_len);
-    static GLuint q_icon_tex    = LoadTextureFromMemory(q_icon_png,    q_icon_png_len);
-    static GLuint user_icon_tex = LoadTextureFromMemory(user_icon_png, user_icon_png_len);
-
     ImGuiContext& g  = *GImGui;
     ImDrawList*   dl = GetWindowDrawList();
     ImVec2        wp = GetWindowPos();
@@ -491,13 +537,13 @@ static void DrawSidebar(float sidebarW) {
 
     BeginGroup();
     SetCursorPos(ImVec2(0.0f, 0.0f));
-    if (SidebarButton(O("Draw"),   draw_icon_tex, g_menu.currentTab == 0, btnW)) g_menu.currentTab = 0;
+    if (SidebarButton(O("Draw"),   0, g_menu.currentTab == 0, btnW)) g_menu.currentTab = 0;
     SameLine(0, 0);
-    if (SidebarButton(O("8 Ball"), play_icon_tex, g_menu.currentTab == 1, btnW)) g_menu.currentTab = 1;
+    if (SidebarButton(O("8 Ball"), 1, g_menu.currentTab == 1, btnW)) g_menu.currentTab = 1;
     SameLine(0, 0);
-    if (SidebarButton(O("9 Ball"), q_icon_tex,    g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
+    if (SidebarButton(O("9 Ball"), 2, g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
     SameLine(0, 0);
-    if (SidebarButton(O("Info"),   user_icon_tex, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
+    if (SidebarButton(O("Info"),   3, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
     EndGroup();
 
     // Measure actual rendered height — this is the true wrap_content
@@ -606,9 +652,7 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
     ImVec4 statusColor = isAnalyzing
         ? ImVec4(1.0f, 0.78f, 0.0f, 1.0f)
         : ImVec4(0.15f, 1.0f, 0.42f, 1.0f);
-    float statusAlpha = isAnalyzing
-        ? (0.55f + 0.45f * sinf(t * 8.0f))
-        : (0.80f + 0.20f * sinf(t * 2.5f));
+    float statusAlpha = isAnalyzing ? 0.90f : 0.88f;
 
     // ── Baris 2: info singkat (plain snprintf, no O() format) ─────────────
     char row2[64] = "";
@@ -661,22 +705,20 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
     float       x   = 22.0f;
     float       y   = 28.0f;
 
-    float dotAlpha = isAnalyzing ? (0.5f + 0.5f * sinf(t * 7.0f)) : 0.6f;
+    float dotAlpha = isAnalyzing ? 0.90f : 0.60f;
     float dotR     = isAnalyzing ? 4.0f : 3.0f;
     fg->AddCircleFilled(ImVec2(x + 5.0f, y + fs * 0.55f), dotR,
         ImColor(modeColor.x, modeColor.y, modeColor.z, dotAlpha));
 
-    float pulse1 = 0.75f + 0.25f * sinf(t * 3.0f);
     fg->AddText(ImVec2(x + 15.0f + 1, y + 1), IM_COL32(0, 0, 0, 100), row1);
     fg->AddText(ImVec2(x + 15.0f, y),
-        ImColor(statusColor.x, statusColor.y, statusColor.z, statusAlpha * pulse1), row1);
+        ImColor(statusColor.x, statusColor.y, statusColor.z, statusAlpha), row1);
     y += fs + 5.0f;
 
     if (row2[0] != '\0') {
-        float glow = 0.70f + 0.30f * sinf(t * 4.5f);
         fg->AddText(ImVec2(x + 15.0f + 1, y + 1), IM_COL32(0, 0, 0, 80), row2);
         fg->AddText(ImVec2(x + 15.0f, y),
-            ImColor(modeColor.x * glow, modeColor.y * glow, modeColor.z * glow, 0.95f), row2);
+            ImColor(modeColor.x, modeColor.y, modeColor.z, 0.95f), row2);
     }
 }
 
@@ -699,34 +741,28 @@ static void DrawWinCenterBanner(ImGuiIO& io) {
     }
     if (!hasWin) return;
 
-    float t = (float)GetTime();
     ImDrawList* fg = GetForegroundDrawList();
     float fs2 = GImGui->FontSize * 1.85f;
 
-    // Hitung lebar teks dengan skala besar (estimasi: scale * lebar normal)
     float normalW  = GImGui->Font->CalcTextSizeA(GImGui->FontSize, FLT_MAX, 0.0f, winMsg, nullptr, nullptr).x;
     float scaledW  = normalW * 1.85f;
     float cx       = io.DisplaySize.x * 0.5f - scaledW * 0.5f;
     float cy       = 52.0f;
 
-    // Glow halo di belakang
-    float halo = 0.20f + 0.15f * sinf(t * 3.5f);
     fg->AddRectFilled(
         ImVec2(cx - 18.0f, cy - 6.0f),
         ImVec2(cx + scaledW + 18.0f, cy + fs2 + 6.0f),
-        ImColor(winColor.x * 0.15f, winColor.y * 0.15f, winColor.z * 0.15f, halo + 0.25f),
+        ImColor(winColor.x * 0.15f, winColor.y * 0.15f, winColor.z * 0.15f, 0.42f),
         10.0f);
     fg->AddRect(
         ImVec2(cx - 18.0f, cy - 6.0f),
         ImVec2(cx + scaledW + 18.0f, cy + fs2 + 6.0f),
-        ImColor(winColor.x, winColor.y, winColor.z, 0.30f + 0.20f * sinf(t * 4.0f)),
+        ImColor(winColor.x, winColor.y, winColor.z, 0.45f),
         10.0f, 0, 1.5f);
 
-    // Shadow + teks utama besar
-    float alpha = 0.88f + 0.12f * sinf(t * 2.5f);
     fg->AddText(GImGui->Font, fs2, ImVec2(cx + 2, cy + 2), IM_COL32(0, 0, 0, 140), winMsg);
     fg->AddText(GImGui->Font, fs2, ImVec2(cx, cy),
-        ImColor(winColor.x, winColor.y, winColor.z, alpha), winMsg);
+        ImColor(winColor.x, winColor.y, winColor.z, 0.92f), winMsg);
 }
 
 
@@ -1252,11 +1288,10 @@ static void DrawContentArea(float winW, float winH) {
 
             // ── Kartu @LYN4XP (hero card) ─────────────────────────────────────
             {
-                static const char* NAME_STR  = "@LYN4XP";
-                static const char* LINK_STR  = "t.me/Lyn4xp";
-                float t   = (float)GetTime();
+                static const char* NAME_STR = "@LYN4XP";
+                static const char* LINK_STR = "t.me/Lyn4xp";
                 float cardW = GetContentRegionAvail().x;
-                float cardH = 90.0f;
+                float cardH = 88.0f;
                 ImVec2 cPos = GetCursorScreenPos();
 
                 // Background gelap gradient
@@ -1264,33 +1299,35 @@ static void DrawContentArea(float winW, float winH) {
                     cPos, ImVec2(cPos.x + cardW, cPos.y + cardH),
                     IM_COL32(5, 20, 12, 240), IM_COL32(8, 28, 18, 240),
                     IM_COL32(6, 24, 14, 240), IM_COL32(4, 18, 10, 240));
-
-                // Border hijau neon (static, no animation to avoid symbol glitches)
+                // Border hijau neon static
                 dl3->AddRect(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH),
                     IM_COL32(12, 240, 115, 200), 14.0f, 0, 1.8f);
 
-                // @LYN4XP — centered, scale besar
-                float bigScale = 1.55f;
-                SetWindowFontScale(bigScale);
-                float tw = CalcTextSize(NAME_STR).x;
-                float tx = cPos.x - GetWindowPos().x + (cardW - tw) * 0.5f;
-                SetCursorPosX(tx);
-                SetCursorPosY(GetCursorPosY() + 12.0f);
-                ImVec2 tSS = GetCursorScreenPos();
-                dl3->AddText(GImGui->Font, GImGui->FontSize * bigScale,
-                    ImVec2(tSS.x + 2, tSS.y + 2), IM_COL32(0, 60, 20, 140), NAME_STR);
-                TextColored(ImVec4(0.08f, 0.95f, 0.45f, 1.0f), "%s", NAME_STR);
-                SetWindowFontScale(1.0f);
+                // @LYN4XP — centered, font besar, pakai AddText langsung (tidak manipulasi cursor)
+                float bigFs = GImGui->FontSize * 1.55f;
+                float nameW = GImGui->Font->CalcTextSizeA(bigFs, FLT_MAX, 0.0f, NAME_STR, nullptr, nullptr).x;
+                float nameX = cPos.x + (cardW - nameW) * 0.5f;
+                float nameY = cPos.y + 13.0f;
+                dl3->AddText(GImGui->Font, bigFs,
+                    ImVec2(nameX + 2.0f, nameY + 2.0f), IM_COL32(0, 60, 20, 140), NAME_STR);
+                dl3->AddText(GImGui->Font, bigFs,
+                    ImVec2(nameX, nameY), IM_COL32(20, 242, 115, 255), NAME_STR);
 
-                // t.me/Lyn4xp — centered
-                float tw2 = CalcTextSize(LINK_STR).x;
-                float tx2 = cPos.x - GetWindowPos().x + (cardW - tw2) * 0.5f;
-                SetCursorPosX(tx2);
-                TextColored(ImVec4(0.25f, 0.75f, 0.45f, 0.80f), "%s", LINK_STR);
+                // t.me/Lyn4xp — centered, font normal
+                float linkW = GImGui->Font->CalcTextSizeA(GImGui->FontSize, FLT_MAX, 0.0f, LINK_STR, nullptr, nullptr).x;
+                float linkX = cPos.x + (cardW - linkW) * 0.5f;
+                float linkY = nameY + bigFs + 5.0f;
+                dl3->AddText(GImGui->Font, GImGui->FontSize,
+                    ImVec2(linkX, linkY), IM_COL32(64, 192, 115, 204), LINK_STR);
 
-                // Advance cursor past card
-                SetCursorPosY(GetCursorPosY() + (cardH - (GetCursorPosY() - (cPos.y - GetWindowPos().y))) + 10.0f);
-                Dummy(ImVec2(0, 0));
+                // Tanda Telegram kecil di pojok kiri bawah
+                static const char* TG_LABEL = "Telegram";
+                float tgY = cPos.y + cardH - GImGui->FontSize - 7.0f;
+                dl3->AddText(GImGui->Font, GImGui->FontSize * 0.82f,
+                    ImVec2(cPos.x + 10.0f, tgY), IM_COL32(64, 148, 220, 170), TG_LABEL);
+
+                // Reserve ruang card dengan Dummy — tidak ada cursor manipulation
+                Dummy(ImVec2(cardW, cardH + 6.0f));
             }
 
             // ── Mod Info ─────────────────────────────────────────────────────
@@ -1319,6 +1356,16 @@ static void DrawContentArea(float winW, float winH) {
                 }
             }
 
+            // ── Contact ───────────────────────────────────────────────────────
+            DrawSecHdr("Contact", ImVec4(0.35f, 0.75f, 1.0f, 0.85f));
+            {
+                static const char* TG_USER = "@LYN4XP";
+                static const char* TG_LINK = "t.me/Lyn4xp";
+                DrawInfoRow("Telegram", TG_USER, ImVec4(0.40f, 0.82f, 1.0f, 1.0f));
+                DrawInfoRow("Channel",  TG_LINK, ImVec4(0.28f, 0.70f, 0.95f, 1.0f));
+                DrawInfoRow("Updates",  TG_LINK, ImVec4(0.55f, 0.85f, 1.0f, 0.85f));
+            }
+
             // ── Device Info ───────────────────────────────────────────────────
             DrawSecHdr("Device", ImVec4(0.25f, 0.80f, 0.55f, 0.85f));
             {
@@ -1343,15 +1390,18 @@ static void DrawContentArea(float winW, float winH) {
             // ── Free Beta notice ──────────────────────────────────────────────
             Dummy(ImVec2(0, 10));
             {
-                static const char* BETA_MSG = "FREE BETA -- If you paid, you were SCAMMED.";
+                static const char* BETA_MSG = "FREE BETA — Join t.me/Lyn4xp for updates";
                 float nW = GetContentRegionAvail().x;
                 ImVec2 nPos = GetCursorScreenPos();
-                dl3->AddRectFilled(nPos, ImVec2(nPos.x + nW, nPos.y + GImGui->FontSize + 14.0f),
-                    IM_COL32(60, 15, 15, 200), 8.0f);
+                float  nH   = GImGui->FontSize + 16.0f;
+                dl3->AddRectFilled(nPos, ImVec2(nPos.x + nW, nPos.y + nH),
+                    IM_COL32(8, 35, 55, 220), 8.0f);
+                dl3->AddRect(nPos, ImVec2(nPos.x + nW, nPos.y + nH),
+                    IM_COL32(40, 140, 220, 120), 8.0f, 0, 1.0f);
                 Dummy(ImVec2(0, 5));
-                SetCursorPosX(GetCursorPosX() + 8.0f);
-                PushTextWrapPos(GetCursorPosX() + nW - 16.0f);
-                TextColored(ImVec4(1.0f, 0.38f, 0.38f, 1.0f), "%s", BETA_MSG);
+                SetCursorPosX(GetCursorPosX() + 10.0f);
+                PushTextWrapPos(GetCursorPosX() + nW - 20.0f);
+                TextColored(ImVec4(0.40f, 0.80f, 1.0f, 1.0f), "%s", BETA_MSG);
                 PopTextWrapPos();
                 Dummy(ImVec2(0, 6));
             }
@@ -1426,8 +1476,8 @@ INLINE void DrawMenu(ImGuiIO& io) {
             SetNextWindowPos(ImVec2(Width / 2.0f, Height / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
             
             PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.13f, 0.f));
-            PushStyleVar(ImGuiStyleVar_WindowRounding, 24.0f);
-            PushStyleVar(ImGuiStyleVar_ChildRounding,  16.0f);
+            PushStyleVar(ImGuiStyleVar_WindowRounding, 32.0f);
+            PushStyleVar(ImGuiStyleVar_ChildRounding,  22.0f);
             PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
             PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
             PushStyleVar(ImGuiStyleVar_Alpha, g_menu.menuAlpha);
@@ -1452,10 +1502,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
 static void DrawToggleButton() {
     ImGuiIO& io = GetIO();
 
-    static GLuint play_on_tex  = LoadTextureFromMemory(play_on_png,  play_on_png_len);
-    static GLuint play_off_tex = LoadTextureFromMemory(play_off_png, play_off_png_len);
-
-    float button_size   = 130.f;
+    float button_size   = 88.0f;
     float winPadX       = GetStyle().WindowPadding.x;
     float winPadY       = GetStyle().WindowPadding.y;
     float windowWidth   = button_size + winPadX * 2.0f;
@@ -1484,14 +1531,65 @@ static void DrawToggleButton() {
 
         bool clicked = InvisibleButton(O("##TglBtnHit"), size);
 
-        // play_on = aimed/calculating, play_off = idle (ready to aim)
-        GLuint tex = AutoAim::bAimed ? play_on_tex : play_off_tex;
+        bool aimed = AutoAim::bAimed;
+        bool calc  = g_autoPlayCalculating;
 
-        float r = size.x * 0.5f;
+        float r  = button_size * 0.5f;
+        float r2 = r - 3.0f;
         ImDrawList* dl = GetWindowDrawList();
-        dl->AddImage((void*)(intptr_t)tex,
-            ImVec2(center.x - r, center.y - r),
-            ImVec2(center.x + r, center.y + r));
+
+        // Shadow
+        dl->AddCircleFilled(center, r + 5.0f, IM_COL32(0, 0, 0, 65), 56);
+
+        // Background fill
+        if (aimed) {
+            // Aimed/lock: deep blue-green
+            dl->AddCircleFilled(center, r, IM_COL32(10, 48, 110, 248), 56);
+            // Outer ring glow
+            dl->AddCircle(center, r, IM_COL32(50, 140, 255, 180), 56, 2.4f);
+            dl->AddCircle(center, r + 3.0f, IM_COL32(30, 100, 220, 80), 56, 2.8f);
+            // Inner concentric rings (target style)
+            dl->AddCircle(center, r2 * 0.65f, IM_COL32(80, 180, 255, 130), 40, 1.4f);
+            dl->AddCircle(center, r2 * 0.35f, IM_COL32(120, 210, 255, 160), 32, 1.2f);
+            // Center dot
+            dl->AddCircleFilled(center, r2 * 0.12f, IM_COL32(180, 230, 255, 230));
+            // Crosshair lines
+            float cg = r2 * 0.38f;
+            ImU32 cc = IM_COL32(140, 210, 255, 180);
+            dl->AddLine(ImVec2(center.x - r2, center.y), ImVec2(center.x - cg, center.y), cc, 1.4f);
+            dl->AddLine(ImVec2(center.x + cg, center.y), ImVec2(center.x + r2, center.y), cc, 1.4f);
+            dl->AddLine(ImVec2(center.x, center.y - r2), ImVec2(center.x, center.y - cg), cc, 1.4f);
+            dl->AddLine(ImVec2(center.x, center.y + cg), ImVec2(center.x, center.y + r2), cc, 1.4f);
+        } else if (calc) {
+            // Calculating: amber/yellow
+            dl->AddCircleFilled(center, r, IM_COL32(60, 35, 5, 245), 56);
+            dl->AddCircle(center, r, IM_COL32(230, 160, 30, 200), 56, 2.2f);
+            dl->AddCircle(center, r + 3.0f, IM_COL32(200, 130, 20, 70), 56, 2.6f);
+            // Spinning dashes indicator
+            float ang0 = (float)GetTime() * 4.0f;
+            for (int i = 0; i < 8; i++) {
+                float a = ang0 + i * 3.14159f * 2.0f / 8.0f;
+                float ri = r2 * 0.72f, ro = r2 * 0.92f;
+                float alpha = (i < 4) ? (float)(i + 1) / 5.0f : (float)(8 - i) / 5.0f;
+                dl->AddLine(
+                    ImVec2(center.x + cosf(a) * ri, center.y + sinf(a) * ri),
+                    ImVec2(center.x + cosf(a) * ro, center.y + sinf(a) * ro),
+                    IM_COL32(240, 175, 40, (int)(alpha * 220)), 2.0f);
+            }
+            dl->AddCircleFilled(center, r2 * 0.18f, IM_COL32(240, 175, 40, 200));
+        } else {
+            // Idle/ready: dark with play arrow
+            dl->AddCircleFilled(center, r, IM_COL32(12, 18, 38, 240), 56);
+            dl->AddCircle(center, r, IM_COL32(60, 90, 170, 150), 56, 2.0f);
+            dl->AddCircle(center, r + 3.0f, IM_COL32(40, 70, 150, 55), 56, 2.4f);
+            // Play triangle (▶)
+            float tp = r2 * 0.72f;
+            float ta = r2 * 0.50f;
+            ImVec2 t1(center.x - ta * 0.60f, center.y - tp * 0.62f);
+            ImVec2 t2(center.x - ta * 0.60f, center.y + tp * 0.62f);
+            ImVec2 t3(center.x + ta * 1.0f,  center.y);
+            dl->AddTriangleFilled(t1, t2, t3, IM_COL32(130, 165, 230, 210));
+        }
 
         // Vertical-only drag
         if (IsItemActive() && IsMouseDragging(ImGuiMouseButton_Left)) {
@@ -1552,10 +1650,9 @@ static void DrawToggleButton() {
 }
 
 static void DrawFloatingButton(ImGuiIO& io) {
-    static GLuint logo_tex   = LoadTextureFromMemory(logo_png, logo_png_len);
-    static bool   isDragging = false;
+    static bool isDragging = false;
 
-    float buttonRadius = 65.0f;
+    float buttonRadius = 34.0f;
     float buttonSize   = buttonRadius * 2.0f;
     float winSize      = buttonSize + 10.0f;
     float margin       = 8.0f;
@@ -1580,30 +1677,50 @@ static void DrawFloatingButton(ImGuiIO& io) {
               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar |
               ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings)) {
 
-        ImDrawList* dl     = GetWindowDrawList();
-        ImVec2      center = ImVec2(fixedX + buttonRadius + 5, posY + buttonRadius + 5);
+        ImDrawList* dl = GetWindowDrawList();
+        ImVec2 center  = ImVec2(fixedX + buttonRadius + 5.0f, posY + buttonRadius + 5.0f);
 
         SetCursorPos(ImVec2(0, 0));
         InvisibleButton(O("##FloatBtnHit"), ImVec2(winSize, winSize));
 
-        // Glow ring di belakang logo
-        float t = (float)GetTime();
         bool menuOpen = g_menu.isOpen;
-        float glowPulse = 0.40f + 0.25f * sinf(t * 2.5f);
-        ImU32 glowCol = menuOpen
-            ? ImColor(0.20f, 0.65f, 1.0f, glowPulse)
-            : ImColor(0.10f, 0.35f, 0.80f, glowPulse * 0.6f);
-        dl->AddCircleFilled(center, buttonRadius + 8.0f, ImColor(0.0f, 0.0f, 0.0f, 0.35f));
-        dl->AddCircle(center, buttonRadius + 5.0f, glowCol, 0, 3.0f);
-        dl->AddCircle(center, buttonRadius + 9.0f,
-            ImColor(0.15f, 0.50f, 1.0f, glowPulse * 0.30f), 0, 5.0f);
 
-        // Logo
-        dl->AddImage((void*)(intptr_t)logo_tex,
-                     ImVec2(center.x - buttonRadius, center.y - buttonRadius),
-                     ImVec2(center.x + buttonRadius, center.y + buttonRadius));
+        // Outer shadow ring
+        dl->AddCircleFilled(center, buttonRadius + 6.0f, IM_COL32(0, 0, 0, 70), 48);
 
-        // Vertical-only drag moves both buttons together via g_sideBtnsY
+        // Background circle — glass-dark
+        dl->AddCircleFilled(center, buttonRadius,
+            menuOpen ? IM_COL32(18, 55, 130, 242) : IM_COL32(14, 20, 42, 235), 48);
+
+        // Rim highlight arc (top-left gloss)
+        dl->AddCircle(center, buttonRadius - 1.5f,
+            menuOpen ? IM_COL32(80, 160, 255, 90) : IM_COL32(60, 100, 200, 70), 48, 1.5f);
+        dl->AddCircle(center, buttonRadius,
+            menuOpen ? IM_COL32(50, 130, 255, 160) : IM_COL32(40, 80, 180, 120), 48, 1.8f);
+
+        float ic = buttonRadius * 0.38f;
+
+        if (menuOpen) {
+            // X icon when menu is open
+            ImU32 xc = IM_COL32(200, 220, 255, 230);
+            dl->AddLine(ImVec2(center.x - ic, center.y - ic),
+                        ImVec2(center.x + ic, center.y + ic), xc, 2.6f);
+            dl->AddLine(ImVec2(center.x + ic, center.y - ic),
+                        ImVec2(center.x - ic, center.y + ic), xc, 2.6f);
+        } else {
+            // Hamburger icon (3 lines) when closed
+            ImU32 hc = IM_COL32(180, 200, 240, 210);
+            float lw = ic * 1.55f;
+            float ls = ic * 0.60f;
+            dl->AddLine(ImVec2(center.x - lw, center.y - ls),
+                        ImVec2(center.x + lw, center.y - ls), hc, 2.4f);
+            dl->AddLine(ImVec2(center.x - lw, center.y),
+                        ImVec2(center.x + lw, center.y), hc, 2.4f);
+            dl->AddLine(ImVec2(center.x - lw, center.y + ls),
+                        ImVec2(center.x + lw, center.y + ls), hc, 2.4f);
+        }
+
+        // Drag (vertical only)
         if (IsItemActive() && IsMouseDragging(0)) {
             isDragging = true;
             g_sideBtnsY += io.MouseDelta.y;
@@ -1814,11 +1931,9 @@ DEFINES(EGLBoolean, Draw, EGLDisplay dpy, EGLSurface surface) {
           ImGuiWindowFlags_NoInputs);
     
     {
-        float t2 = (float)ImGui::GetTime();
-        float gA  = 0.75f + 0.25f * sinf(t2 * 2.8f);
         ImVec2 cp = ImGui::GetCursorScreenPos();
         ImDrawList* fgDl = ImGui::GetWindowDrawList();
-        const char lbl[] = "@LYN4XP";          // plain literal — no O() dangling ptr
+        const char lbl[] = "@LYN4XP";
         ImVec2 ts2 = ImGui::CalcTextSize(lbl);
         fgDl->AddRectFilled(
             ImVec2(cp.x - 8, cp.y - 3),
@@ -1827,9 +1942,9 @@ DEFINES(EGLBoolean, Draw, EGLDisplay dpy, EGLSurface surface) {
         fgDl->AddRect(
             ImVec2(cp.x - 8, cp.y - 3),
             ImVec2(cp.x + ts2.x + 8, cp.y + ts2.y + 3),
-            ImColor(0.05f, 0.92f, 0.42f, gA * 0.70f), 8.0f, 0, 1.2f);
+            IM_COL32(12, 235, 107, 125), 8.0f, 0, 1.2f);
         fgDl->AddText(ImVec2(cp.x + 1, cp.y + 1), IM_COL32(0, 40, 15, 120), lbl);
-        ImGui::TextColored(ImVec4(0.06f, 0.95f + 0.05f * sinf(t2 * 4.0f), 0.42f, gA), "%s", lbl);
+        ImGui::TextColored(ImVec4(0.06f, 0.95f, 0.42f, 0.88f), "%s", lbl);
     }
     
     End();
