@@ -97,8 +97,6 @@ namespace AutoAim {
 
     void Update() {
         if (!bActive || !sharedGameManager) return;
-        // Jangan reset bAimed saat PowerSlider sedang aktif (proses tembak)
-        if (powerSlider.Active) return;
         GameStateManager gsm = sharedGameManager.mStateManager;
         if (!gsm) return;
         int stateId = gsm.getCurrentStateId();

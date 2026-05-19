@@ -1135,7 +1135,8 @@ INLINE void DrawMenu(ImGuiIO& io) {
 
         buttonClicker.Update();
         powerSlider.Update();
-        AutoAim::Update();
+        // Jangan reset bAimed saat PowerSlider sedang proses tembak
+        if (!powerSlider.Active) AutoAim::Update();
 
         // Auto Shoot aktif otomatis saat mode Aim Predict (8 Ball / 9 Ball)
         AutoShoot::bEnabled = persistent_bool[O("bAutoAim")] &&
