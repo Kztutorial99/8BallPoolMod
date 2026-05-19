@@ -141,9 +141,9 @@
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/typeindex \
   include/external/imgui/inc/8bp.h mod/keylogin.h include/obfuscate.h \
   mod/PocketSelector.h mod/ButtonClicker.h game/inc/AutoPlay.h \
-  game/inc/BreakSpecial.h game/inc/AimLockTarget.h game/inc/AimBreak.h \
-  game/inc/AimLock8Ball.h game/inc/Aim9Ball.h game/inc/Aim9BallBreak.h \
-  mod/kill.h include/syscall.h
+  game/inc/BreakSpecial.h game/inc/AimSafety.h game/inc/AimLockTarget.h \
+  game/inc/AimBreak.h game/inc/AimLock8Ball.h game/inc/Aim9Ball.h \
+  game/inc/Aim9BallBreak.h mod/kill.h include/syscall.h
 
 include/includes.h:
 
@@ -514,6 +514,8 @@ mod/ButtonClicker.h:
 game/inc/AutoPlay.h:
 
 game/inc/BreakSpecial.h:
+
+game/inc/AimSafety.h:
 
 game/inc/AimLockTarget.h:
 

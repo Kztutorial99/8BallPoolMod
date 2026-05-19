@@ -293,6 +293,7 @@ static int g_selectedPocket8 = -1;
 #include "mod/ButtonClicker.h"
 #include "game/inc/AutoPlay.h"
 #include "game/inc/BreakSpecial.h"
+#include "game/inc/AimSafety.h"
 #include "game/inc/AimLockTarget.h"
 #include "game/inc/AimBreak.h"
 #include "game/inc/AimLock8Ball.h"
@@ -303,6 +304,7 @@ static int g_selectedPocket8 = -1;
 
 // Active aim mode
 enum class AimMode : int {
+    EIGHTBALL_SAFETY      = 7,
     NONE                  = 0,
     EIGHTBALL_PREDICT     = 1,
     EIGHTBALL_BREAK       = 2,
@@ -639,6 +641,7 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
         case AimMode::EIGHTBALL_POCKET_LOCK: strcpy(modeName,"PKT"); modeColor=ImVec4(1.0f, 0.75f,0.10f,1.0f); break;
         case AimMode::NINEBALL_PREDICT:      strcpy(modeName,"9BP"); modeColor=ImVec4(0.15f,0.85f,0.55f,1.0f); break;
         case AimMode::NINEBALL_BREAK:    strcpy(modeName,"9GW"); modeColor=ImVec4(1.0f, 0.82f,0.05f,1.0f); break;
+        case AimMode::EIGHTBALL_SAFETY:  strcpy(modeName,"SFT"); modeColor=ImVec4(0.10f,0.88f,0.72f,1.0f); break;
         default: break;
     }
 
@@ -695,6 +698,13 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
         case AimMode::NINEBALL_BREAK:
             if (Aim9BallBreak::lastBestCount > 0)
                 snprintf(row2, sizeof(row2), "%d balls", Aim9BallBreak::lastBestCount);
+            break;
+        case AimMode::EIGHTBALL_SAFETY:
+            if (!isAimed || !AimSafety::lastHadShot)
+                snprintf(row2, sizeof(row2), "No safety found");
+            else
+                snprintf(row2, sizeof(row2), "Blocked %d  Pkt %d",
+                    AimSafety::lastBlockedCount, AimSafety::lastTargetPocket);
             break;
         default: break;
     }
@@ -931,6 +941,7 @@ static void DrawContentArea(float winW, float winH) {
             ModeSwitch8(O("Aim Predict"),       AimMode::EIGHTBALL_PREDICT);
             ModeSwitch8(O("Aim Lock 8 Ball"),   AimMode::EIGHTBALL_8LOCK);
             ModeSwitch8(O("Aim Lock Pocket"),   AimMode::EIGHTBALL_POCKET_LOCK);
+            ModeSwitch8(O("Safety Shot"),       AimMode::EIGHTBALL_SAFETY);
 
             Dummy(ImVec2(0, 4));
 
@@ -1605,6 +1616,7 @@ static void DrawToggleButton() {
             AimBreak::lastBestCount        = 0;  AimBreak::lastTargetBall       = -1;
             Aim9Ball::lastTargetBall       = -1; Aim9Ball::lastWasCombo         = false;
             Aim9BallBreak::lastWasWin9     = false; Aim9BallBreak::lastBestCount = 0;
+            AimSafety::lastHadShot         = false; AimSafety::lastBlockedCount  = 0;
 
             g_autoPlayCalculating = true;
             AutoAim::bAimed       = false;
@@ -1632,7 +1644,9 @@ static void DrawToggleButton() {
                         break;
                     case AimMode::NINEBALL_BREAK:
                         Aim9BallBreak::Aim();
-                        // Break shot: tidak perlu tap pocket
+                        break;
+                    case AimMode::EIGHTBALL_SAFETY:
+                        AimSafety::Aim();
                         break;
                     default:
                         AutoAim::TriggerAim();
