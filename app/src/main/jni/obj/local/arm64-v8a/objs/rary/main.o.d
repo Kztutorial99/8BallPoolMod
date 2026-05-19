@@ -1,6 +1,4 @@
-/home/runner/workspace/app/src/main/jni/obj/local/arm64-v8a/objs/rary/main.o: \
-  /home/runner/workspace/app/src/main/jni/main.cpp \
-  /home/runner/workspace/app/src/main/jni/include/includes.h \
+./obj/local/arm64-v8a/objs/rary/main.o: main.cpp include/includes.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__config \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string_view \
@@ -47,15 +45,12 @@
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cctype \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ctype.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wctype.h \
-  /home/runner/workspace/app/src/main/jni/include/external/Vector/Vectors.h \
-  /home/runner/workspace/app/src/main/jni/include/external/Vector/Vector2.hpp \
+  include/external/Vector/Vectors.h include/external/Vector/Vector2.hpp \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/math.h \
-  /home/runner/workspace/app/src/main/jni/include/external/Vector/Vector2d.hpp \
-  /home/runner/workspace/app/src/main/jni/include/external/Vector/Vector3.hpp \
-  /home/runner/workspace/app/src/main/jni/include/external/Vector/Vector3d.hpp \
-  /home/runner/workspace/app/src/main/jni/include/external/Vector/Vec2d.h \
-  /home/runner/workspace/app/src/main/jni/include/external/Vector/Vec3d.h \
-  /home/runner/workspace/app/src/main/jni/include/external/Vector/Quaternion.hpp \
+  include/external/Vector/Vector2d.hpp \
+  include/external/Vector/Vector3.hpp \
+  include/external/Vector/Vector3d.hpp include/external/Vector/Vec2d.h \
+  include/external/Vector/Vec3d.h include/external/Vector/Quaternion.hpp \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iostream \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/ios \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__locale \
@@ -74,7 +69,7 @@
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bsd_locale_fallbacks.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/bitset \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bit_reference \
-  /home/runner/workspace/app/src/main/jni/include/external/Vector/Quaterniond.hpp \
+  include/external/Vector/Quaterniond.hpp \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/fstream \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/filesystem \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stack \
@@ -90,22 +85,20 @@
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/list \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/thread \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/set \
-  /home/runner/workspace/app/src/main/jni/include/stacktrace.h \
+  include/stacktrace.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++abi/include/cxxabi.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/stddef.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++abi/include/__cxxabi_config.h \
-  /home/runner/workspace/app/src/main/jni/include/logger.h \
-  /home/runner/workspace/app/src/main/jni/include/pointers.h \
+  include/logger.h include/pointers.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/csignal \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/csetjmp \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/setjmp.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/persistence.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/../src/imgui.h \
+  include/external/imgui/inc/persistence.h \
+  include/external/imgui/inc/../src/imgui.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/float.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/custom_theme.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/helpers.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/dynamic.h \
-  /home/runner/workspace/app/src/main/jni/include/external/json/json.hpp \
+  include/external/imgui/inc/custom_theme.h \
+  include/external/imgui/inc/helpers.h \
+  include/external/imgui/inc/dynamic.h include/external/json/json.hpp \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/numeric \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/cmath \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/array \
@@ -118,85 +111,43 @@
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/any \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/experimental/__config \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/regex \
-  /home/runner/workspace/app/src/main/jni/include/hook.h \
-  /home/runner/workspace/app/src/main/jni/include/external/And64InlineHook/And64InlineHook.hpp \
-  /home/runner/workspace/app/src/main/jni/include/obfuscation.h \
-  /home/runner/workspace/app/src/main/jni/include/external/obfy/instr.h \
+  include/hook.h include/external/And64InlineHook/And64InlineHook.hpp \
+  include/obfuscation.h include/external/obfy/instr.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/random \
-  /home/runner/workspace/app/src/main/jni/include/external/oxorany/oxorany.h \
-  /home/runner/workspace/app/src/main/jni/include/random_names.h \
-  /home/runner/workspace/app/src/main/jni/include/external/Substrate/SubstrateHook.h \
-  /home/runner/workspace/app/src/main/jni/include/external/dlfcn/dlfcn.hpp \
-  /home/runner/workspace/app/src/main/jni/include/input.h \
-  /home/runner/workspace/app/src/main/jni/include/java.h \
-  /home/runner/workspace/app/src/main/jni/include/external/xhook/xhook.h \
-  /home/runner/workspace/app/src/main/jni/include/external/xhook/src/xhook.h \
-  /home/runner/workspace/app/src/main/jni/include/manual_dlsym.h \
-  /home/runner/workspace/app/src/main/jni/include/random_defs.h \
-  /home/runner/workspace/app/src/main/jni/menu.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/imgui.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_internal.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/../src/imstb_textedit.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_truetype.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_textedit.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_rectpack.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_android.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_opengl3.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/../imgui.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/touch.h \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/stb_image.h \
-  /home/runner/workspace/app/src/main/jni/icons/icons.h \
-  /home/runner/workspace/app/src/main/jni/icons/logo.h \
-  /home/runner/workspace/app/src/main/jni/icons/draw_icon.h \
-  /home/runner/workspace/app/src/main/jni/icons/play_icon.h \
-  /home/runner/workspace/app/src/main/jni/icons/q_icon.h \
-  /home/runner/workspace/app/src/main/jni/icons/user_icon.h \
-  /home/runner/workspace/app/src/main/jni/icons/play_on.h \
-  /home/runner/workspace/app/src/main/jni/icons/play_off.h \
-  /home/runner/workspace/app/src/main/jni/game.h \
-  /home/runner/workspace/app/src/main/jni/game/Foundation.h \
-  /home/runner/workspace/app/src/main/jni/game/Types.h \
-  /home/runner/workspace/app/src/main/jni/game/CCNode.h \
-  /home/runner/workspace/app/src/main/jni/game/CCDirector.h \
-  /home/runner/workspace/app/src/main/jni/game/StateManager.h \
-  /home/runner/workspace/app/src/main/jni/game/State.h \
-  /home/runner/workspace/app/src/main/jni/game/GameManager.h \
-  /home/runner/workspace/app/src/main/jni/game/VisualCue.h \
-  /home/runner/workspace/app/src/main/jni/game/Ball.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/NumberUtils.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/GameConstants.h \
-  /home/runner/workspace/app/src/main/jni/game/Table.h \
-  /home/runner/workspace/app/src/main/jni/game/FrictionProperties.h \
-  /home/runner/workspace/app/src/main/jni/game/VisualEnglishControl.h \
-  /home/runner/workspace/app/src/main/jni/game/MainManager.h \
-  /home/runner/workspace/app/src/main/jni/game/MenuManager.h \
-  /home/runner/workspace/app/src/main/jni/game/UserInfo.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/game.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/Prediction.fast.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/Prediction.update.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/ScreenTable.h \
-  /home/runner/workspace/app/src/main/jni/game/Ruleset.h \
+  include/external/oxorany/oxorany.h include/random_names.h \
+  include/external/Substrate/SubstrateHook.h \
+  include/external/dlfcn/dlfcn.hpp include/input.h include/java.h \
+  include/external/xhook/xhook.h include/external/xhook/src/xhook.h \
+  include/manual_dlsym.h include/random_defs.h menu.h \
+  include/external/imgui/imgui.h include/external/imgui/src/imgui.h \
+  include/external/imgui/src/imgui_internal.h \
+  include/external/imgui/inc/../src/imstb_textedit.h \
+  include/external/imgui/src/imstb_truetype.h \
+  include/external/imgui/src/imstb_textedit.h \
+  include/external/imgui/src/imstb_rectpack.h \
+  include/external/imgui/src/backends/imgui_impl_android.h \
+  include/external/imgui/src/backends/imgui_impl_opengl3.h \
+  include/external/imgui/src/backends/../imgui.h \
+  include/external/imgui/inc/touch.h \
+  include/external/imgui/inc/stb_image.h icons/icons.h icons/logo.h \
+  icons/draw_icon.h icons/play_icon.h icons/q_icon.h icons/user_icon.h \
+  icons/play_on.h icons/play_off.h game.h game/Foundation.h game/Types.h \
+  game/CCNode.h game/CCDirector.h game/StateManager.h game/State.h \
+  game/GameManager.h game/VisualCue.h game/Ball.h game/inc/NumberUtils.h \
+  game/inc/GameConstants.h game/Table.h game/FrictionProperties.h \
+  game/VisualEnglishControl.h game/MainManager.h game/MenuManager.h \
+  game/UserInfo.h game/inc/game.h game/inc/Prediction.fast.h \
+  game/inc/Prediction.update.h game/inc/ScreenTable.h game/Ruleset.h \
   /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/typeindex \
-  /home/runner/workspace/app/src/main/jni/include/external/imgui/inc/8bp.h \
-  /home/runner/workspace/app/src/main/jni/mod/keylogin.h \
-  /home/runner/workspace/app/src/main/jni/include/obfuscate.h \
-  /home/runner/workspace/app/src/main/jni/mod/PocketSelector.h \
-  /home/runner/workspace/app/src/main/jni/mod/DumpOffset.h \
-  /home/runner/workspace/app/src/main/jni/mod/OffsetSearch.h \
-  /home/runner/workspace/app/src/main/jni/mod/ButtonClicker.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/AutoPlay.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/AimLockTarget.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/AimBreak.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/AimLock8Ball.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/Aim9Ball.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/Aim9BallBreak.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/AutoPower.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/AutoEnglish.h \
-  /home/runner/workspace/app/src/main/jni/mod/kill.h \
-  /home/runner/workspace/app/src/main/jni/include/syscall.h
+  include/external/imgui/inc/8bp.h mod/keylogin.h include/obfuscate.h \
+  mod/PocketSelector.h mod/DumpOffset.h mod/OffsetSearch.h \
+  mod/ButtonClicker.h game/inc/AutoPlay.h game/inc/AimLockTarget.h \
+  game/inc/AimBreak.h game/inc/AimLock8Ball.h game/inc/Aim9Ball.h \
+  game/inc/Aim9BallBreak.h game/inc/AutoPower.h game/inc/AutoEnglish.h \
+  game/inc/AutoShoot.h game/inc/../../mod/PowerSlider.h \
+  game/inc/../UserSettingsManager.h mod/kill.h include/syscall.h
 
-/home/runner/workspace/app/src/main/jni/include/includes.h:
+include/includes.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/string:
 
@@ -290,23 +241,23 @@
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/wctype.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/Vector/Vectors.h:
+include/external/Vector/Vectors.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/Vector/Vector2.hpp:
+include/external/Vector/Vector2.hpp:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/math.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/Vector/Vector2d.hpp:
+include/external/Vector/Vector2d.hpp:
 
-/home/runner/workspace/app/src/main/jni/include/external/Vector/Vector3.hpp:
+include/external/Vector/Vector3.hpp:
 
-/home/runner/workspace/app/src/main/jni/include/external/Vector/Vector3d.hpp:
+include/external/Vector/Vector3d.hpp:
 
-/home/runner/workspace/app/src/main/jni/include/external/Vector/Vec2d.h:
+include/external/Vector/Vec2d.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/Vector/Vec3d.h:
+include/external/Vector/Vec3d.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/Vector/Quaternion.hpp:
+include/external/Vector/Quaternion.hpp:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/iostream:
 
@@ -344,7 +295,7 @@
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/__bit_reference:
 
-/home/runner/workspace/app/src/main/jni/include/external/Vector/Quaterniond.hpp:
+include/external/Vector/Quaterniond.hpp:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/fstream:
 
@@ -376,7 +327,7 @@
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/set:
 
-/home/runner/workspace/app/src/main/jni/include/stacktrace.h:
+include/stacktrace.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++abi/include/cxxabi.h:
 
@@ -384,9 +335,9 @@
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++abi/include/__cxxabi_config.h:
 
-/home/runner/workspace/app/src/main/jni/include/logger.h:
+include/logger.h:
 
-/home/runner/workspace/app/src/main/jni/include/pointers.h:
+include/pointers.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/csignal:
 
@@ -394,19 +345,19 @@
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/setjmp.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/persistence.h:
+include/external/imgui/inc/persistence.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/../src/imgui.h:
+include/external/imgui/inc/../src/imgui.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/float.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/custom_theme.h:
+include/external/imgui/inc/custom_theme.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/helpers.h:
+include/external/imgui/inc/helpers.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/dynamic.h:
+include/external/imgui/inc/dynamic.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/json/json.hpp:
+include/external/json/json.hpp:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/numeric:
 
@@ -432,156 +383,162 @@
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/regex:
 
-/home/runner/workspace/app/src/main/jni/include/hook.h:
+include/hook.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/And64InlineHook/And64InlineHook.hpp:
+include/external/And64InlineHook/And64InlineHook.hpp:
 
-/home/runner/workspace/app/src/main/jni/include/obfuscation.h:
+include/obfuscation.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/obfy/instr.h:
+include/external/obfy/instr.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/random:
 
-/home/runner/workspace/app/src/main/jni/include/external/oxorany/oxorany.h:
+include/external/oxorany/oxorany.h:
 
-/home/runner/workspace/app/src/main/jni/include/random_names.h:
+include/random_names.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/Substrate/SubstrateHook.h:
+include/external/Substrate/SubstrateHook.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/dlfcn/dlfcn.hpp:
+include/external/dlfcn/dlfcn.hpp:
 
-/home/runner/workspace/app/src/main/jni/include/input.h:
+include/input.h:
 
-/home/runner/workspace/app/src/main/jni/include/java.h:
+include/java.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/xhook/xhook.h:
+include/external/xhook/xhook.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/xhook/src/xhook.h:
+include/external/xhook/src/xhook.h:
 
-/home/runner/workspace/app/src/main/jni/include/manual_dlsym.h:
+include/manual_dlsym.h:
 
-/home/runner/workspace/app/src/main/jni/include/random_defs.h:
+include/random_defs.h:
 
-/home/runner/workspace/app/src/main/jni/menu.h:
+menu.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/imgui.h:
+include/external/imgui/imgui.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui.h:
+include/external/imgui/src/imgui.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imgui_internal.h:
+include/external/imgui/src/imgui_internal.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/../src/imstb_textedit.h:
+include/external/imgui/inc/../src/imstb_textedit.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_truetype.h:
+include/external/imgui/src/imstb_truetype.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_textedit.h:
+include/external/imgui/src/imstb_textedit.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/src/imstb_rectpack.h:
+include/external/imgui/src/imstb_rectpack.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_android.h:
+include/external/imgui/src/backends/imgui_impl_android.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/imgui_impl_opengl3.h:
+include/external/imgui/src/backends/imgui_impl_opengl3.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/src/backends/../imgui.h:
+include/external/imgui/src/backends/../imgui.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/touch.h:
+include/external/imgui/inc/touch.h:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/stb_image.h:
+include/external/imgui/inc/stb_image.h:
 
-/home/runner/workspace/app/src/main/jni/icons/icons.h:
+icons/icons.h:
 
-/home/runner/workspace/app/src/main/jni/icons/logo.h:
+icons/logo.h:
 
-/home/runner/workspace/app/src/main/jni/icons/draw_icon.h:
+icons/draw_icon.h:
 
-/home/runner/workspace/app/src/main/jni/icons/play_icon.h:
+icons/play_icon.h:
 
-/home/runner/workspace/app/src/main/jni/icons/q_icon.h:
+icons/q_icon.h:
 
-/home/runner/workspace/app/src/main/jni/icons/user_icon.h:
+icons/user_icon.h:
 
-/home/runner/workspace/app/src/main/jni/icons/play_on.h:
+icons/play_on.h:
 
-/home/runner/workspace/app/src/main/jni/icons/play_off.h:
+icons/play_off.h:
 
-/home/runner/workspace/app/src/main/jni/game.h:
+game.h:
 
-/home/runner/workspace/app/src/main/jni/game/Foundation.h:
+game/Foundation.h:
 
-/home/runner/workspace/app/src/main/jni/game/Types.h:
+game/Types.h:
 
-/home/runner/workspace/app/src/main/jni/game/CCNode.h:
+game/CCNode.h:
 
-/home/runner/workspace/app/src/main/jni/game/CCDirector.h:
+game/CCDirector.h:
 
-/home/runner/workspace/app/src/main/jni/game/StateManager.h:
+game/StateManager.h:
 
-/home/runner/workspace/app/src/main/jni/game/State.h:
+game/State.h:
 
-/home/runner/workspace/app/src/main/jni/game/GameManager.h:
+game/GameManager.h:
 
-/home/runner/workspace/app/src/main/jni/game/VisualCue.h:
+game/VisualCue.h:
 
-/home/runner/workspace/app/src/main/jni/game/Ball.h:
+game/Ball.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/NumberUtils.h:
+game/inc/NumberUtils.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/GameConstants.h:
+game/inc/GameConstants.h:
 
-/home/runner/workspace/app/src/main/jni/game/Table.h:
+game/Table.h:
 
-/home/runner/workspace/app/src/main/jni/game/FrictionProperties.h:
+game/FrictionProperties.h:
 
-/home/runner/workspace/app/src/main/jni/game/VisualEnglishControl.h:
+game/VisualEnglishControl.h:
 
-/home/runner/workspace/app/src/main/jni/game/MainManager.h:
+game/MainManager.h:
 
-/home/runner/workspace/app/src/main/jni/game/MenuManager.h:
+game/MenuManager.h:
 
-/home/runner/workspace/app/src/main/jni/game/UserInfo.h:
+game/UserInfo.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/game.h:
+game/inc/game.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/Prediction.fast.h:
+game/inc/Prediction.fast.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/Prediction.update.h:
+game/inc/Prediction.update.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/ScreenTable.h:
+game/inc/ScreenTable.h:
 
-/home/runner/workspace/app/src/main/jni/game/Ruleset.h:
+game/Ruleset.h:
 
 /tmp/android-ndk-r25c/sources/cxx-stl/llvm-libc++/include/typeindex:
 
-/home/runner/workspace/app/src/main/jni/include/external/imgui/inc/8bp.h:
+include/external/imgui/inc/8bp.h:
 
-/home/runner/workspace/app/src/main/jni/mod/keylogin.h:
+mod/keylogin.h:
 
-/home/runner/workspace/app/src/main/jni/include/obfuscate.h:
+include/obfuscate.h:
 
-/home/runner/workspace/app/src/main/jni/mod/PocketSelector.h:
+mod/PocketSelector.h:
 
-/home/runner/workspace/app/src/main/jni/mod/DumpOffset.h:
+mod/DumpOffset.h:
 
-/home/runner/workspace/app/src/main/jni/mod/OffsetSearch.h:
+mod/OffsetSearch.h:
 
-/home/runner/workspace/app/src/main/jni/mod/ButtonClicker.h:
+mod/ButtonClicker.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/AutoPlay.h:
+game/inc/AutoPlay.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/AimLockTarget.h:
+game/inc/AimLockTarget.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/AimBreak.h:
+game/inc/AimBreak.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/AimLock8Ball.h:
+game/inc/AimLock8Ball.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/Aim9Ball.h:
+game/inc/Aim9Ball.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/Aim9BallBreak.h:
+game/inc/Aim9BallBreak.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/AutoPower.h:
+game/inc/AutoPower.h:
 
-/home/runner/workspace/app/src/main/jni/game/inc/AutoEnglish.h:
+game/inc/AutoEnglish.h:
 
-/home/runner/workspace/app/src/main/jni/mod/kill.h:
+game/inc/AutoShoot.h:
 
-/home/runner/workspace/app/src/main/jni/include/syscall.h:
+game/inc/../../mod/PowerSlider.h:
+
+game/inc/../UserSettingsManager.h:
+
+mod/kill.h:
+
+include/syscall.h:

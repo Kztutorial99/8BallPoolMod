@@ -209,6 +209,7 @@ static int g_selectedPocket8 = -1;
 #include "game/inc/Aim9BallBreak.h"
 #include "game/inc/AutoPower.h"
 #include "game/inc/AutoEnglish.h"
+#include "game/inc/AutoShoot.h"
 #include <thread>
 #include <atomic>
 
@@ -817,6 +818,8 @@ static void DrawContentArea(float winW, float winH) {
             Dummy(ImVec2(0, 4));
             if (ToggleSwitch(O("Auto English"), &persistent_bool[O("bAutoEnglish")])) need_save = true;
             Dummy(ImVec2(0, 4));
+            if (ToggleSwitch(O("Auto Shoot"), &AutoShoot::bEnabled)) need_save = true;
+            Dummy(ImVec2(0, 4));
 
             // ── Pocket Info (read-only, selalu otomatis) ──────────────────
             if (g_aimMode == AimMode::EIGHTBALL_PREDICT || g_aimMode == AimMode::EIGHTBALL_8LOCK) {
@@ -989,6 +992,8 @@ static void DrawContentArea(float winW, float winH) {
             if (ToggleSwitch(O("Auto Power"), &persistent_bool[O("bAutoPower")])) need_save = true;
             Dummy(ImVec2(0, 4));
             if (ToggleSwitch(O("Auto English"), &persistent_bool[O("bAutoEnglish")])) need_save = true;
+            Dummy(ImVec2(0, 4));
+            if (ToggleSwitch(O("Auto Shoot"), &AutoShoot::bEnabled)) need_save = true;
             Dummy(ImVec2(0, 4));
 
             break;
@@ -1546,7 +1551,9 @@ INLINE void DrawMenu(ImGuiIO& io) {
         }
 
         buttonClicker.Update();
+        powerSlider.Update();
         AutoAim::Update();
+        AutoShoot::Update();
         PocketSelector::Update();  // proses tap pocket dari input thread
 
         g_espStateReady = false;
