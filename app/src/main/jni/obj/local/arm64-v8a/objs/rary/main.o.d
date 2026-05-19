@@ -184,6 +184,7 @@
   /home/runner/workspace/app/src/main/jni/mod/PocketSelector.h \
   /home/runner/workspace/app/src/main/jni/mod/ButtonClicker.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AutoPlay.h \
+  /home/runner/workspace/app/src/main/jni/game/inc/BreakSpecial.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimLockTarget.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimBreak.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimLock8Ball.h \
@@ -559,6 +560,8 @@
 /home/runner/workspace/app/src/main/jni/mod/ButtonClicker.h:
 
 /home/runner/workspace/app/src/main/jni/game/inc/AutoPlay.h:
+
+/home/runner/workspace/app/src/main/jni/game/inc/BreakSpecial.h:
 
 /home/runner/workspace/app/src/main/jni/game/inc/AimLockTarget.h:
 

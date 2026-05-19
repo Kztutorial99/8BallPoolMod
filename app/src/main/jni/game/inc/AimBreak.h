@@ -6,8 +6,11 @@
 //  - Cue ball must NOT be scratched
 //  - 8-ball (index 8) should NOT be pocketed on break (foul in standard rules)
 //  - Scan every angle, keep absolute best (max balls pocketed)
-//  - No early exit — full scan for maximum accuracy
+//  - Tiebreaker: BreakSpecial::ScoreAngleDifficulty() — pilih angle yang buat
+//    posisi sisa bola musuh paling susah (dekat rail, jauh dari pocket)
 // ─────────────────────────────────────────────────────────────────────────────
+
+#include "BreakSpecial.h"
 
 namespace AimBreak {
     bool bActive = false;
@@ -28,6 +31,7 @@ namespace AimBreak {
 
         double bestAngle      = startAngle;
         int    bestCount      = -1;
+        double bestDiffScore  = -1.0;  // [A] tiebreaker: kesulitan posisi sisa bola
         int    bestFirstBall  = -1;
 
         double scanAngle = startAngle;
@@ -74,10 +78,25 @@ namespace AimBreak {
                 continue;
             }
 
+            // [A] Hitung skor kesulitan posisi sisa bola musuh
+            double diffScore = BreakSpecial::bEnabled
+                ? BreakSpecial::ScoreAngleDifficulty()
+                : 0.0;
+
+            // Pilih: lebih banyak bola masuk = prioritas utama
+            //        sama banyak → pilih yang skor kesulitannya lebih tinggi
+            bool better = false;
             if (potted > bestCount) {
-                bestCount     = potted;
-                bestAngle     = scanAngle;
-                bestFirstBall = firstBallIdx;
+                better = true;
+            } else if (potted == bestCount && diffScore > bestDiffScore) {
+                better = true;
+            }
+
+            if (better) {
+                bestCount      = potted;
+                bestDiffScore  = diffScore;
+                bestAngle      = scanAngle;
+                bestFirstBall  = firstBallIdx;
             }
 
             scanAngle = fmod(scanAngle + ANGLE_STEP + MAX_ANGLE_RADIANS, MAX_ANGLE_RADIANS);

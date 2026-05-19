@@ -200,6 +200,7 @@ static int g_selectedPocket8 = -1;
 
 #include "mod/ButtonClicker.h"
 #include "game/inc/AutoPlay.h"
+#include "game/inc/BreakSpecial.h"
 #include "game/inc/AimLockTarget.h"
 #include "game/inc/AimBreak.h"
 #include "game/inc/AimLock8Ball.h"
@@ -738,6 +739,41 @@ static void DrawContentArea(float winW, float winH) {
             need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
             need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
 
+            Dummy(ImVec2(0, 14));
+
+            // ── Break Special ────────────────────────────────────────────────
+            {
+                float cardW = GetContentRegionAvail().x;
+                ImVec2 cPos = GetCursorScreenPos();
+                ImDrawList* dlbs = GetWindowDrawList();
+                float cardH = 72.0f;
+
+                // Background card merah-gelap
+                bool bsOn = persistent_bool[O("bBreakSpecial")];
+                ImU32 bgCol    = bsOn ? IM_COL32(60, 10, 10, 210) : IM_COL32(18, 14, 30, 200);
+                ImU32 borderCol= bsOn ? IM_COL32(220, 50, 50, 200) : IM_COL32(60, 40, 80, 160);
+                dlbs->AddRectFilled(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH), bgCol, 10.0f);
+                dlbs->AddRect(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH), borderCol, 10.0f, 0, 1.5f);
+
+                SetCursorPosY(GetCursorPosY() + 8.0f);
+                SetCursorPosX(GetCursorPosX() + 12.0f);
+
+                if (ToggleSwitch(O("Break Special"), &persistent_bool[O("bBreakSpecial")])) {
+                    BreakSpecial::bEnabled = persistent_bool[O("bBreakSpecial")];
+                    need_save = true;
+                }
+
+                SetCursorPosX(GetCursorPosX() + 12.0f);
+                TextColored(bsOn ? ImVec4(1.0f, 0.45f, 0.45f, 0.90f)
+                                 : ImVec4(0.45f, 0.38f, 0.55f, 0.75f),
+                    bsOn ? O("Aktif: bola musuh digeser ke rail")
+                         : O("Nonaktif"));
+
+                float usedH = GetCursorPosY() - (cPos.y - GetWindowPos().y);
+                float padH  = cardH - (usedH - (cPos.y - GetWindowPos().y));
+                if (padH > 0) Dummy(ImVec2(0, padH));
+            }
+
 
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
@@ -1149,7 +1185,8 @@ INLINE void DrawMenu(ImGuiIO& io) {
         {
             static bool s_stateRestored = false;
             if (!s_stateRestored) {
-                AutoAim::bActive          = persistent_bool[O("bAutoAim")];
+                AutoAim::bActive       = persistent_bool[O("bAutoAim")];
+                BreakSpecial::bEnabled = persistent_bool[O("bBreakSpecial")];
                 s_stateRestored = true;
             }
         }
@@ -1165,7 +1202,8 @@ INLINE void DrawMenu(ImGuiIO& io) {
 
         buttonClicker.Update();
         AutoAim::Update();
-        PocketSelector::Update();  // proses tap pocket dari input thread
+        PocketSelector::Update();
+        BreakSpecial::UpdateNudge();  // proses tap pocket dari input thread
 
         g_espStateReady = false;
         g_espIsInGame   = false;    // reset tiap frame — DrawESP akan set true jika memang in-game
