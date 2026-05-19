@@ -189,9 +189,6 @@
   /home/runner/workspace/app/src/main/jni/game/inc/AimLock8Ball.h \
   /home/runner/workspace/app/src/main/jni/game/inc/Aim9Ball.h \
   /home/runner/workspace/app/src/main/jni/game/inc/Aim9BallBreak.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/AutoShoot.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/../../mod/PowerSlider.h \
-  /home/runner/workspace/app/src/main/jni/game/inc/../UserSettingsManager.h \
   /home/runner/workspace/app/src/main/jni/mod/kill.h \
   /home/runner/workspace/app/src/main/jni/include/syscall.h
 
@@ -572,12 +569,6 @@
 /home/runner/workspace/app/src/main/jni/game/inc/Aim9Ball.h:
 
 /home/runner/workspace/app/src/main/jni/game/inc/Aim9BallBreak.h:
-
-/home/runner/workspace/app/src/main/jni/game/inc/AutoShoot.h:
-
-/home/runner/workspace/app/src/main/jni/game/inc/../../mod/PowerSlider.h:
-
-/home/runner/workspace/app/src/main/jni/game/inc/../UserSettingsManager.h:
 
 /home/runner/workspace/app/src/main/jni/mod/kill.h:
 

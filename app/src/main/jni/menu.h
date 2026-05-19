@@ -205,7 +205,6 @@ static int g_selectedPocket8 = -1;
 #include "game/inc/AimLock8Ball.h"
 #include "game/inc/Aim9Ball.h"
 #include "game/inc/Aim9BallBreak.h"
-#include "game/inc/AutoShoot.h"
 #include <thread>
 #include <atomic>
 
@@ -352,6 +351,39 @@ INLINE void DrawESP(ImDrawList* draw) {
                 if (Prediction::pocketStatus[i]) {
                     auto screenPos = WorldToScreen(pockets[i]);
                     draw->AddCircle(ImVec2(screenPos.x, screenPos.y), 30, GREEN, 0, 5.f);
+                }
+            }
+        }
+
+        // ── Show Pockets: lingkaran bernomor di setiap pocket + lock indicator ──
+        if (persistent_bool[O("bShowPockets")]) {
+            int lockedPkt = PocketSelector::Get();
+            for (int i = 0; i < 6; i++) {
+                ImVec2 ps = WorldToScreen(PocketSelector::POCKET_WORLD[i]);
+                bool isLocked = (i == lockedPkt);
+
+                float r           = isLocked ? 32.0f : 26.0f;
+                float borderThick = isLocked ? 3.0f  : 1.8f;
+
+                ImU32 fillCol   = isLocked ? IM_COL32(80, 55, 0, 130) : IM_COL32(10, 20, 60, 90);
+                ImU32 borderCol = isLocked ? IM_COL32(255, 210, 30, 230) : IM_COL32(160, 190, 255, 180);
+                ImU32 numCol    = isLocked ? IM_COL32(255, 218, 40, 255) : IM_COL32(210, 225, 255, 210);
+
+                draw->AddCircleFilled(ps, r, fillCol);
+                draw->AddCircle(ps, r, borderCol, 0, borderThick);
+
+                // Nomor pocket di tengah lingkaran
+                char numBuf[4];
+                snprintf(numBuf, sizeof(numBuf), "%d", i);
+                ImVec2 ts = GImGui->Font->CalcTextSizeA(GImGui->FontSize, FLT_MAX, 0.0f, numBuf);
+                draw->AddText(ImVec2(ps.x - ts.x * 0.5f, ps.y - ts.y * 0.5f), numCol, numBuf);
+
+                // Label "LOCK" di bawah pocket terkunci
+                if (isLocked) {
+                    const char* lbl = "LOCK";
+                    ImVec2 lts = GImGui->Font->CalcTextSizeA(GImGui->FontSize, FLT_MAX, 0.0f, lbl);
+                    draw->AddText(ImVec2(ps.x - lts.x * 0.5f, ps.y + r + 4.0f),
+                                  IM_COL32(255, 210, 30, 230), lbl);
                 }
             }
         }
@@ -693,8 +725,16 @@ static void DrawContentArea(float winW, float winH) {
     switch (g_menu.currentTab) {
         case 0: {
             Dummy(ImVec2(0, 10));
+
+            // ── Enable Play Button (tombol aim di layar game) ─────────────────
+            if (ToggleSwitch(O("Enable Play Button"), &persistent_bool[O("bAutoAim")])) {
+                AutoAim::bActive = persistent_bool[O("bAutoAim")];
+                need_save = true;
+            }
+            Dummy(ImVec2(0, 14));
+
             need_save |= ToggleSwitch(O("Draw Lines"), &persistent_bool[O("bESP_DrawPredictionLine")]);
-           // need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPockets")]);
+            need_save |= ToggleSwitch(O("Show Pockets"), &persistent_bool[O("bShowPockets")]);
             need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
             need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
 
@@ -751,11 +791,6 @@ static void DrawContentArea(float winW, float winH) {
         case 1: {
             // ── 8 BALL POOL ───────────────────────────────────────────────
             Dummy(ImVec2(0, 10));
-            if (ToggleSwitch(O("Enable Play Button"), &persistent_bool[O("bAutoAim")])) {
-                AutoAim::bActive = persistent_bool[O("bAutoAim")];
-                need_save = true;
-            }
-            Dummy(ImVec2(0, 16));
 
             // ── Mode selector ─────────────────────────────────────────────
             auto ModeSwitch8 = [&](const char* label, AimMode mode) {
@@ -767,9 +802,9 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 6));
             };
 
-            ModeSwitch8(O("Aim Break"),             AimMode::EIGHTBALL_BREAK);
-            ModeSwitch8(O("Aim Predict Auto Shoot"), AimMode::EIGHTBALL_PREDICT);
-            ModeSwitch8(O("Aim Lock 8 Ball"),        AimMode::EIGHTBALL_8LOCK);
+            ModeSwitch8(O("Aim Break"),        AimMode::EIGHTBALL_BREAK);
+            ModeSwitch8(O("Aim Predict"),      AimMode::EIGHTBALL_PREDICT);
+            ModeSwitch8(O("Aim Lock 8 Ball"),  AimMode::EIGHTBALL_8LOCK);
 
             Dummy(ImVec2(0, 4));
 
@@ -919,11 +954,6 @@ static void DrawContentArea(float winW, float winH) {
         case 2: {
             // ── 9 BALL POOL ───────────────────────────────────────────────
             Dummy(ImVec2(0, 10));
-            if (ToggleSwitch(O("Enable Play Button"), &persistent_bool[O("bAutoAim")])) {
-                AutoAim::bActive = persistent_bool[O("bAutoAim")];
-                need_save = true;
-            }
-            Dummy(ImVec2(0, 20));
 
             // ── Mode selector: radio-style toggle switches ─────────────────
             auto ModeSwitch9 = [&](const char* label, AimMode mode) {
@@ -935,8 +965,8 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 8));
             };
 
-            ModeSwitch9(O("Aim Ghost 90% Win"),      AimMode::NINEBALL_BREAK);
-            ModeSwitch9(O("Aim Predict Auto Shoot"), AimMode::NINEBALL_PREDICT);
+            ModeSwitch9(O("Aim Ghost 90% Win"), AimMode::NINEBALL_BREAK);
+            ModeSwitch9(O("Aim Predict"),       AimMode::NINEBALL_PREDICT);
 
             Dummy(ImVec2(0, 4));
 
@@ -1134,15 +1164,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
         }
 
         buttonClicker.Update();
-        powerSlider.Update();
-        // Jangan reset bAimed saat PowerSlider sedang proses tembak
-        if (!powerSlider.Active) AutoAim::Update();
-
-        // Auto Shoot aktif otomatis saat mode Aim Predict (8 Ball / 9 Ball)
-        AutoShoot::bEnabled = persistent_bool[O("bAutoAim")] &&
-            (g_aimMode == AimMode::EIGHTBALL_PREDICT ||
-             g_aimMode == AimMode::NINEBALL_PREDICT);
-        AutoShoot::Update();
+        AutoAim::Update();
         PocketSelector::Update();  // proses tap pocket dari input thread
 
         g_espStateReady = false;
