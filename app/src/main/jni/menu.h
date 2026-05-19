@@ -65,9 +65,9 @@ static bool SidebarButton(const char* label, GLuint iconTex, bool selected, floa
     const ImGuiStyle& style = g.Style;
     const ImGuiID id = window->GetID(label);
 
-    float iconSize   = 60.0f;
-    float vPad       = 10.0f;
-    float btnH       = vPad + iconSize + 4.0f + g.FontSize + vPad;
+    float iconSize = 44.0f;
+    float vPad     = 12.0f;
+    float btnH     = vPad + iconSize + 5.0f + g.FontSize * 0.88f + vPad;
 
     ImVec2 pos  = window->DC.CursorPos;
     ImVec2 size = ImVec2(width, btnH);
@@ -81,39 +81,56 @@ static bool SidebarButton(const char* label, GLuint iconTex, bool selected, floa
 
     ImDrawList* dl = window->DrawList;
 
-    // Icon center position
-    float iconBgPad  = 6.0f;
-    float iconBgSize = iconSize + iconBgPad * 2.0f;
+    // Hover feedback
+    if (hovered && !selected) {
+        dl->AddRectFilled(
+            ImVec2(bb.Min.x + 6.0f, bb.Min.y + 4.0f),
+            ImVec2(bb.Max.x - 6.0f, bb.Max.y - 4.0f),
+            IM_COL32(255, 255, 255, 14), 12.0f);
+    }
+
+    float iconBgR = iconSize * 0.5f + 7.0f;
     ImVec2 iconCenter = ImVec2(
         bb.Min.x + width * 0.5f,
         bb.Min.y + vPad + iconSize * 0.5f
     );
 
-    // Selected: blue rounded rect behind icon only
+    // Selected: gradient pill behind icon
     if (selected) {
-        dl->AddRectFilled(
-            ImVec2(iconCenter.x - iconBgSize * 0.5f, iconCenter.y - iconBgSize * 0.5f),
-            ImVec2(iconCenter.x + iconBgSize * 0.5f, iconCenter.y + iconBgSize * 0.5f),
-            IM_COL32(30, 100, 220, 255), 12.0f
-        );
+        ImVec2 pMin = ImVec2(iconCenter.x - iconBgR, iconCenter.y - iconBgR);
+        ImVec2 pMax = ImVec2(iconCenter.x + iconBgR, iconCenter.y + iconBgR);
+        dl->AddRectFilledMultiColor(pMin, pMax,
+            IM_COL32(18, 90, 210, 240), IM_COL32(28, 120, 240, 240),
+            IM_COL32(20, 100, 225, 240), IM_COL32(15, 80, 195, 240));
+        // Subtle border glow
+        dl->AddRect(pMin, pMax, IM_COL32(80, 160, 255, 90), 12.0f, 0, 1.2f);
     }
 
-    // Draw icon texture centered, with color filter when not selected
+    // Draw icon texture
     if (iconTex) {
+        ImU32 tint = selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 210, 230, 190);
         ImVec2 iconMin = ImVec2(iconCenter.x - iconSize * 0.5f, iconCenter.y - iconSize * 0.5f);
         ImVec2 iconMax = ImVec2(iconCenter.x + iconSize * 0.5f, iconCenter.y + iconSize * 0.5f);
-        ImU32 tint = selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(255, 255, 255, 255);
-        dl->AddImage((void*)(intptr_t)iconTex, iconMin, iconMax, ImVec2(0,0), ImVec2(1,1));
+        dl->AddImage((void*)(intptr_t)iconTex, iconMin, iconMax, ImVec2(0,0), ImVec2(1,1), tint);
     }
 
-    // Draw label centered below icon
+    // Draw label centered below icon — slightly smaller font feel via direct text
     ImVec2 labelSize = CalcTextSize(label);
-    ImVec2 textPos   = ImVec2(
+    ImVec2 textPos = ImVec2(
         bb.Min.x + (width - labelSize.x) * 0.5f,
-        bb.Min.y + vPad + iconSize + 4.0f
+        bb.Min.y + vPad + iconSize + 5.0f
     );
-    ImU32 textCol = selected ? IM_COL32(255, 255, 255, 255) : IM_COL32(140, 140, 150, 255);
+    ImU32 textCol = selected
+        ? IM_COL32(230, 240, 255, 255)
+        : IM_COL32(120, 130, 155, 210);
     dl->AddText(textPos, textCol, label);
+
+    // Active indicator dot under label
+    if (selected) {
+        dl->AddCircleFilled(
+            ImVec2(bb.Min.x + width * 0.5f, bb.Max.y - 4.0f),
+            2.5f, IM_COL32(100, 180, 255, 200));
+    }
 
     return pressed;
 }
@@ -126,14 +143,15 @@ static bool ToggleSwitch(const char* label, bool* v) {
     const ImGuiStyle& style = g.Style;
     const ImGuiID id = window->GetID(label);
 
-    float scale = 1.5f; // 1.5f is with 50% bigger than writen values
-    float height = 32.0f * scale;
-    float width = 56.0f * scale;
+    float scale  = 1.18f;
+    float height = 28.0f * scale;
+    float width  = 52.0f * scale;
     float radius = height * 0.5f;
 
     ImVec2 textSize = CalcTextSize(label);
-    ImVec2 pos = window->DC.CursorPos;
-    ImVec2 size = ImVec2(GetContentRegionAvail().x, ImMax(height, textSize.y) + style.FramePadding.y * 2 + 10.0f);
+    float rowH = ImMax(height, textSize.y + 2.0f) + style.FramePadding.y * 2.0f + 8.0f;
+    ImVec2 pos  = window->DC.CursorPos;
+    ImVec2 size = ImVec2(GetContentRegionAvail().x, rowH);
 
     const ImRect bb(pos, pos + size);
     ItemSize(size, style.FramePadding.y);
@@ -146,30 +164,53 @@ static bool ToggleSwitch(const char* label, bool* v) {
     static std::map<ImGuiID, float> switchAnim;
     float& animT = switchAnim[id];
     float targetT = *v ? 1.0f : 0.0f;
-    animT += (targetT - animT) * g.IO.DeltaTime * 14.0f;
+    animT += (targetT - animT) * g.IO.DeltaTime * 16.0f;
 
     ImDrawList* dl = window->DrawList;
-    
-    if (hovered) {
-        dl->AddRectFilled(bb.Min, bb.Max, IM_COL32(45, 45, 55, 100), 10.0f);
-    }
-    
-    ImVec2 togglePos = ImVec2(bb.Max.x - width - 15.0f, bb.Min.y + (size.y - height) * 0.5f);
-    ImVec2 toggleEnd = ImVec2(togglePos.x + width, togglePos.y + height);
-    
-    ImVec4 offColor = ImVec4(0.27f, 0.27f, 0.31f, 1.0f);
-    ImVec4 onColor = ImVec4(0.12f, 0.45f, 0.95f, 1.0f);
-    ImVec4 bgColorV = ImLerp(offColor, onColor, animT);
-    dl->AddRectFilled(togglePos, toggleEnd, ImColor(bgColorV), radius);
-    
-    float knobX = togglePos.x + radius + (width - height) * animT;
-    float knobY = togglePos.y + radius;
-    float knobR = radius - 4.0f;
-    
-    dl->AddCircleFilled(ImVec2(knobX, knobY), knobR + 2.0f, IM_COL32(0, 0, 0, 40));
-    dl->AddCircleFilled(ImVec2(knobX, knobY), knobR, IM_COL32(255, 255, 255, 255));
 
-    dl->AddText(ImVec2(bb.Min.x + 15.0f, bb.Min.y + (size.y - textSize.y) * 0.5f), IM_COL32(230, 230, 240, 255), label);
+    // Row hover highlight
+    if (hovered) {
+        dl->AddRectFilled(bb.Min, bb.Max, IM_COL32(255, 255, 255, 10), 8.0f);
+    }
+
+    // Left accent bar when ON
+    if (animT > 0.05f) {
+        float barH = size.y * 0.55f;
+        float barY = bb.Min.y + (size.y - barH) * 0.5f;
+        dl->AddRectFilled(
+            ImVec2(bb.Min.x, barY),
+            ImVec2(bb.Min.x + 2.5f, barY + barH),
+            IM_COL32(40, 140, 255, (int)(animT * 200)), 2.0f);
+    }
+
+    // Toggle track
+    ImVec2 togglePos = ImVec2(bb.Max.x - width - 14.0f, bb.Min.y + (rowH - height) * 0.5f);
+    ImVec2 toggleEnd = ImVec2(togglePos.x + width, togglePos.y + height);
+
+    ImVec4 offColor = ImVec4(0.22f, 0.24f, 0.30f, 1.0f);
+    ImVec4 onColor  = ImVec4(0.10f, 0.42f, 0.92f, 1.0f);
+    ImVec4 bgColorV = ImLerp(offColor, onColor, animT);
+    // Track shadow
+    dl->AddRectFilled(
+        ImVec2(togglePos.x + 1, togglePos.y + 2),
+        ImVec2(toggleEnd.x + 1, toggleEnd.y + 2),
+        IM_COL32(0, 0, 0, 60), radius);
+    dl->AddRectFilled(togglePos, toggleEnd, ImColor(bgColorV), radius);
+
+    // Knob
+    float knobX = togglePos.x + radius + (width - height) * animT;
+    float knobY  = togglePos.y + radius;
+    float knobR  = radius - 3.5f;
+    dl->AddCircleFilled(ImVec2(knobX, knobY + 1.5f), knobR, IM_COL32(0, 0, 0, 50));
+    dl->AddCircleFilled(ImVec2(knobX, knobY), knobR, IM_COL32(255, 255, 255, 255));
+    // Knob shine
+    dl->AddCircleFilled(ImVec2(knobX - knobR * 0.25f, knobY - knobR * 0.28f),
+        knobR * 0.38f, IM_COL32(255, 255, 255, 80));
+
+    // Label
+    float labelY = bb.Min.y + (rowH - textSize.y) * 0.5f;
+    ImU32 labelCol = *v ? IM_COL32(230, 238, 255, 255) : IM_COL32(165, 172, 195, 230);
+    dl->AddText(ImVec2(bb.Min.x + 16.0f, labelY), labelCol, label);
 
     return pressed;
 }
@@ -211,12 +252,13 @@ static int g_selectedPocket8 = -1;
 
 // Active aim mode
 enum class AimMode : int {
-    NONE              = 0,
-    EIGHTBALL_PREDICT = 1,
-    EIGHTBALL_BREAK   = 2,
-    NINEBALL_PREDICT  = 3,
-    NINEBALL_BREAK    = 4,
-    EIGHTBALL_8LOCK   = 5,
+    NONE                  = 0,
+    EIGHTBALL_PREDICT     = 1,
+    EIGHTBALL_BREAK       = 2,
+    NINEBALL_PREDICT      = 3,
+    NINEBALL_BREAK        = 4,
+    EIGHTBALL_8LOCK       = 5,
+    EIGHTBALL_POCKET_LOCK = 6,
 };
 static AimMode g_aimMode = AimMode::EIGHTBALL_PREDICT;
 
@@ -540,8 +582,9 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
     switch (g_aimMode) {
         case AimMode::EIGHTBALL_PREDICT: strcpy(modeName,"8BP"); modeColor=ImVec4(0.25f,0.60f,1.0f,1.0f); break;
         case AimMode::EIGHTBALL_BREAK:   strcpy(modeName,"8BK"); modeColor=ImVec4(1.0f, 0.50f,0.10f,1.0f); break;
-        case AimMode::EIGHTBALL_8LOCK:   strcpy(modeName,"LK8"); modeColor=ImVec4(0.90f,0.20f,0.90f,1.0f); break;
-        case AimMode::NINEBALL_PREDICT:  strcpy(modeName,"9BP"); modeColor=ImVec4(0.15f,0.85f,0.55f,1.0f); break;
+        case AimMode::EIGHTBALL_8LOCK:       strcpy(modeName,"LK8"); modeColor=ImVec4(0.90f,0.20f,0.90f,1.0f); break;
+        case AimMode::EIGHTBALL_POCKET_LOCK: strcpy(modeName,"PKT"); modeColor=ImVec4(1.0f, 0.75f,0.10f,1.0f); break;
+        case AimMode::NINEBALL_PREDICT:      strcpy(modeName,"9BP"); modeColor=ImVec4(0.15f,0.85f,0.55f,1.0f); break;
         case AimMode::NINEBALL_BREAK:    strcpy(modeName,"9GW"); modeColor=ImVec4(1.0f, 0.82f,0.05f,1.0f); break;
         default: break;
     }
@@ -580,6 +623,20 @@ static void DrawAimInfoOverlay(ImGuiIO& io) {
             else if (AimLock8Ball::lastTargetPocket >= 0)
                 snprintf(row2, sizeof(row2), "Ball 8  Pkt %d", AimLock8Ball::lastTargetPocket);
             break;
+        case AimMode::EIGHTBALL_POCKET_LOCK: {
+            int fp = PocketSelector::Get();
+            if (fp >= 0) {
+                const char* pN[6] = {"TL","TC","TR","BR","BC","BL"};
+                if (isAimed && !AimLockTarget::lastHadShot)
+                    snprintf(row2, sizeof(row2), "No shot  Pkt:%s", pN[fp]);
+                else if (AimLockTarget::lastTargetBall >= 0)
+                    snprintf(row2, sizeof(row2), "B%d -> Pkt %s",
+                        AimLockTarget::lastTargetBall, pN[fp]);
+            } else {
+                snprintf(row2, sizeof(row2), "No pocket locked");
+            }
+            break;
+        }
         case AimMode::NINEBALL_PREDICT:
             if (Aim9Ball::lastTargetBall >= 0)
                 snprintf(row2, sizeof(row2), "Ball %d", Aim9Ball::lastTargetBall);
@@ -685,38 +742,63 @@ static void DrawContentArea(float winW, float winH) {
     );
     
     const char* tabTitles[] = {
-        O("Draw Settings"),
+        O("Draw"),
         O("8 Ball"),
         O("9 Ball"),
         O("Info")
     };
+    // Tab accent colors matching each section
+    const ImU32 tabAccents[] = {
+        IM_COL32(60, 140, 255, 220),
+        IM_COL32(30, 200, 120, 220),
+        IM_COL32(200, 165, 30, 220),
+        IM_COL32(130, 90, 220, 220),
+    };
 
-    // --- CENTRARE TITLU TAB ---
     const char* currentTitle = tabTitles[g_menu.currentTab];
-    float titlePadT = 18.0f;
-    float titlePadB = 12.0f;
+    ImU32 accentCol = tabAccents[g_menu.currentTab];
 
-    // 1. Setăm scara fontului înainte de calcul
-    SetWindowFontScale(1.15f);
+    float titlePadT = 14.0f;
+    float titlePadB = 10.0f;
+
+    // Title with larger font
+    SetWindowFontScale(1.18f);
     ImVec2 ts = CalcTextSize(currentTitle);
-    
-    // 2. Calculăm X pentru centrare: (Lățime fereastră - Lățime text) / 2
+    SetWindowFontScale(1.0f);
+
+    float titleBlockH = titlePadT + ts.y + titlePadB;
+
+    // Subtle title background strip
+    dl->AddRectFilled(
+        ImVec2(wp.x, wp.y + startY),
+        ImVec2(wp.x + contentW, wp.y + startY + titleBlockH),
+        IM_COL32(8, 16, 38, 200));
+
+    // Left accent stripe
+    dl->AddRectFilled(
+        ImVec2(wp.x, wp.y + startY + titlePadT * 0.5f),
+        ImVec2(wp.x + 3.5f, wp.y + startY + titleBlockH - titlePadT * 0.5f),
+        accentCol, 2.0f);
+
+    // Title text — draw directly so we can use font scale without affecting cursor flow
+    SetWindowFontScale(1.18f);
     float centeredX = (contentW - ts.x) * 0.5f;
     SetCursorPos(ImVec2(centeredX, startY + titlePadT));
-    
-    // 3. Afișăm textul
-    TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", currentTitle);
-    SetWindowFontScale(1.0f); // Resetăm imediat
+    TextColored(ImVec4(0.92f, 0.95f, 1.0f, 1.0f), "%s", currentTitle);
+    SetWindowFontScale(1.0f);
 
-    // Linie separatoare centrată și ea (lăsăm 20px margini)
-    float lineY = startY + titlePadT + ts.y + titlePadB;
-    dl->AddLine(
-        ImVec2(wp.x + 20.0f, wp.y + lineY),
-        ImVec2(wp.x + contentW - 20.0f, wp.y + lineY),
-        IM_COL32(40, 100, 220, 180), 1.0f
-    );
+    // Separator line with gradient fade on both ends
+    float lineY = startY + titleBlockH;
+    dl->AddRectFilledMultiColor(
+        ImVec2(wp.x,               wp.y + lineY - 0.5f),
+        ImVec2(wp.x + contentW * 0.35f, wp.y + lineY + 1.0f),
+        IM_COL32(0, 0, 0, 0), accentCol, accentCol, IM_COL32(0, 0, 0, 0));
+    dl->AddRectFilledMultiColor(
+        ImVec2(wp.x + contentW * 0.35f, wp.y + lineY - 0.5f),
+        ImVec2(wp.x + contentW,         wp.y + lineY + 1.0f),
+        accentCol, IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0), accentCol);
 
-    float headerH = (lineY - startY) + 10.0f;
+    float headerH = lineY - startY + 8.0f;
     SetCursorPos(ImVec2(10.0f, startY + headerH));
     
     // Începutul zonei de child (conținutul propriu-zis)
@@ -738,42 +820,6 @@ static void DrawContentArea(float winW, float winH) {
             need_save |= ToggleSwitch(O("Show Pockets"), &persistent_bool[O("bShowPockets")]);
             need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
             need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
-
-            Dummy(ImVec2(0, 14));
-
-            // ── Break Special ────────────────────────────────────────────────
-            {
-                float cardW = GetContentRegionAvail().x;
-                ImVec2 cPos = GetCursorScreenPos();
-                ImDrawList* dlbs = GetWindowDrawList();
-                float cardH = 72.0f;
-
-                // Background card merah-gelap
-                bool bsOn = persistent_bool[O("bBreakSpecial")];
-                ImU32 bgCol    = bsOn ? IM_COL32(60, 10, 10, 210) : IM_COL32(18, 14, 30, 200);
-                ImU32 borderCol= bsOn ? IM_COL32(220, 50, 50, 200) : IM_COL32(60, 40, 80, 160);
-                dlbs->AddRectFilled(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH), bgCol, 10.0f);
-                dlbs->AddRect(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH), borderCol, 10.0f, 0, 1.5f);
-
-                SetCursorPosY(GetCursorPosY() + 8.0f);
-                SetCursorPosX(GetCursorPosX() + 12.0f);
-
-                if (ToggleSwitch(O("Break Special"), &persistent_bool[O("bBreakSpecial")])) {
-                    BreakSpecial::bEnabled = persistent_bool[O("bBreakSpecial")];
-                    need_save = true;
-                }
-
-                SetCursorPosX(GetCursorPosX() + 12.0f);
-                TextColored(bsOn ? ImVec4(1.0f, 0.45f, 0.45f, 0.90f)
-                                 : ImVec4(0.45f, 0.38f, 0.55f, 0.75f),
-                    bsOn ? O("Aktif: bola musuh digeser ke rail")
-                         : O("Nonaktif"));
-
-                float usedH = GetCursorPosY() - (cPos.y - GetWindowPos().y);
-                float padH  = cardH - (usedH - (cPos.y - GetWindowPos().y));
-                if (padH > 0) Dummy(ImVec2(0, padH));
-            }
-
 
             Dummy(ImVec2(0, 16));
             TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
@@ -838,11 +884,155 @@ static void DrawContentArea(float winW, float winH) {
                 Dummy(ImVec2(0, 6));
             };
 
-            ModeSwitch8(O("Aim Break"),        AimMode::EIGHTBALL_BREAK);
-            ModeSwitch8(O("Aim Predict"),      AimMode::EIGHTBALL_PREDICT);
-            ModeSwitch8(O("Aim Lock 8 Ball"),  AimMode::EIGHTBALL_8LOCK);
+            ModeSwitch8(O("Aim Break"),         AimMode::EIGHTBALL_BREAK);
+            ModeSwitch8(O("Aim Predict"),       AimMode::EIGHTBALL_PREDICT);
+            ModeSwitch8(O("Aim Lock 8 Ball"),   AimMode::EIGHTBALL_8LOCK);
+            ModeSwitch8(O("Aim Lock Pocket"),   AimMode::EIGHTBALL_POCKET_LOCK);
 
             Dummy(ImVec2(0, 4));
+
+            // ── Pocket Lock Selector Grid ─────────────────────────────────
+            if (g_aimMode == AimMode::EIGHTBALL_POCKET_LOCK) {
+                Dummy(ImVec2(0, 6));
+
+                float cardW = GetContentRegionAvail().x;
+                ImVec2 hdrPos = GetCursorScreenPos();
+                ImDrawList* dlpg = GetWindowDrawList();
+
+                // Section header card
+                float hdrH = 30.0f;
+                dlpg->AddRectFilled(hdrPos, ImVec2(hdrPos.x + cardW, hdrPos.y + hdrH),
+                    IM_COL32(10, 20, 48, 230), 10.0f, ImDrawFlags_RoundCornersTop);
+                dlpg->AddRect(hdrPos, ImVec2(hdrPos.x + cardW, hdrPos.y + hdrH),
+                    IM_COL32(45, 90, 200, 100), 10.0f, ImDrawFlags_RoundCornersTop, 1.0f);
+
+                SetWindowFontScale(0.88f);
+                ImVec2 htSz = CalcTextSize(O("Select Pocket to Lock"));
+                SetCursorPosX(hdrPos.x - GetWindowPos().x + (cardW - htSz.x) * 0.5f);
+                SetCursorPosY(GetCursorPosY() + (hdrH - htSz.y) * 0.5f);
+                TextColored(ImVec4(0.65f, 0.75f, 1.0f, 0.95f), "%s", O("Select Pocket to Lock"));
+                SetWindowFontScale(1.0f);
+
+                Dummy(ImVec2(0, 6));
+
+                // Pocket grid — 3 columns x 2 rows
+                // Visual table layout:
+                //  Row 0 (top of table):  [0:TL]  [1:TC]  [2:TR]
+                //  Row 1 (bottom):        [5:BL]  [4:BC]  [3:BR]
+                const int order[6] = {0, 1, 2, 5, 4, 3};
+                const char* pktLabel[6] = {"TL","TC","TR","BR","BC","BL"};
+                const char* pktFull[6]  = {"Top-Left","Top-Center","Top-Right","Bot-Right","Bot-Center","Bot-Left"};
+                int selPktLock = PocketSelector::Get();
+
+                float gap  = 5.0f;
+                float btnW = (cardW - gap * 2.0f) / 3.0f;
+                float btnH = 48.0f;
+                float t    = (float)GetTime();
+
+                for (int row = 0; row < 2; row++) {
+                    for (int col = 0; col < 3; col++) {
+                        int idx = order[row * 3 + col];
+                        bool isSel = (selPktLock == idx);
+
+                        ImVec2 bmin = GetCursorScreenPos();
+                        ImVec2 bmax = ImVec2(bmin.x + btnW, bmin.y + btnH);
+
+                        PushID(idx + 100);
+                        bool clicked = InvisibleButton("##pktbtn", ImVec2(btnW, btnH));
+                        PopID();
+
+                        if (clicked) {
+                            if (isSel) PocketSelector::Reset();
+                            else       PocketSelector::selectedPocket.store(idx);
+                        }
+
+                        bool hov = IsItemHovered();
+
+                        // Background
+                        if (isSel) {
+                            float gA = 0.80f + 0.20f * sinf(t * 3.0f);
+                            dlpg->AddRectFilledMultiColor(bmin, bmax,
+                                IM_COL32(130, 90, 0, 220), IM_COL32(160, 110, 0, 220),
+                                IM_COL32(150, 100, 0, 220), IM_COL32(120, 80, 0, 220));
+                            dlpg->AddRect(bmin, bmax,
+                                ImColor(1.0f, 0.82f, 0.10f, gA), 8.0f, 0, 2.0f);
+                        } else if (hov) {
+                            dlpg->AddRectFilled(bmin, bmax, IM_COL32(30, 55, 120, 200), 8.0f);
+                            dlpg->AddRect(bmin, bmax, IM_COL32(70, 120, 220, 180), 8.0f, 0, 1.2f);
+                        } else {
+                            dlpg->AddRectFilled(bmin, bmax, IM_COL32(10, 18, 42, 200), 8.0f);
+                            dlpg->AddRect(bmin, bmax, IM_COL32(35, 55, 100, 150), 8.0f, 0, 1.0f);
+                        }
+
+                        // Pocket number circle
+                        float cx = bmin.x + btnW * 0.5f;
+                        float cy = bmin.y + btnH * 0.5f - 5.0f;
+                        float cr = 10.0f;
+                        dlpg->AddCircleFilled(ImVec2(cx, cy), cr,
+                            isSel ? IM_COL32(255, 210, 30, 180) : IM_COL32(40, 70, 140, 180));
+                        char numStr[4];
+                        snprintf(numStr, sizeof(numStr), "%d", idx);
+                        ImVec2 ns = GImGui->Font->CalcTextSizeA(GImGui->FontSize * 0.82f, FLT_MAX, 0.f, numStr);
+                        dlpg->AddText(GImGui->Font, GImGui->FontSize * 0.82f,
+                            ImVec2(cx - ns.x * 0.5f, cy - ns.y * 0.5f),
+                            isSel ? IM_COL32(20, 10, 0, 255) : IM_COL32(200, 220, 255, 220),
+                            numStr);
+
+                        // Short label below circle
+                        ImVec2 lsz = GImGui->Font->CalcTextSizeA(GImGui->FontSize * 0.78f, FLT_MAX, 0.f, pktLabel[idx]);
+                        dlpg->AddText(GImGui->Font, GImGui->FontSize * 0.78f,
+                            ImVec2(bmin.x + (btnW - lsz.x) * 0.5f, bmin.y + btnH - lsz.y - 5.0f),
+                            isSel ? IM_COL32(255, 240, 160, 255) : IM_COL32(130, 150, 195, 200),
+                            pktLabel[idx]);
+
+                        if (col < 2) { SameLine(0, gap); }
+                    }
+                    if (row < 1) Dummy(ImVec2(0, gap));
+                }
+
+                Dummy(ImVec2(0, 6));
+
+                // Status strip
+                if (selPktLock >= 0) {
+                    float sW = cardW;
+                    ImVec2 sPos = GetCursorScreenPos();
+                    float sH = 36.0f;
+                    dlpg->AddRectFilled(sPos, ImVec2(sPos.x + sW, sPos.y + sH),
+                        IM_COL32(60, 40, 0, 210), 8.0f);
+                    dlpg->AddRect(sPos, ImVec2(sPos.x + sW, sPos.y + sH),
+                        IM_COL32(220, 175, 20, 180), 8.0f, 0, 1.2f);
+
+                    // Lock icon (small diamond)
+                    float lx = sPos.x + 14.0f;
+                    float ly = sPos.y + sH * 0.5f;
+                    dlpg->AddCircleFilled(ImVec2(lx, ly), 4.5f, IM_COL32(255, 205, 20, 230));
+
+                    SetCursorPosY(GetCursorPosY() + (sH - GImGui->FontSize) * 0.5f);
+                    SetCursorPosX(GetCursorPosX() + 24.0f);
+                    char lockBuf[48];
+                    snprintf(lockBuf, sizeof(lockBuf), "Locked  [%d] %s", selPktLock, pktFull[selPktLock]);
+                    SetWindowFontScale(0.90f);
+                    TextColored(ImVec4(1.0f, 0.88f, 0.20f, 1.0f), "%s", lockBuf);
+                    SetWindowFontScale(1.0f);
+                    Dummy(ImVec2(0, sH - (GImGui->FontSize + (sH - GImGui->FontSize) * 0.5f)));
+
+                    Dummy(ImVec2(0, 4));
+                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.40f, 0.10f, 0.05f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.60f, 0.15f, 0.08f, 1.0f));
+                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.30f, 0.08f, 0.04f, 1.0f));
+                    if (Button(O("Reset (Auto)"), ImVec2(cardW, 34.0f)))
+                        PocketSelector::Reset();
+                    PopStyleColor(3);
+                    PopStyleVar();
+                } else {
+                    SetWindowFontScale(0.85f);
+                    TextColored(ImVec4(0.40f, 0.48f, 0.65f, 0.85f),
+                        O("  Tap a pocket above, then press Aim"));
+                    SetWindowFontScale(1.0f);
+                }
+                Dummy(ImVec2(0, 8));
+            }
 
             // ── Pocket Info (read-only, selalu otomatis) ──────────────────
             if (g_aimMode == AimMode::EIGHTBALL_PREDICT || g_aimMode == AimMode::EIGHTBALL_8LOCK) {
@@ -1185,9 +1375,8 @@ INLINE void DrawMenu(ImGuiIO& io) {
         {
             static bool s_stateRestored = false;
             if (!s_stateRestored) {
-                AutoAim::bActive       = persistent_bool[O("bAutoAim")];
-                BreakSpecial::bEnabled = persistent_bool[O("bBreakSpecial")];
-                s_stateRestored = true;
+                AutoAim::bActive = persistent_bool[O("bAutoAim")];
+                s_stateRestored  = true;
             }
         }
 
@@ -1203,7 +1392,6 @@ INLINE void DrawMenu(ImGuiIO& io) {
         buttonClicker.Update();
         AutoAim::Update();
         PocketSelector::Update();
-        BreakSpecial::UpdateNudge();  // proses tap pocket dari input thread
 
         g_espStateReady = false;
         g_espIsInGame   = false;    // reset tiap frame — DrawESP akan set true jika memang in-game
@@ -1333,6 +1521,9 @@ static void DrawToggleButton() {
                         break;
                     case AimMode::EIGHTBALL_8LOCK:
                         AimLock8Ball::Aim();
+                        break;
+                    case AimMode::EIGHTBALL_POCKET_LOCK:
+                        AimLockTarget::Aim();
                         break;
                     case AimMode::NINEBALL_PREDICT:
                         Aim9Ball::Aim();
