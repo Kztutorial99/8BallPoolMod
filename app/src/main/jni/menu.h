@@ -294,6 +294,7 @@ static int g_selectedPocket8 = -1;
 #include "game/inc/AutoPlay.h"
 #include "game/inc/BreakSpecial.h"
 #include "game/inc/AimSafety.h"
+#include "game/inc/EnemySabotage.h"
 #include "game/inc/AimLockTarget.h"
 #include "game/inc/AimBreak.h"
 #include "game/inc/AimLock8Ball.h"
@@ -1228,6 +1229,109 @@ static void DrawContentArea(float winW, float winH) {
                 if (leftH > 0) Dummy(ImVec2(0, leftH));
             }
 
+            // ── Enemy Sabotage ─────────────────────────────────────────────
+            {
+                Dummy(ImVec2(0, 18));
+
+                // Section header card
+                float sabW = GetContentRegionAvail().x;
+                ImVec2 sabHdrPos = GetCursorScreenPos();
+                ImDrawList* sabDl = GetWindowDrawList();
+
+                float sabHdrH = 32.0f;
+                sabDl->AddRectFilled(sabHdrPos,
+                    ImVec2(sabHdrPos.x + sabW, sabHdrPos.y + sabHdrH),
+                    IM_COL32(55, 8, 8, 230), 10.0f, ImDrawFlags_RoundCornersTop);
+                sabDl->AddRect(sabHdrPos,
+                    ImVec2(sabHdrPos.x + sabW, sabHdrPos.y + sabHdrH),
+                    IM_COL32(220, 45, 45, 160), 10.0f, ImDrawFlags_RoundCornersTop, 1.0f);
+
+                // Animated red pulse on header
+                {
+                    float t = (float)GetTime();
+                    float alpha = 0.35f + 0.25f * sinf(t * 3.5f);
+                    sabDl->AddRect(sabHdrPos,
+                        ImVec2(sabHdrPos.x + sabW, sabHdrPos.y + sabHdrH),
+                        IM_COL32(255, 60, 60, (int)(alpha * 255)), 10.0f,
+                        ImDrawFlags_RoundCornersTop, 1.8f);
+                }
+
+                SetWindowFontScale(0.90f);
+                const char* sabTitle = O("  Enemy Sabotage");
+                ImVec2 sabTitleSz = CalcTextSize(sabTitle);
+                SetCursorPosY(GetCursorPosY() + (sabHdrH - sabTitleSz.y) * 0.5f);
+                SetCursorPosX(GetCursorPosX() + 8.0f);
+                TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%s", sabTitle);
+                SetWindowFontScale(1.0f);
+
+                // Body card
+                Dummy(ImVec2(0, 0));
+                ImVec2 sabBodyPos = GetCursorScreenPos();
+                float sabBodyH = EnemySabotage::bActive ? 160.0f : 70.0f;
+                sabDl->AddRectFilled(sabBodyPos,
+                    ImVec2(sabBodyPos.x + sabW, sabBodyPos.y + sabBodyH),
+                    IM_COL32(30, 8, 8, 220), 10.0f, ImDrawFlags_RoundCornersBottom);
+                sabDl->AddRect(sabBodyPos,
+                    ImVec2(sabBodyPos.x + sabW, sabBodyPos.y + sabBodyH),
+                    IM_COL32(140, 30, 30, 120), 10.0f, ImDrawFlags_RoundCornersBottom, 1.0f);
+
+                Dummy(ImVec2(0, 8));
+                SetCursorPosX(GetCursorPosX() + 10.0f);
+
+                // Toggle on/off
+                if (ToggleSwitch(O("Aktifkan Sabotase Musuh"), &EnemySabotage::bActive)) {}
+
+                if (EnemySabotage::bActive) {
+                    Dummy(ImVec2(0, 10));
+                    SetCursorPosX(GetCursorPosX() + 10.0f);
+                    TextColored(ImVec4(0.75f, 0.40f, 0.40f, 1.0f), O("Mode Serangan:"));
+                    Dummy(ImVec2(0, 6));
+
+                    // Mode radio buttons
+                    const char* modeLabels[4] = {
+                        O("Aim Deflect  (geser bidikan)"),
+                        O("Power Drain  (lemahkan power)"),
+                        O("Spin Chaos   (spin liar)"),
+                        O("Combo        (semua sekaligus)"),
+                    };
+                    for (int mi = 0; mi < 4; mi++) {
+                        bool isSel = (EnemySabotage::iMode == mi);
+                        PushID(mi + 900);
+                        PushStyleColor(ImGuiCol_Button,
+                            isSel ? ImVec4(0.60f, 0.08f, 0.08f, 1.0f)
+                                  : ImVec4(0.18f, 0.06f, 0.06f, 1.0f));
+                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.75f, 0.12f, 0.12f, 1.0f));
+                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.50f, 0.06f, 0.06f, 1.0f));
+                        PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                        SetCursorPosX(GetCursorPosX() + 10.0f);
+                        if (Button(modeLabels[mi], ImVec2(sabW - 20.0f, 30.0f)))
+                            EnemySabotage::iMode = mi;
+                        PopStyleVar();
+                        PopStyleColor(3);
+                        PopID();
+                        Dummy(ImVec2(0, 3));
+                    }
+
+                    // Aim offset slider (only relevant for modes 0 and 3)
+                    if (EnemySabotage::iMode == 0 || EnemySabotage::iMode == 3) {
+                        Dummy(ImVec2(0, 6));
+                        SetCursorPosX(GetCursorPosX() + 10.0f);
+                        TextColored(ImVec4(0.65f, 0.35f, 0.35f, 1.0f), O("Deflect offset (rad)"));
+                        PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                        PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
+                        PushStyleColor(ImGuiCol_FrameBg,        ImVec4(0.15f, 0.05f, 0.05f, 1.0f));
+                        PushStyleColor(ImGuiCol_SliderGrab,     ImVec4(0.85f, 0.15f, 0.15f, 1.0f));
+                        PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0.25f, 0.25f, 1.0f));
+                        SetNextItemWidth(sabW - 20.0f);
+                        SliderFloat(O("##sabOffset"), &EnemySabotage::fOffset, 0.02f, 0.40f, "%.3f rad");
+                        PopStyleColor(3);
+                        PopStyleVar(2);
+                    }
+                }
+
+                Dummy(ImVec2(0, sabBodyH - (EnemySabotage::bActive ? 155.0f : 60.0f)));
+            }
+
             break;
         }
 
@@ -1456,6 +1560,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
         buttonClicker.Update();
         AutoAim::Update();
         PocketSelector::Update();
+        EnemySabotage::Update();
 
         g_espStateReady = false;
         g_espIsInGame   = false;    // reset tiap frame — DrawESP akan set true jika memang in-game
