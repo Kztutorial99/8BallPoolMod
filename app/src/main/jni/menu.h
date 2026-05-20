@@ -1117,23 +1117,28 @@ static void DrawContentArea(float contentW, float winH) {
                     TextColored(ImVec4(0.45f, 0.78f, 1.0f, 1.0f), O("Mode Serangan:"));
                     Dummy(ImVec2(0, 5));
 
-                    // 9 mode buttons (3 columns × 3 rows)
-                    struct { const char* lbl; const char* tip; } modes[9] = {
-                        { O("Aim Deflect"),  O("Geser bidikan") },
-                        { O("Pwr Drain"),    O("Power lemah")   },
-                        { O("Spin Chaos"),   O("Spin gila")     },
-                        { O("Combo"),        O("Deflect+Drain+Spin") },
-                        { O("Aim Invert"),   O("Arah terbalik") },
-                        { O("Micro Jitter"), O("Osilasi kecil") },
-                        { O("Top Lock"),     O("Topspin max")   },
-                        { O("Pwr Surge"),    O("Power max")     },
-                        { O("Chaos MAX"),    O("Semua extreme") },
+                    // 14 mode buttons (3 columns × 5 rows, last row 2 items)
+                    struct { const char* lbl; } modes[14] = {
+                        { O("Aim Deflect")  },
+                        { O("Pwr Drain")    },
+                        { O("Spin Chaos")   },
+                        { O("Combo")        },
+                        { O("Aim Invert")   },
+                        { O("Micro Jitter") },
+                        { O("Top Lock")     },
+                        { O("Pwr Surge")    },
+                        { O("Chaos MAX")    },
+                        { O("Angle Zero")   },
+                        { O("Eng Random")   },
+                        { O("Pwr Glitch")   },
+                        { O("Angle Drift")  },
+                        { O("BLACKOUT")     },
                     };
 
                     float colW = (sabW - 20.0f) / 3.0f;
-                    for (int mi = 0; mi < 9; mi++) {
-                        bool isSel = (EnemySabotage::iMode == mi);
-                        bool isRisky = (mi >= 4);    // modes 4-8 are new risky ones
+                    for (int mi = 0; mi < 14; mi++) {
+                        bool isSel   = (EnemySabotage::iMode == mi);
+                        bool isRisky = (mi >= 4);   // modes 4-13 are high risk
                         PushID(mi + 900);
 
                         ImVec4 btnCol  = isSel

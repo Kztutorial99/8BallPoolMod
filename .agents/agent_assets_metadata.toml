@@ -54,3 +54,9 @@ id = "hzoM6zwU1n9eAVt3fgjwN"
 uri = "file://app/build/outputs/apk/debug/FluxProEngine_SmoothDarkGlass.tar.gz"
 type = "unspecified"
 title = "Flux Pro Engine — Smooth Dark Glass (app-debug.apk)"
+
+[[outputs]]
+id = "oBTCa3gziNdbJxAr_sKkL"
+uri = "file://app/build/outputs/apk/debug/FluxProEngine_14Mode_Blackout.tar.gz"
+type = "unspecified"
+title = "Flux Pro Engine — 14 Mode Sabotase + Clean Build"
