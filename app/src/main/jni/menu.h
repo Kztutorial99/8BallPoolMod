@@ -57,101 +57,60 @@ static void DrawGradientRect(ImDrawList* dl, ImVec2 p1, ImVec2 p2, ImU32 col1, I
     }
 }
 
-// iconType: 0=pencil(Draw) 1=8ball 2=9ball 3=info
+// iconType: 0=eye(Visual) 1=crosshair(Aim) 2=wrench(Misc) 3=person(User)
 static void DrawTabIcon(ImDrawList* dl, ImVec2 center, float sz, int iconType, bool selected) {
     ImU32 col  = selected ? IM_COL32(255, 255, 255, 245) : IM_COL32(160, 175, 210, 200);
     ImU32 col2 = selected ? IM_COL32(160, 210, 255, 200) : IM_COL32(100, 115, 150, 150);
-    float r = sz * 0.42f;
+    float lw   = selected ? 2.0f : 1.5f;
 
     if (iconType == 0) {
-        // Pencil icon: diagonal body + nib
-        float hw = sz * 0.09f;
-        float plen = sz * 0.38f;
-        ImVec2 pA(center.x - plen * 0.55f, center.y + plen * 0.55f);
-        ImVec2 pB(center.x + plen * 0.45f, center.y - plen * 0.45f);
-        dl->AddLine(pA, pB, col, sz * 0.16f);
-        // nib tip triangle
-        ImVec2 ptip(pA.x - hw * 0.8f, pA.y + hw * 0.8f);
-        dl->AddTriangleFilled(
-            ImVec2(pA.x - hw, pA.y),
-            ImVec2(pA.x, pA.y - hw),
-            ptip, col2);
-        // eraser cap
-        float cx2 = pB.x + hw * 0.7f, cy2 = pB.y - hw * 0.7f;
-        dl->AddRectFilled(
-            ImVec2(cx2 - hw, cy2 - hw * 0.6f),
-            ImVec2(cx2 + hw, cy2 + hw * 0.6f),
-            col2, 1.5f);
+        // Eye icon — Visual
+        float ew = sz * 0.40f;
+        float eh = sz * 0.20f;
+        const int N = 24;
+        ImVec2 pts[N];
+        for (int i = 0; i < N; i++) {
+            float a = (float)i / N * 3.14159f * 2.0f;
+            pts[i] = ImVec2(center.x + cosf(a) * ew, center.y + sinf(a) * eh);
+        }
+        dl->AddPolyline(pts, N, col, ImDrawFlags_Closed, lw);
+        dl->AddCircleFilled(center, sz * 0.12f, col, 16);
+        dl->AddCircleFilled(ImVec2(center.x + sz * 0.06f, center.y - sz * 0.06f),
+                            sz * 0.04f, IM_COL32(255,255,255,180));
     } else if (iconType == 1) {
-        // 8 Ball: filled circle + "8"
-        dl->AddCircleFilled(center, r, selected ? IM_COL32(30, 30, 40, 230) : IM_COL32(20, 22, 35, 200), 32);
-        dl->AddCircle(center, r, col, 32, selected ? 2.0f : 1.5f);
-        // small white dot
-        dl->AddCircleFilled(ImVec2(center.x + r * 0.28f, center.y - r * 0.28f), r * 0.22f, IM_COL32(255,255,255,180));
-        // "8" text centered
-        const char* t = "8";
-        ImVec2 ts = GImGui->Font->CalcTextSizeA(GImGui->FontSize * 0.82f, FLT_MAX, 0, t);
-        dl->AddText(GImGui->Font, GImGui->FontSize * 0.82f,
-            ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f), col, t);
+        // Crosshair icon — Aim
+        float cr  = sz * 0.34f;
+        float gap = sz * 0.11f;
+        dl->AddCircle(center, cr * 0.55f, col, 24, lw);
+        dl->AddLine(ImVec2(center.x - cr, center.y),  ImVec2(center.x - gap, center.y), col, lw);
+        dl->AddLine(ImVec2(center.x + gap, center.y), ImVec2(center.x + cr,  center.y), col, lw);
+        dl->AddLine(ImVec2(center.x, center.y - cr),  ImVec2(center.x, center.y - gap), col, lw);
+        dl->AddLine(ImVec2(center.x, center.y + gap), ImVec2(center.x, center.y + cr),  col, lw);
+        dl->AddCircleFilled(center, sz * 0.05f, col);
     } else if (iconType == 2) {
-        // 9 Ball: circle outline + "9"
-        dl->AddCircle(center, r, col, 32, selected ? 2.2f : 1.8f);
-        dl->AddCircleFilled(center, r * 0.6f, selected ? IM_COL32(40, 60, 100, 180) : IM_COL32(25, 35, 60, 150), 24);
-        const char* t = "9";
-        ImVec2 ts = GImGui->Font->CalcTextSizeA(GImGui->FontSize * 0.82f, FLT_MAX, 0, t);
-        dl->AddText(GImGui->Font, GImGui->FontSize * 0.82f,
-            ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f), col, t);
-    } else if (iconType == 3) {
-        // Info: circle + "i"
-        dl->AddCircle(center, r, col, 32, selected ? 2.2f : 1.8f);
-        // dot above
-        dl->AddCircleFilled(ImVec2(center.x, center.y - r * 0.38f), sz * 0.07f, col);
-        // bar below
-        dl->AddRectFilled(
-            ImVec2(center.x - sz * 0.07f, center.y - r * 0.12f),
-            ImVec2(center.x + sz * 0.07f, center.y + r * 0.50f),
-            col, 2.0f);
+        // Wrench icon — Misc
+        float wl = sz * 0.35f;
+        ImVec2 pA(center.x - wl * 0.60f, center.y + wl * 0.60f);
+        ImVec2 pB(center.x + wl * 0.50f, center.y - wl * 0.50f);
+        dl->AddLine(pA, pB, col, sz * 0.16f);
+        dl->AddCircle(ImVec2(pB.x + sz * 0.06f, pB.y - sz * 0.06f),
+                      sz * 0.17f, col, 16, lw);
+        dl->AddCircleFilled(ImVec2(pA.x - sz * 0.05f, pA.y + sz * 0.05f),
+                            sz * 0.09f, col2);
     } else {
-        // Lab Flask icon — cylindrical body + narrow neck + liquid
-        ImU32 colFlask = selected ? IM_COL32(80, 255, 180, 230) : IM_COL32(80, 200, 150, 160);
-        ImU32 colLiquid = selected ? IM_COL32(60, 255, 140, 200) : IM_COL32(40, 200, 120, 130);
-        ImU32 colBubble = selected ? IM_COL32(180, 255, 220, 180) : IM_COL32(120, 220, 180, 110);
-        float bw = sz * 0.36f;  // body half-width
-        float bh = sz * 0.30f;  // body height
-        float nw = sz * 0.12f;  // neck half-width
-        float nh = sz * 0.20f;  // neck height
-        float liqH = bh * 0.45f;
-        // Body (trapezoid via AddQuadFilled)
-        ImVec2 bodyBL(center.x - bw, center.y + bh * 0.5f);
-        ImVec2 bodyBR(center.x + bw, center.y + bh * 0.5f);
-        ImVec2 bodyTL(center.x - nw, center.y - bh * 0.5f + nh * 0.1f);
-        ImVec2 bodyTR(center.x + nw, center.y - bh * 0.5f + nh * 0.1f);
-        // Liquid fill
-        dl->AddQuadFilled(
-            ImVec2(center.x - bw,        center.y + bh * 0.5f - liqH),
-            ImVec2(center.x + bw,        center.y + bh * 0.5f - liqH),
-            ImVec2(center.x + bw,        center.y + bh * 0.5f),
-            ImVec2(center.x - bw,        center.y + bh * 0.5f),
-            colLiquid);
-        // Body outline
-        dl->AddQuad(bodyTL, bodyTR, bodyBR, bodyBL, colFlask, selected ? 1.8f : 1.3f);
-        // Neck
-        dl->AddRectFilled(
-            ImVec2(center.x - nw, center.y - bh * 0.5f - nh),
-            ImVec2(center.x + nw, center.y - bh * 0.5f + nh * 0.15f),
-            IM_COL32(0,0,0,0));
-        dl->AddRect(
-            ImVec2(center.x - nw, center.y - bh * 0.5f - nh),
-            ImVec2(center.x + nw, center.y - bh * 0.5f + nh * 0.1f),
-            colFlask, 0, 0, selected ? 1.8f : 1.3f);
-        // Small rim cap
-        dl->AddRectFilled(
-            ImVec2(center.x - nw * 1.35f, center.y - bh * 0.5f - nh),
-            ImVec2(center.x + nw * 1.35f, center.y - bh * 0.5f - nh + sz * 0.06f),
-            colFlask, 1.5f);
-        // Bubbles inside liquid
-        dl->AddCircleFilled(ImVec2(center.x - sz * 0.10f, center.y + bh * 0.25f), sz * 0.04f, colBubble, 8);
-        dl->AddCircleFilled(ImVec2(center.x + sz * 0.12f, center.y + bh * 0.35f), sz * 0.03f, colBubble, 8);
+        // Person icon — User
+        // Head
+        dl->AddCircle(ImVec2(center.x, center.y - sz * 0.20f), sz * 0.14f, col, 20, lw);
+        // Shoulders arc (half-ellipse)
+        const int SN = 12;
+        ImVec2 spts[SN];
+        float sr = sz * 0.28f;
+        for (int i = 0; i < SN; i++) {
+            float a = 3.14159f + (float)i / (SN - 1) * 3.14159f;
+            spts[i] = ImVec2(center.x + cosf(a) * sr,
+                             center.y + sz * 0.16f + sinf(a) * sr * 0.45f);
+        }
+        dl->AddPolyline(spts, SN, col, ImDrawFlags_None, lw);
     }
 }
 
@@ -346,8 +305,6 @@ static int g_selectedPocket8 = -1;
 #include "game/inc/Aim9BallBreak.h"
 #include <thread>
 #include <atomic>
-
-#include "mod/ExperimentEngine.h"
 
 // Active aim mode
 enum class AimMode : int {
@@ -636,19 +593,18 @@ static void DrawSidebar(float sidebarW, float winH) {
 
     // ── 4 Vertical Tab Buttons ────────────────────────────────────────────
     float tabAvailH = winH - hdrH;
-    float tabH      = tabAvailH / 5.0f;
+    float tabH      = tabAvailH / 4.0f;
 
     // Plain string labels — O() macro TIDAK boleh dipakai untuk display text
     // karena hasilnya bisa berupa pointer ke buffer yang sama (ID collision)
     // dan karakter obfuscated menyebabkan teks tampil sebagai "???"
-    struct { const char* lbl; int icon; } tabs[5] = {
-        { "Draw",   0 },
-        { "8 Ball", 1 },
-        { "9 Ball", 2 },
-        { "Info",   3 },
-        { "Lab",    4 },
+    struct { const char* lbl; int icon; } tabs[4] = {
+        { "Visual", 0 },
+        { "Aim",    1 },
+        { "Misc",   2 },
+        { "User",   3 },
     };
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 4; i++) {
         SetCursorPos(ImVec2(0.0f, hdrH + i * tabH));
         // PushID(i) memastikan setiap tab punya ImGui ID unik
         // sehingga semua tab bisa diklik (fix: 8 Ball tab tidak bisa diklik)
@@ -870,57 +826,84 @@ static void DrawContentArea(float contentW, float winH) {
         IM_COL32(0,0,0, 0), IM_COL32(0,0,0, 0),
         IM_COL32(0,0,0,55), IM_COL32(0,0,0,55));
 
-    static const char* const tabTitles[] = { "Draw", "8 Ball", "9 Ball", "Info", "Experiment Lab" };
-    // Tab accent colors — ice blue + lab green for tab 4
+    static const char* const tabTitles[]    = { "VISUAL", "AIM", "MISC", "USER" };
+    static const char* const tabSubtitles[] = {
+        "ESP and draw settings",
+        "Aim mode selection",
+        "Ghost mode & extras",
+        "Mod info & device",
+    };
     const ImU32 tabAccents[] = {
         IM_COL32( 0, 185, 225, 215),
         IM_COL32(10, 170, 210, 215),
         IM_COL32(20, 195, 230, 215),
         IM_COL32( 0, 160, 200, 215),
-        IM_COL32(40, 230, 140, 215),
     };
 
-    const char* currentTitle = tabTitles[g_menu.currentTab];
+    const char* currentTitle    = tabTitles[g_menu.currentTab];
+    const char* currentSubtitle = tabSubtitles[g_menu.currentTab];
     ImU32 accentCol = tabAccents[g_menu.currentTab];
 
-    float titlePadT = 13.0f;
-    float titlePadB = 10.0f;
+    float titlePadT = 10.0f;
+    float titlePadB = 8.0f;
 
-    // Title with larger font
-    SetWindowFontScale(1.18f);
+    // Measure title + subtitle height
+    SetWindowFontScale(1.10f);
     ImVec2 ts = CalcTextSize(currentTitle);
+    SetWindowFontScale(0.78f);
+    ImVec2 ss = CalcTextSize(currentSubtitle);
     SetWindowFontScale(1.0f);
 
-    float titleBlockH = titlePadT + ts.y + titlePadB;
+    float titleBlockH = titlePadT + ts.y + 4.0f + ss.y + titlePadB;
 
-    // Subtle title background strip
+    // Title background strip
     dl->AddRectFilled(
         ImVec2(wp.x + startX, wp.y + startY),
         ImVec2(wp.x + startX + contentW, wp.y + startY + titleBlockH),
-        IM_COL32(6, 10, 22, 210));
+        IM_COL32(6, 10, 22, 220));
 
     // Left accent stripe
     dl->AddRectFilled(
-        ImVec2(wp.x + startX, wp.y + startY + titlePadT * 0.5f),
-        ImVec2(wp.x + startX + 3.5f, wp.y + startY + titleBlockH - titlePadT * 0.5f),
+        ImVec2(wp.x + startX, wp.y + startY + titlePadT * 0.4f),
+        ImVec2(wp.x + startX + 3.5f, wp.y + startY + titleBlockH - titlePadT * 0.4f),
         accentCol, 2.0f);
 
-    // Title text
-    SetWindowFontScale(1.18f);
-    float centeredX = startX + (contentW - ts.x) * 0.5f;
-    SetCursorPos(ImVec2(centeredX, startY + titlePadT));
+    // FPS bar — top right
+    {
+        float fps = ImGui::GetIO().Framerate;
+        char fpsBuf[48];
+        snprintf(fpsBuf, sizeof(fpsBuf), "FPS %.0f", fps);
+        SetWindowFontScale(0.72f);
+        ImVec2 fpsSz = CalcTextSize(fpsBuf);
+        dl->AddText(GImGui->Font, GImGui->FontSize * 0.72f,
+            ImVec2(wp.x + startX + contentW - fpsSz.x - 10.0f,
+                   wp.y + startY + titlePadT + (ts.y - fpsSz.y) * 0.5f),
+            IM_COL32(100, 130, 160, 180), fpsBuf);
+        SetWindowFontScale(1.0f);
+    }
+
+    // Title text (left-aligned with small pad)
+    float titleX = startX + 14.0f;
+    SetWindowFontScale(1.10f);
+    SetCursorPos(ImVec2(titleX, startY + titlePadT));
     TextColored(ImVec4(0.88f, 0.95f, 1.0f, 1.0f), "%s", currentTitle);
+    SetWindowFontScale(0.78f);
+    // Separator pipe
+    SameLine(0, 8.0f);
+    TextColored(ImVec4(0.40f, 0.55f, 0.70f, 1.0f), "|");
+    SameLine(0, 8.0f);
+    TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "%s", currentSubtitle);
     SetWindowFontScale(1.0f);
 
     // Separator line — ice blue gradient
     float lineY = startY + titleBlockH;
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x + startX,                   wp.y + lineY - 0.5f),
-        ImVec2(wp.x + startX + contentW * 0.35f, wp.y + lineY + 1.0f),
+        ImVec2(wp.x + startX,                    wp.y + lineY - 0.5f),
+        ImVec2(wp.x + startX + contentW * 0.35f,  wp.y + lineY + 1.0f),
         IM_COL32(0,0,0,0), accentCol, accentCol, IM_COL32(0,0,0,0));
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x + startX + contentW * 0.35f, wp.y + lineY - 0.5f),
-        ImVec2(wp.x + startX + contentW,          wp.y + lineY + 1.0f),
+        ImVec2(wp.x + startX + contentW * 0.35f,  wp.y + lineY - 0.5f),
+        ImVec2(wp.x + startX + contentW,           wp.y + lineY + 1.0f),
         accentCol, IM_COL32(0,0,0,0), IM_COL32(0,0,0,0), accentCol);
 
     float headerH = lineY - startY + 8.0f;
@@ -931,47 +914,78 @@ static void DrawContentArea(float contentW, float winH) {
     
     switch (g_menu.currentTab) {
         case 0: {
-            Dummy(ImVec2(0, 10));
-
-            // ── Enable Play Button (tombol aim di layar game) ─────────────────
-            if (ToggleSwitch(O("Enable Play Button"), &persistent_bool[O("bAutoAim")])) {
-                AutoAim::bActive = persistent_bool[O("bAutoAim")];
-                need_save = true;
-            }
-            Dummy(ImVec2(0, 14));
-
-            need_save |= ToggleSwitch(O("Draw Lines"), &persistent_bool[O("bESP_DrawPredictionLine")]);
-            need_save |= ToggleSwitch(O("Show Pockets"), &persistent_bool[O("bShowPockets")]);
-            need_save |= ToggleSwitch(O("Draw Pockets"), &persistent_bool[O("bESP_DrawPocketsShotState")]);
-            need_save |= ToggleSwitch(O("Enemy Line"), &persistent_bool[O("bESP_EnemyLine")]);
-
-            Dummy(ImVec2(0, 16));
-            TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Line Thickness"));
             Dummy(ImVec2(0, 8));
+
+            // ── Section header helper ────────────────────────────────────────
+            auto DrawSectionHdr0 = [&](const char* title) {
+                Dummy(ImVec2(0, 4));
+                TextColored(ImVec4(0.52f, 0.68f, 0.88f, 0.90f), "%s", title);
+                Dummy(ImVec2(0, 3));
+                ImVec2 lp = GetCursorScreenPos();
+                GetWindowDrawList()->AddLine(lp,
+                    ImVec2(lp.x + GetContentRegionAvail().x, lp.y),
+                    IM_COL32(45, 75, 120, 100), 1.0f);
+                Dummy(ImVec2(0, 7));
+            };
+
+            // ── Checkbox style helper ────────────────────────────────────────
+            auto StyledCheckbox = [&](const char* label, bool* val) -> bool {
+                PushStyleColor(ImGuiCol_FrameBg,         ImVec4(0.13f, 0.15f, 0.22f, 1.0f));
+                PushStyleColor(ImGuiCol_FrameBgHovered,  ImVec4(0.18f, 0.22f, 0.32f, 1.0f));
+                PushStyleColor(ImGuiCol_FrameBgActive,   ImVec4(0.10f, 0.38f, 0.78f, 1.0f));
+                PushStyleColor(ImGuiCol_CheckMark,       ImVec4(1.00f, 1.00f, 1.00f, 1.0f));
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+                bool changed = Checkbox(label, val);
+                PopStyleVar();
+                PopStyleColor(4);
+                Dummy(ImVec2(0, 6));
+                return changed;
+            };
+
+            // ── Draw section ─────────────────────────────────────────────────
+            DrawSectionHdr0("Draw");
+            need_save |= StyledCheckbox(O("Draw Lines"),
+                &persistent_bool[O("bESP_DrawPredictionLine")]);
+            need_save |= StyledCheckbox(O("Draw Pockets"),
+                &persistent_bool[O("bESP_DrawPocketsShotState")]);
+            need_save |= StyledCheckbox(O("Show Enemy Lines"),
+                &persistent_bool[O("bESP_EnemyLine")]);
+            {
+                bool changed = StyledCheckbox(O("Enable Play Button"),
+                    &persistent_bool[O("bAutoAim")]);
+                if (changed) {
+                    AutoAim::bActive = persistent_bool[O("bAutoAim")];
+                    need_save = true;
+                }
+            }
+            need_save |= StyledCheckbox(O("Show Pockets"),
+                &persistent_bool[O("bShowPockets")]);
+
+            // ── Settings section ─────────────────────────────────────────────
+            DrawSectionHdr0("Settings");
+
             {
                 if (persistent_int[O("iLineThickness")] < 1) persistent_int[O("iLineThickness")] = 4;
                 PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.12f, 0.45f, 0.95f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.55f, 1.0f, 1.0f));
-                SetNextItemWidth(GetContentRegionAvail().x);
+                PushStyleColor(ImGuiCol_FrameBg,          ImVec4(0.12f, 0.12f, 0.18f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrab,       ImVec4(0.12f, 0.45f, 0.95f, 1.0f));
+                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.55f, 1.00f, 1.0f));
+                float avail = GetContentRegionAvail().x;
+                // Label right-aligned
+                const char* lbl1 = "Line Thickness";
+                ImVec2 lsz1 = CalcTextSize(lbl1);
+                TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "%s", lbl1);
+                SameLine(avail - lsz1.x + 4.0f);
+                SetNextItemWidth(avail * 0.52f);
                 need_save |= SliderInt(O("##lineThick"), &persistent_int[O("iLineThickness")], 1, 10, "%d");
-                PopStyleColor(3);
-                PopStyleVar(2);
-            }
-
-            Dummy(ImVec2(0, 16));
-            TextColored(ImVec4(0.75f, 0.75f, 0.8f, 1.0f), O("Fix Menu Size"));
-            Dummy(ImVec2(0, 8));
-            {
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.12f, 0.12f, 0.15f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.12f, 0.45f, 0.95f, 1.0f));
-                PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.20f, 0.55f, 1.0f, 1.0f));
-                SetNextItemWidth(GetContentRegionAvail().x);
+                Dummy(ImVec2(0, 6));
                 int& menuSz = persistent_int[O("iMenuSizeOffset")];
+                const char* lbl2 = "Fix Menu Size";
+                TextColored(ImVec4(0.55f, 0.65f, 0.80f, 1.0f), "%s", lbl2);
+                ImVec2 lsz2 = CalcTextSize(lbl2);
+                SameLine(avail - lsz2.x + 4.0f);
+                SetNextItemWidth(avail * 0.52f);
                 bool changed = SliderInt(O("##menuSize"), &menuSz, -10, 10,
                     menuSz == 0 ? O("Normal") : "%d");
                 need_save |= changed;
@@ -979,13 +993,13 @@ static void DrawContentArea(float contentW, float winH) {
                 PopStyleVar(2);
             }
 
-            Dummy(ImVec2(0, 20));
+            Dummy(ImVec2(0, 18));
             {
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
+                PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                 PushStyleColor(ImGuiCol_Button,        ImVec4(0.10f, 0.38f, 0.85f, 1.0f));
                 PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.15f, 0.48f, 1.00f, 1.0f));
                 PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.08f, 0.30f, 0.70f, 1.0f));
-                if (Button(O("Save Config"), ImVec2(GetContentRegionAvail().x, 55.0f))) {
+                if (Button(O("Save Config"), ImVec2(GetContentRegionAvail().x, 48.0f))) {
                     svConfig_Save();
                 }
                 PopStyleColor(3);
@@ -1372,468 +1386,9 @@ static void DrawContentArea(float contentW, float winH) {
             break;
         }
 
-        case 4: {
-            // ════════════════════════════════════════════════════════════
-            // ⚗  EXPERIMENT LAB v3 — Password Protected, Crash-Safe
-            // ════════════════════════════════════════════════════════════
-            Experiment::Tick();
-
-            static bool s_labUnlocked = false;
-            static char s_passInput[32] = {};
-            static bool s_passWrong = false;
-            static float s_wrongTimer = 0.0f;
-            static const char* LAB_PASS = "8ball";
-
-            float labW = GetContentRegionAvail().x;
-            ImDrawList* labDl = GetWindowDrawList();
-            float tt = (float)GetTime();
-            float fz = GImGui->FontSize;
-
-            // ════ PASSWORD GATE ═══════════════════════════════════════════
-            if (!s_labUnlocked) {
-                Dummy(ImVec2(0, 20));
-
-                // Lock icon (drawn)
-                {
-                    ImVec2 cp = GetCursorScreenPos();
-                    float cx = cp.x + labW * 0.5f;
-                    float cy = cp.y;
-                    // shackle arc
-                    labDl->AddCircle(ImVec2(cx, cy + 10), 14.0f,
-                        IM_COL32(180,180,60,220), 16, 2.5f);
-                    // body
-                    labDl->AddRectFilled(ImVec2(cx - 14, cy + 18),
-                        ImVec2(cx + 14, cy + 40),
-                        IM_COL32(200,180,30,230), 3.0f);
-                    // keyhole
-                    labDl->AddCircleFilled(ImVec2(cx, cy + 27),
-                        4.5f, IM_COL32(30,25,5,255));
-                    labDl->AddRectFilled(ImVec2(cx - 2, cy + 29),
-                        ImVec2(cx + 2, cy + 36),
-                        IM_COL32(30,25,5,255));
-                    Dummy(ImVec2(0, 50));
-                }
-
-                // Title
-                SetWindowFontScale(0.90f);
-                float tw = CalcTextSize("EXPERIMENT LAB").x;
-                SetCursorPosX((labW - tw) * 0.5f);
-                TextColored(ImVec4(0.9f,0.85f,0.2f,0.95f), "EXPERIMENT LAB");
-                SetWindowFontScale(0.72f);
-                float tw2 = CalcTextSize("Enter password to unlock").x;
-                SetCursorPosX((labW - tw2) * 0.5f);
-                TextColored(ImVec4(0.6f,0.6f,0.6f,0.8f), "Enter password to unlock");
-                SetWindowFontScale(1.0f);
-                Dummy(ImVec2(0, 12));
-
-                // Password input
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
-                PushStyleColor(ImGuiCol_FrameBg,        ImVec4(0.10f,0.10f,0.08f,1.f));
-                PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.15f,0.15f,0.10f,1.f));
-                PushStyleColor(ImGuiCol_FrameBgActive,  ImVec4(0.18f,0.18f,0.12f,1.f));
-                SetNextItemWidth(labW);
-                if (InputText("##pass", s_passInput, sizeof(s_passInput),
-                              ImGuiInputTextFlags_Password |
-                              ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    if (strcmp(s_passInput, LAB_PASS) == 0) {
-                        s_labUnlocked = true; s_passWrong = false;
-                        memset(s_passInput, 0, sizeof(s_passInput));
-                    } else {
-                        s_passWrong = true; s_wrongTimer = (float)GetTime();
-                        memset(s_passInput, 0, sizeof(s_passInput));
-                    }
-                }
-                PopStyleColor(3); PopStyleVar(2);
-                Dummy(ImVec2(0, 8));
-
-                // Unlock button
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.28f,0.22f,0.04f,1.f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.42f,0.34f,0.06f,1.f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.20f,0.15f,0.03f,1.f));
-                float bw = labW * 0.55f;
-                SetCursorPosX((labW - bw) * 0.5f);
-                if (Button("  Unlock  ", ImVec2(bw, 32.0f))) {
-                    if (strcmp(s_passInput, LAB_PASS) == 0) {
-                        s_labUnlocked = true; s_passWrong = false;
-                        memset(s_passInput, 0, sizeof(s_passInput));
-                    } else {
-                        s_passWrong = true; s_wrongTimer = (float)GetTime();
-                        memset(s_passInput, 0, sizeof(s_passInput));
-                    }
-                }
-                PopStyleColor(3); PopStyleVar();
-
-                // Wrong password feedback
-                if (s_passWrong && (tt - s_wrongTimer) < 3.0f) {
-                    float alpha = 1.0f - (tt - s_wrongTimer) / 3.0f;
-                    Dummy(ImVec2(0, 6));
-                    float ew = CalcTextSize("Wrong password").x;
-                    SetCursorPosX((labW - ew) * 0.5f);
-                    TextColored(ImVec4(1.0f, 0.25f, 0.25f, alpha), "Wrong password");
-                } else if (s_passWrong && (tt - s_wrongTimer) >= 3.0f) {
-                    s_passWrong = false;
-                }
-
-                break;
-            }
-
-            // ════ UNLOCKED — EXPERIMENT UI ════════════════════════════════
-
-            // ── Mini header ──────────────────────────────────────────────
-            {
-                Dummy(ImVec2(0, 4));
-                ImVec2 hp = GetCursorScreenPos();
-                float hH = 24.0f;
-                float pa = 0.25f + 0.20f * sinf(tt * 3.0f);
-                labDl->AddRectFilled(hp, ImVec2(hp.x + labW, hp.y + hH),
-                    IM_COL32(4, 22, 14, 230), 6.0f);
-                labDl->AddRect(hp, ImVec2(hp.x + labW, hp.y + hH),
-                    IM_COL32(40, 200, 120, (int)(pa * 255)), 6.0f, 0, 1.2f);
-                SetWindowFontScale(0.75f);
-                SetCursorPosY(GetCursorPosY() + (hH - fz * 0.75f) * 0.5f);
-                SetCursorPosX(GetCursorPosX() + 8.0f);
-                TextColored(ImVec4(0.25f,1.f,0.6f,0.9f), "⚗ EXPERIMENT LAB  —  HIGH RISK");
-                SameLine();
-                // Lock button (re-lock)
-                float lbw = CalcTextSize("lock").x + 16.f;
-                SetCursorPosX(hp.x + labW - lbw - 4.f);
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.25f,0.05f,0.05f,1.f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.45f,0.08f,0.08f,1.f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.18f,0.03f,0.03f,1.f));
-                if (SmallButton("lock")) { s_labUnlocked = false; Experiment::ResetAll(); }
-                PopStyleColor(3); PopStyleVar();
-                SetWindowFontScale(1.0f);
-                Dummy(ImVec2(0, 4));
-            }
-
-            // ── Compact helper: toggle row ────────────────────────────────
-            // Returns true when toggled
-            auto ToggleRow = [&](const char* id, const char* label,
-                                  bool& flag, ImVec4 onCol) -> bool {
-                bool clicked = false;
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-                float btnW = 46.0f;
-                float textX = GetCursorPosX();
-                // Label
-                SetCursorPosY(GetCursorPosY() + 3.0f);
-                SetWindowFontScale(0.78f);
-                TextColored(ImVec4(0.75f,0.75f,0.75f,0.9f), "%s", label);
-                SetWindowFontScale(1.0f);
-                // Toggle button right-aligned
-                SameLine(labW - btnW - 2.0f);
-                SetCursorPosY(GetCursorPosY() - 3.0f);
-                PushStyleColor(ImGuiCol_Button,
-                    flag ? onCol : ImVec4(0.12f,0.12f,0.12f,1.f));
-                PushStyleColor(ImGuiCol_ButtonHovered,
-                    flag ? ImVec4(onCol.x*1.2f,onCol.y*1.2f,onCol.z*1.2f,1.f)
-                         : ImVec4(0.20f,0.20f,0.20f,1.f));
-                PushStyleColor(ImGuiCol_ButtonActive,
-                    ImVec4(onCol.x*0.7f,onCol.y*0.7f,onCol.z*0.7f,1.f));
-                char btnId[64]; snprintf(btnId, sizeof(btnId), "%s##tgl", id);
-                SetWindowFontScale(0.72f);
-                if (Button(flag ? "ON " : "OFF", ImVec2(btnW, 22.0f))) {
-                    flag = !flag; clicked = true;
-                }
-                SetWindowFontScale(1.0f);
-                PopStyleColor(3); PopStyleVar();
-                return clicked;
-            };
-
-            // Compact readout badge (inline, 1 line)
-            auto InlineBadge = [&](const char* val, ImVec4 col) {
-                SetWindowFontScale(0.68f);
-                TextColored(col, "  %s", val);
-                SetWindowFontScale(1.0f);
-            };
-
-            // Compact slider
-            auto CSlider = [&](const char* id, float& val,
-                                float mn, float mx, const char* fmt) {
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
-                PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 3));
-                PushStyleColor(ImGuiCol_FrameBg,     ImVec4(0.10f,0.10f,0.10f,1.f));
-                PushStyleColor(ImGuiCol_SliderGrab,  ImVec4(0.50f,0.50f,0.50f,1.f));
-                SetNextItemWidth(labW);
-                SliderFloat(id, &val, mn, mx, fmt);
-                PopStyleColor(2); PopStyleVar(2);
-            };
-
-            // One-shot button
-            auto FireBtn = [&](const char* label, ImVec4 col) -> bool {
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-                PushStyleColor(ImGuiCol_Button,        col);
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(col.x*1.3f,col.y*1.3f,col.z*1.3f,1.f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(col.x*0.7f,col.y*0.7f,col.z*0.7f,1.f));
-                SetWindowFontScale(0.78f);
-                bool r = Button(label, ImVec2(labW, 26.0f));
-                SetWindowFontScale(1.0f);
-                PopStyleColor(3); PopStyleVar();
-                return r;
-            };
-
-            // Section divider
-            auto Div = [&](const char* title) {
-                Dummy(ImVec2(0, 5));
-                float avail = GetContentRegionAvail().x;
-                ImVec2 p = GetCursorScreenPos();
-                float ly = p.y + fz * 0.40f;
-                labDl->AddLine(ImVec2(p.x, ly), ImVec2(p.x + avail, ly),
-                    IM_COL32(60, 60, 60, 120), 1.0f);
-                SetWindowFontScale(0.68f);
-                TextColored(ImVec4(0.45f,0.45f,0.45f,0.8f), " %s", title);
-                SetWindowFontScale(1.0f);
-            };
-
-            // ══════════════════════════════════════════════════════════════
-            // GROUP A: Shot & Aim Exploits
-            // ══════════════════════════════════════════════════════════════
-            Div("── SHOT & AIM");
-
-            // [1] mAimOffset
-            ToggleRow("E01", "[1] mAimOffset Inject",
-                Experiment::bAimOffsetActive, ImVec4(0.3f,0.7f,1.f,1.f));
-            if (Experiment::bAimOffsetActive) {
-                CSlider("##aoX", Experiment::fAimOffsetX, -5.f, 5.f, "X: %.2f");
-                CSlider("##aoY", Experiment::fAimOffsetY, -5.f, 5.f, "Y: %.2f");
-            }
-            {
-                char b[48]; snprintf(b, sizeof(b), "off=(%.2f,%.2f)",
-                    Experiment::rdAimOffX, Experiment::rdAimOffY);
-                InlineBadge(b, ImVec4(0.4f,0.7f,1.f,0.8f));
-            }
-
-            // [2] CUE_MAX_POWER
-            ToggleRow("E02", "[2] CUE_MAX_POWER Override",
-                Experiment::bMaxPowerActive, ImVec4(1.f,0.5f,0.1f,1.f));
-            if (Experiment::bMaxPowerActive)
-                CSlider("##mp", Experiment::fMaxPowerMul, 1.f, 5.f, "x%.2f");
-            {
-                char b[40]; snprintf(b, sizeof(b), "now=%.3f", Experiment::rdMaxPowerNow);
-                InlineBadge(b, ImVec4(1.f,0.5f,0.2f,0.8f));
-            }
-
-            // [3] CUE_SPIN
-            ToggleRow("E03", "[3] CUE_SPIN Override",
-                Experiment::bMaxSpinActive, ImVec4(0.6f,1.f,0.3f,1.f));
-            if (Experiment::bMaxSpinActive)
-                CSlider("##ms", Experiment::fMaxSpinMul, 1.f, 5.f, "x%.2f");
-
-            // [9] Shot Power Force Max
-            ToggleRow("E09", "[9] Shot Power FORCE MAX",
-                Experiment::bShotPowerMax, ImVec4(1.f,0.35f,0.05f,1.f));
-            {
-                char b[40]; snprintf(b, sizeof(b), "mPower=%.4f", Experiment::rdPowerNow);
-                InlineBadge(b, ImVec4(1.f,0.5f,0.2f,0.8f));
-            }
-
-            // [10] Aim Angle Override
-            ToggleRow("E10", "[10] Aim Angle LOCK",
-                Experiment::bAimAngleOverride, ImVec4(0.4f,0.7f,1.f,1.f));
-            if (Experiment::bAimAngleOverride)
-                CSlider("##ang", Experiment::fAimAngleDeg, 0.f, 360.f, "%.1f deg");
-            {
-                char b[48]; snprintf(b, sizeof(b), "angle=%.3f rad", Experiment::rdCurrentAngle);
-                InlineBadge(b, ImVec4(0.4f,0.7f,1.f,0.8f));
-            }
-
-            // ══════════════════════════════════════════════════════════════
-            // GROUP B: Ball Physics
-            // ══════════════════════════════════════════════════════════════
-            Div("── BALL PHYSICS");
-
-            // [11] Enemy Ball Sink (ONE-SHOT)
-            Dummy(ImVec2(0, 2));
-            if (FireBtn("[11] ENEMY BALL SINK  (one-shot)", ImVec4(0.45f,0.04f,0.14f,1.f)))
-                Experiment::DoEnemySink();
-            InlineBadge(Experiment::szSinkResult, ImVec4(1.f,0.3f,0.4f,0.85f));
-
-            // [12] Zero Friction
-            ToggleRow("E12", "[12] Zero Friction  (balls slide forever)",
-                Experiment::bZeroFriction, ImVec4(0.1f,0.9f,0.8f,1.f));
-
-            // [13] Cue Ball Ghost
-            ToggleRow("E13", "[13] Cue Ball Ghost  (tiny radius)",
-                Experiment::bCueBallGhost, ImVec4(0.8f,0.8f,1.f,1.f));
-            if (Experiment::bCueBallGhost)
-                CSlider("##gr", Experiment::fGhostRadius, 0.05f, 1.f, "r=%.2fx");
-            {
-                char b[48]; snprintf(b, sizeof(b), "radius=%.3f", Experiment::rdCueBallRadius);
-                InlineBadge(b, ImVec4(0.8f,0.8f,1.f,0.8f));
-            }
-
-            // [14] Cue Ball Warp (ONE-SHOT)
-            Dummy(ImVec2(0, 2));
-            {
-                CSlider("##wx", Experiment::fWarpX, -127.f, 127.f, "WarpX=%.1f");
-                CSlider("##wy", Experiment::fWarpY, -63.5f, 63.5f, "WarpY=%.1f");
-                if (FireBtn("[14] WARP CUE BALL  (one-shot)", ImVec4(0.35f,0.25f,0.f,1.f)))
-                    Experiment::DoCueBallWarp();
-            }
-
-            // [15] Velocity Burst (ONE-SHOT)
-            Dummy(ImVec2(0, 2));
-            CSlider("##bs", Experiment::fBurstStrength, 10.f, 200.f, "speed=%.0f");
-            if (FireBtn("[15] VELOCITY BURST  (scatter enemy balls)", ImVec4(0.45f,0.10f,0.f,1.f)))
-                Experiment::DoVelocityBurst();
-
-            // ══════════════════════════════════════════════════════════════
-            // GROUP C: Game State
-            // ══════════════════════════════════════════════════════════════
-            Div("── GAME STATE");
-
-            // [4] VIP Hook
-            ToggleRow("E04", "[4] VIP / isPayingUser Hook",
-                Experiment::bVIPActive, ImVec4(1.f,0.8f,0.1f,1.f));
-
-            // [5] Pocket Nomination Bypass
-            ToggleRow("E05", "[5] Pocket Nomination Bypass",
-                Experiment::bNomBypass, ImVec4(0.6f,0.9f,0.3f,1.f));
-
-            // [6] Golden Shot Mode
-            ToggleRow("E06", "[6] Golden Shot Mode  (GM+0x5C0=16)",
-                Experiment::bGoldenShot, ImVec4(1.f,0.85f,0.f,1.f));
-
-            // [16] Ruleset Nomination Override
-            ToggleRow("E16", "[16] Ruleset NomMode=0  (no call required)",
-                Experiment::bRuleNomZero, ImVec4(0.75f,0.4f,1.f,1.f));
-
-            // ══════════════════════════════════════════════════════════════
-            // GROUP D: Account / Memory
-            // ══════════════════════════════════════════════════════════════
-            Div("── ACCOUNT & MEMORY");
-
-            // [17] Coins Write (ONE-SHOT)
-            Dummy(ImVec2(0, 2));
-            CSlider("##cv", Experiment::fCoinsValue, 100000.f, 999999999.f, "%.0f coins");
-            if (FireBtn("[17] WRITE COINS  (one-shot)", ImVec4(0.35f,0.28f,0.f,1.f)))
-                Experiment::DoCoinsWrite();
-            InlineBadge(Experiment::szCoinsResult, ImVec4(1.f,0.85f,0.2f,0.85f));
-
-            // [20] CCDirector Scan (READ-ONLY)
-            ToggleRow("E20", "[20] CCDirector Scan  (read-only)",
-                Experiment::bDirScan, ImVec4(0.3f,0.9f,0.4f,1.f));
-            if (Experiment::bDirScan) {
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
-                PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4,3));
-                PushStyleColor(ImGuiCol_FrameBg,     ImVec4(0.08f,0.08f,0.08f,1.f));
-                PushStyleColor(ImGuiCol_SliderGrab,  ImVec4(0.3f,0.8f,0.4f,1.f));
-                SetNextItemWidth(labW);
-                SliderInt("##doff", &Experiment::iDirScanOffset, 0, 0x500, "offset +%03X");
-                PopStyleColor(2); PopStyleVar(2);
-                SetWindowFontScale(0.65f);
-                TextColored(ImVec4(0.3f,0.8f,0.4f,0.85f), "%s", Experiment::szDirScan);
-                SetWindowFontScale(1.0f);
-            }
-
-            // ══════════════════════════════════════════════════════════════
-            // GROUP E: Network Probes
-            // ══════════════════════════════════════════════════════════════
-            Div("── NETWORK PROBES");
-
-            // [7] Packet Logger
-            {
-                bool logOn = Experiment::bPacketLogActive;
-                if (ToggleRow("E07", "[7] Packet Logger  (libc hook)",
-                    logOn, ImVec4(0.3f,0.9f,0.5f,1.f)))
-                    Experiment::SetPacketLog(logOn);
-                if (Experiment::bPacketLogActive) {
-                    char b[80];
-                    snprintf(b, sizeof(b), "TX:%d(%zuB)  RX:%d(%zuB)",
-                        Experiment::iSendCount.load(), Experiment::lastSendLen,
-                        Experiment::iRecvCount.load(), Experiment::lastRecvLen);
-                    InlineBadge(b, ImVec4(0.3f,0.9f,0.5f,0.85f));
-                    SetWindowFontScale(0.62f);
-                    TextColored(ImVec4(0.4f,0.8f,0.5f,0.8f),
-                        "TX: %s", Experiment::szLastSend);
-                    TextColored(ImVec4(0.3f,0.7f,0.9f,0.8f),
-                        "RX: %s", Experiment::szLastRecv);
-                    SetWindowFontScale(1.0f);
-                }
-            }
-
-            // [8] grant-reward API Probe
-            Dummy(ImVec2(0, 2));
-            {
-                static char s_uid[48] = "12345678";
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-                PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6,4));
-                PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.09f,0.12f,0.09f,1.f));
-                SetNextItemWidth(labW);
-                InputText("##uid", s_uid, sizeof(s_uid));
-                PopStyleColor(); PopStyleVar(2);
-                bool apiRun = Experiment::bAPITestRunning.load();
-                if (!apiRun) {
-                    if (FireBtn("[8] PROBE grant-reward API", ImVec4(0.05f,0.30f,0.10f,1.f)))
-                        Experiment::RunAPITest(s_uid);
-                } else {
-                    float sa = 0.5f + 0.5f * sinf(tt * 7.f);
-                    PushStyleColor(ImGuiCol_Text, ImVec4(0.3f,1.f,0.5f,sa));
-                    SetWindowFontScale(0.78f);
-                    Button("Probing API...", ImVec2(labW, 26.0f));
-                    SetWindowFontScale(1.0f);
-                    PopStyleColor();
-                }
-                InlineBadge(Experiment::szAPIResult, ImVec4(0.3f,1.f,0.5f,0.85f));
-            }
-
-            // [18] BACON WebSocket Probe
-            Dummy(ImVec2(0, 2));
-            {
-                bool br = Experiment::bBACONRunning.load();
-                if (!br) {
-                    if (FireBtn("[18] PROBE BACON Server  (WebSocket)", ImVec4(0.04f,0.28f,0.10f,1.f)))
-                        Experiment::RunBACONProbe();
-                } else {
-                    float sa = 0.5f + 0.5f * sinf(tt * 7.f);
-                    PushStyleColor(ImGuiCol_Text, ImVec4(0.4f,1.f,0.5f,sa));
-                    SetWindowFontScale(0.78f);
-                    Button("Probing BACON...", ImVec2(labW, 26.0f));
-                    SetWindowFontScale(1.0f);
-                    PopStyleColor();
-                }
-                InlineBadge(Experiment::szBACONResult, ImVec4(0.3f,1.f,0.5f,0.85f));
-            }
-
-            // [19] S3 Config Probe
-            Dummy(ImVec2(0, 2));
-            {
-                bool sr = Experiment::bS3Running.load();
-                if (!sr) {
-                    if (FireBtn("[19] PROBE S3 Config Bucket", ImVec4(0.30f,0.15f,0.02f,1.f)))
-                        Experiment::RunS3Probe();
-                } else {
-                    float sa = 0.5f + 0.5f * sinf(tt * 7.f);
-                    PushStyleColor(ImGuiCol_Text, ImVec4(1.f,0.6f,0.2f,sa));
-                    SetWindowFontScale(0.78f);
-                    Button("Probing S3...", ImVec2(labW, 26.0f));
-                    SetWindowFontScale(1.0f);
-                    PopStyleColor();
-                }
-                InlineBadge(Experiment::szS3Result, ImVec4(1.f,0.65f,0.2f,0.85f));
-            }
-
-            // ══════════════════════════════════════════════════════════════
-            // RESET ALL
-            // ══════════════════════════════════════════════════════════════
-            Dummy(ImVec2(0, 10));
-            {
-                PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                PushStyleColor(ImGuiCol_Button,        ImVec4(0.35f,0.05f,0.05f,1.f));
-                PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.55f,0.08f,0.08f,1.f));
-                PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.22f,0.03f,0.03f,1.f));
-                SetWindowFontScale(0.80f);
-                if (Button("Reset All Experiments", ImVec2(labW, 30.0f)))
-                    Experiment::ResetAll();
-                SetWindowFontScale(1.0f);
-                PopStyleColor(3); PopStyleVar();
-            }
-            Dummy(ImVec2(0, 8));
-
+        case 4:
+        default:
             break;
-        }
 
     }
     
