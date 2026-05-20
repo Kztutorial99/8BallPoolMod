@@ -297,6 +297,7 @@ static int g_selectedPocket8 = -1;
 #include "game/inc/BreakSpecial.h"
 #include "game/inc/AimSafety.h"
 #include "game/inc/EnemySabotage.h"
+#include "game/inc/GhostMode.h"
 #include "game/inc/AimLockTarget.h"
 #include "game/inc/AimBreak.h"
 #include "game/inc/AimLock8Ball.h"
@@ -966,192 +967,245 @@ static void DrawContentArea(float contentW, float winH) {
             ModeSwitch8(O("Aim Predict"),     AimMode::EIGHTBALL_PREDICT);
             ModeSwitch8(O("Aim Lock 8"),      AimMode::EIGHTBALL_8LOCK);
 
-            // ── Enemy Sabotage ─────────────────────────────────────────────
+            // ══════════════════════════════════════════════════════════════
+            // INJECT GHOST MODE — Unified Speed Exploit System
+            // ══════════════════════════════════════════════════════════════
             {
                 Dummy(ImVec2(0, 16));
 
-                float sabW = GetContentRegionAvail().x;
-                ImDrawList* sabDl = GetWindowDrawList();
+                float gmW  = GetContentRegionAvail().x;
+                ImDrawList* gmDl = GetWindowDrawList();
 
-                // ── Header card ───────────────────────────────────────────
-                float sabHdrH = 32.0f;
-                ImVec2 sabHdrPos = GetCursorScreenPos();
-                sabDl->AddRectFilled(sabHdrPos,
-                    ImVec2(sabHdrPos.x + sabW, sabHdrPos.y + sabHdrH),
-                    IM_COL32(6, 12, 28, 235), 10.0f, ImDrawFlags_RoundCornersTop);
-                sabDl->AddRect(sabHdrPos,
-                    ImVec2(sabHdrPos.x + sabW, sabHdrPos.y + sabHdrH),
-                    IM_COL32(0, 165, 210, 140), 10.0f, ImDrawFlags_RoundCornersTop, 1.0f);
-                // Animated ice pulse
+                // ── Animated ghost header ─────────────────────────────────
+                float gmHdrH = 38.0f;
+                ImVec2 gmHdrPos = GetCursorScreenPos();
+                float tt = (float)GetTime();
+
+                // Header BG — deep purple/ghost gradient
+                gmDl->AddRectFilledMultiColor(
+                    gmHdrPos, ImVec2(gmHdrPos.x + gmW, gmHdrPos.y + gmHdrH),
+                    IM_COL32(20,  4, 38, 245), IM_COL32(32,  6, 55, 245),
+                    IM_COL32(28,  5, 48, 245), IM_COL32(18,  3, 32, 245));
+                // Animated purple pulse border
                 {
-                    float t = (float)GetTime();
-                    float alpha = 0.30f + 0.22f * sinf(t * 3.2f);
-                    sabDl->AddRect(sabHdrPos,
-                        ImVec2(sabHdrPos.x + sabW, sabHdrPos.y + sabHdrH),
-                        IM_COL32(0, 200, 255, (int)(alpha * 255)), 10.0f,
-                        ImDrawFlags_RoundCornersTop, 1.6f);
+                    float pa  = 0.35f + 0.28f * sinf(tt * 4.0f);
+                    float pa2 = 0.20f + 0.15f * sinf(tt * 2.5f + 1.0f);
+                    gmDl->AddRect(gmHdrPos,
+                        ImVec2(gmHdrPos.x + gmW, gmHdrPos.y + gmHdrH),
+                        IM_COL32(160, 40, 255, (int)(pa * 255)),
+                        10.0f, ImDrawFlags_RoundCornersTop, 1.8f);
+                    gmDl->AddRect(
+                        ImVec2(gmHdrPos.x - 2, gmHdrPos.y - 2),
+                        ImVec2(gmHdrPos.x + gmW + 2, gmHdrPos.y + gmHdrH + 2),
+                        IM_COL32(200, 80, 255, (int)(pa2 * 255)),
+                        12.0f, ImDrawFlags_RoundCornersTop, 3.0f);
                 }
-                SetWindowFontScale(0.88f);
-                const char* sabTitle = "  Enemy Sabotage";
-                ImVec2 sabTitleSz = CalcTextSize(sabTitle);
-                SetCursorPosY(GetCursorPosY() + (sabHdrH - sabTitleSz.y) * 0.5f);
-                SetCursorPosX(GetCursorPosX() + 8.0f);
-                TextColored(ImVec4(0.35f, 0.82f, 1.0f, 1.0f), "%s", sabTitle);
+                // Ghost icon "G" + title
+                SetWindowFontScale(0.95f);
+                const char* gmTitle = "  ☠  INJECT GHOST MODE";
+                ImVec2 gmTitleSz = CalcTextSize(gmTitle);
+                SetCursorPosY(GetCursorPosY() + (gmHdrH - gmTitleSz.y) * 0.5f);
+                SetCursorPosX(GetCursorPosX() + 10.0f);
+                // Glow text effect
+                ImVec2 gmTitleScreenPos = GetCursorScreenPos();
+                float glowAlpha = 0.18f + 0.14f * sinf(tt * 3.8f);
+                gmDl->AddText(
+                    ImVec2(gmTitleScreenPos.x + 1, gmTitleScreenPos.y + 1),
+                    IM_COL32(200, 80, 255, (int)(glowAlpha * 255 * 3)), gmTitle);
+                TextColored(ImVec4(0.88f, 0.42f, 1.0f, 1.0f), "%s", gmTitle);
                 SetWindowFontScale(1.0f);
 
-                // ── Body card — dynamic height, NO fixed cutoff ───────────
+                // ── Body card ─────────────────────────────────────────────
                 Dummy(ImVec2(0, 2));
-                ImVec2 sabBodyStart = GetCursorScreenPos();
+                ImVec2 gmBodyStart = GetCursorScreenPos();
+                gmDl->ChannelsSplit(2);
+                gmDl->ChannelsSetCurrent(1);
 
-                // Draw body BG at end (after we know height). Use channel split.
-                sabDl->ChannelsSplit(2);
-                sabDl->ChannelsSetCurrent(1);
+                Dummy(ImVec2(0, 10));
 
-                Dummy(ImVec2(0, 8));
+                // ── Toggle Ghost Mode ─────────────────────────────────────
                 SetCursorPosX(GetCursorPosX() + 10.0f);
-                if (ToggleSwitch("Aktifkan Sabotase Musuh", &EnemySabotage::bActive)) {}
+                {
+                    bool wasActive = GhostMode::bActive;
+                    if (ToggleSwitch("Inject Ghost Mode (ALL sabotage)", &GhostMode::bActive)) {
+                        GhostMode::SetActive(GhostMode::bActive);
+                    }
+                    // Jika state berubah lewat toggle internal
+                    if (GhostMode::bActive != wasActive) {
+                        GhostMode::SetActive(GhostMode::bActive);
+                    }
+                }
 
-                if (EnemySabotage::bActive) {
-                    Dummy(ImVec2(0, 8));
+                if (GhostMode::bActive) {
+                    // ── Status badge aktif ────────────────────────────────
+                    Dummy(ImVec2(0, 6));
                     SetCursorPosX(GetCursorPosX() + 10.0f);
-                    TextColored(ImVec4(0.45f, 0.78f, 1.0f, 1.0f), "Mode Serangan:");
-                    Dummy(ImVec2(0, 5));
-
-                    // ── 19 Mode buttons — 2 kolom agar label tidak terpotong ──
-                    // Mode 0-13: standar | Mode 14-18: ULTRA RISK
-                    struct { const char* lbl; bool ultraRisk; } modes[19] = {
-                        { "Aim Deflect",  false },   //  0
-                        { "Pwr Drain",    false },   //  1
-                        { "Spin Chaos",   false },   //  2
-                        { "Combo",        false },   //  3
-                        { "Aim Invert",   true  },   //  4
-                        { "Micro Jitter", true  },   //  5
-                        { "Top Lock",     true  },   //  6
-                        { "Pwr Surge",    true  },   //  7
-                        { "Chaos MAX",    true  },   //  8
-                        { "Angle Zero",   true  },   //  9
-                        { "Eng Random",   true  },   // 10
-                        { "Pwr Glitch",   true  },   // 11
-                        { "Angle Drift",  true  },   // 12
-                        { "BLACKOUT",     true  },   // 13
-                        // ── ULTRA RISK ──────────────────────────
-                        { "No Shoot",     true  },   // 14
-                        { "Ctrl Turn",    true  },   // 15
-                        { "Force Foul",   true  },   // 16
-                        { "Scratch+",     true  },   // 17
-                        { "GODMODE",      true  },   // 18
-                    };
-
-                    // 2 kolom: lebih lebar → label tidak terpotong
-                    float colW = (sabW - 24.0f) / 2.0f;
-
-                    for (int mi = 0; mi < 19; mi++) {
-                        bool isSel      = (EnemySabotage::iMode == mi);
-                        bool isUltra    = (mi >= 14);
-                        bool isRisky    = (mi >= 4);
-                        PushID(mi + 900);
-
-                        ImVec4 btnCol, btnHov, btnAct;
-                        if (isSel) {
-                            // Aktif: biru cerah
-                            btnCol = ImVec4(0.04f, 0.42f, 0.58f, 1.0f);
-                            btnHov = ImVec4(0.06f, 0.52f, 0.72f, 1.0f);
-                            btnAct = ImVec4(0.03f, 0.32f, 0.48f, 1.0f);
-                        } else if (isUltra) {
-                            // Ultra risk: merah gelap
-                            btnCol = ImVec4(0.28f, 0.06f, 0.06f, 1.0f);
-                            btnHov = ImVec4(0.42f, 0.08f, 0.08f, 1.0f);
-                            btnAct = ImVec4(0.20f, 0.04f, 0.04f, 1.0f);
-                        } else if (isRisky) {
-                            // High risk: biru-gelap
-                            btnCol = ImVec4(0.10f, 0.14f, 0.26f, 1.0f);
-                            btnHov = ImVec4(0.14f, 0.22f, 0.38f, 1.0f);
-                            btnAct = ImVec4(0.07f, 0.10f, 0.20f, 1.0f);
-                        } else {
-                            // Normal: abu gelap
-                            btnCol = ImVec4(0.07f, 0.11f, 0.20f, 1.0f);
-                            btnHov = ImVec4(0.12f, 0.20f, 0.32f, 1.0f);
-                            btnAct = ImVec4(0.05f, 0.08f, 0.16f, 1.0f);
-                        }
-
-                        PushStyleColor(ImGuiCol_Button,        btnCol);
-                        PushStyleColor(ImGuiCol_ButtonHovered, btnHov);
-                        PushStyleColor(ImGuiCol_ButtonActive,  btnAct);
-                        PushStyleVar(ImGuiStyleVar_FrameRounding, 7.0f);
-
-                        // Kolom kiri: indent 10px, kolom kanan: SameLine
-                        if (mi % 2 == 0) SetCursorPosX(GetCursorPosX() + 10.0f);
-                        if (Button(modes[mi].lbl, ImVec2(colW - 4.0f, 32.0f)))
-                            EnemySabotage::iMode = mi;
-
-                        PopStyleVar();
-                        PopStyleColor(3);
-                        PopID();
-
-                        if (mi % 2 == 0) { SameLine(0, 4.0f); }
-                        else             { Dummy(ImVec2(0, 4.0f)); }
+                    {
+                        float bPulse = 0.70f + 0.30f * sinf(tt * 6.0f);
+                        ImVec2 badgePos = GetCursorScreenPos();
+                        float bW = gmW - 20.0f;
+                        gmDl->AddRectFilled(badgePos,
+                            ImVec2(badgePos.x + bW, badgePos.y + 22.0f),
+                            IM_COL32(60, 10, 100, (int)(bPulse * 200)), 6.0f);
+                        gmDl->AddRect(badgePos,
+                            ImVec2(badgePos.x + bW, badgePos.y + 22.0f),
+                            IM_COL32(200, 80, 255, (int)(bPulse * 230)), 6.0f, 0, 1.2f);
+                        const char* statusTxt = "  ◆ GHOST AKTIF — SEMUA INJECT BERJALAN";
+                        ImVec2 stSz = CalcTextSize(statusTxt);
+                        gmDl->AddText(
+                            ImVec2(badgePos.x + (bW - stSz.x) * 0.5f, badgePos.y + (22.0f - stSz.y) * 0.5f),
+                            IM_COL32(230, 150, 255, 255), statusTxt);
+                        Dummy(ImVec2(0, 28));
                     }
 
-                    // ── Badge untuk mode yang dipilih ─────────────────────────
+                    // ── Speed Exploit ─────────────────────────────────────
                     Dummy(ImVec2(0, 4));
                     SetCursorPosX(GetCursorPosX() + 10.0f);
-                    if (EnemySabotage::iMode >= 14) {
-                        TextColored(ImVec4(1.0f, 0.20f, 0.20f, 1.0f),
-                            "!!! ULTRA RISK — Sangat berbahaya!");
-                    } else if (EnemySabotage::iMode >= 4) {
-                        TextColored(ImVec4(1.0f, 0.55f, 0.15f, 1.0f),
-                            "!  Mode berisiko tinggi");
+                    TextColored(ImVec4(0.78f, 0.38f, 1.0f, 1.0f), "Speed Exploit:");
+
+                    Dummy(ImVec2(0, 4));
+
+                    // Speed category badges (Min / Normal / High / Extreme / ULTRA MAX)
+                    {
+                        struct { const char* lbl; float val; ImVec4 col; } speeds[] = {
+                            { "MIN",       1.0f,  ImVec4(0.40f, 0.40f, 0.55f, 1.0f) },
+                            { "NORMAL",   10.0f,  ImVec4(0.20f, 0.60f, 0.90f, 1.0f) },
+                            { "HIGH",     35.0f,  ImVec4(0.90f, 0.60f, 0.10f, 1.0f) },
+                            { "EXTREME",  70.0f,  ImVec4(0.95f, 0.25f, 0.25f, 1.0f) },
+                            { "ULTRA MAX",100.0f, ImVec4(0.88f, 0.20f, 1.00f, 1.0f) },
+                        };
+                        float btnW = (gmW - 20.0f - 4.0f * 4.0f) / 5.0f;
+                        SetCursorPosX(GetCursorPosX() + 10.0f);
+                        for (int si = 0; si < 5; si++) {
+                            bool isCurSpeed = (GhostMode::fSpeed >= speeds[si].val - 0.5f &&
+                                (si == 4 || GhostMode::fSpeed < speeds[si+1 < 5 ? si+1 : 4].val - 0.5f));
+                            ImVec4 bc = isCurSpeed
+                                ? ImVec4(speeds[si].col.x * 0.6f + 0.05f,
+                                         speeds[si].col.y * 0.5f + 0.05f,
+                                         speeds[si].col.z * 0.6f + 0.10f, 1.0f)
+                                : ImVec4(0.08f, 0.06f, 0.14f, 1.0f);
+                            ImVec4 bh = ImVec4(bc.x + 0.08f, bc.y + 0.06f, bc.z + 0.10f, 1.0f);
+                            PushID(si + 2000);
+                            PushStyleColor(ImGuiCol_Button,        bc);
+                            PushStyleColor(ImGuiCol_ButtonHovered, bh);
+                            PushStyleColor(ImGuiCol_ButtonActive,  bc);
+                            PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+                            if (isCurSpeed) {
+                                // Glowing border for selected
+                                ImVec2 btnPos = GetCursorScreenPos();
+                                gmDl->AddRect(btnPos,
+                                    ImVec2(btnPos.x + btnW, btnPos.y + 28.0f),
+                                    ImColor(speeds[si].col), 6.0f, 0, 1.5f);
+                            }
+                            if (Button(speeds[si].lbl, ImVec2(btnW, 28.0f)))
+                                GhostMode::fSpeed = speeds[si].val;
+                            PopStyleVar();
+                            PopStyleColor(3);
+                            PopID();
+                            if (si < 4) SameLine(0, 4.0f);
+                        }
                     }
 
-                    // ── Ctrl Turn: pilih pocket target ────────────────────────
-                    if (EnemySabotage::iMode == 15) {
-                        Dummy(ImVec2(0, 6));
-                        SetCursorPosX(GetCursorPosX() + 10.0f);
-                        TextColored(ImVec4(0.38f, 0.72f, 0.92f, 1.0f), "Arahkan ke pocket:");
+                    // ── Speed fine-tune slider ────────────────────────────
+                    Dummy(ImVec2(0, 8));
+                    SetCursorPosX(GetCursorPosX() + 10.0f);
+                    TextColored(ImVec4(0.62f, 0.62f, 0.72f, 1.0f), "Fine Tune:");
+                    Dummy(ImVec2(0, 4));
+                    {
+                        // Warna slider berubah sesuai kecepatan (biru→merah→ungu)
+                        float spd = GhostMode::fSpeed;
+                        float r   = ImClamp(spd / 100.0f, 0.0f, 1.0f);
+                        ImVec4 grabCol  = ImVec4(0.12f + r * 0.76f, 0.55f - r * 0.35f, 1.0f - r * 0.5f, 1.0f);
+                        ImVec4 grabActv = ImVec4(grabCol.x + 0.1f, grabCol.y + 0.08f, grabCol.z + 0.05f, 1.0f);
+
+                        PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+                        PushStyleVar(ImGuiStyleVar_GrabRounding,  10.0f);
+                        PushStyleColor(ImGuiCol_FrameBg,          ImVec4(0.08f, 0.04f, 0.14f, 1.0f));
+                        PushStyleColor(ImGuiCol_SliderGrab,       grabCol);
+                        PushStyleColor(ImGuiCol_SliderGrabActive, grabActv);
+                        SetNextItemWidth(gmW - 20.0f);
+                        SliderFloat("##ghostSpeed", &GhostMode::fSpeed, 1.0f, 100.0f, "%.1f");
+                        PopStyleColor(3);
+                        PopStyleVar(2);
+                    }
+
+                    // ── Speed info label ──────────────────────────────────
+                    Dummy(ImVec2(0, 6));
+                    SetCursorPosX(GetCursorPosX() + 10.0f);
+                    {
+                        const char* spLbl = GhostMode::GetSpeedLabel(GhostMode::fSpeed);
+                        bool isUltra = (GhostMode::fSpeed >= 85.0f);
+                        bool isHigh  = (GhostMode::fSpeed >= 50.0f);
+                        ImVec4 spColor = isUltra
+                            ? ImVec4(0.90f, 0.20f, 1.00f, 1.0f)
+                            : isHigh
+                                ? ImVec4(1.00f, 0.28f, 0.28f, 1.0f)
+                                : ImVec4(0.55f, 0.80f, 1.00f, 1.0f);
+                        if (isUltra) {
+                            // Flashing warning untuk ultra max
+                            float flashA = 0.75f + 0.25f * sinf(tt * 8.0f);
+                            spColor.w = flashA;
+                        }
+                        TextColored(spColor, "%s", spLbl);
+                    }
+
+                    // ── Ctrl Turn pocket selector ─────────────────────────
+                    Dummy(ImVec2(0, 10));
+                    SetCursorPosX(GetCursorPosX() + 10.0f);
+                    TextColored(ImVec4(0.62f, 0.38f, 0.88f, 1.0f), "Arahkan aim musuh ke pocket:");
+                    Dummy(ImVec2(0, 4));
+                    {
                         const char* pocketNames[] = {
                             "0 - Top Left", "1 - Top Center", "2 - Top Right",
                             "3 - Bot Right", "4 - Bot Center", "5 - Bot Left"
                         };
                         PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                        PushStyleColor(ImGuiCol_FrameBg,   ImVec4(0.06f, 0.10f, 0.20f, 1.0f));
-                        PushStyleColor(ImGuiCol_Header,    ImVec4(0.04f, 0.42f, 0.58f, 1.0f));
-                        SetNextItemWidth(sabW - 20.0f);
-                        Combo("##ctrlPocket", &EnemySabotage::iCtrlPocket, pocketNames, 6);
-                        PopStyleColor(2);
+                        PushStyleColor(ImGuiCol_FrameBg,        ImVec4(0.10f, 0.04f, 0.18f, 1.0f));
+                        PushStyleColor(ImGuiCol_Header,         ImVec4(0.35f, 0.08f, 0.60f, 1.0f));
+                        PushStyleColor(ImGuiCol_HeaderHovered,  ImVec4(0.45f, 0.12f, 0.75f, 1.0f));
+                        SetNextItemWidth(gmW - 20.0f);
+                        Combo("##ghostCtrlPocket", &GhostMode::iCtrlPocket, pocketNames, 6);
+                        PopStyleColor(3);
                         PopStyleVar();
                     }
 
-                    // ── Deflect offset slider (modes 0, 3, 4, 5, 8) ──────────
-                    if (EnemySabotage::iMode == 0 || EnemySabotage::iMode == 3 ||
-                        EnemySabotage::iMode == 4 || EnemySabotage::iMode == 5 ||
-                        EnemySabotage::iMode == 8) {
+                    // ── WARNING badge ─────────────────────────────────────
+                    if (GhostMode::fSpeed >= 85.0f) {
+                        Dummy(ImVec2(0, 8));
+                        SetCursorPosX(GetCursorPosX() + 10.0f);
+                        float wPulse = 0.60f + 0.40f * sinf(tt * 9.0f);
+                        TextColored(
+                            ImVec4(1.0f, 0.12f, 0.12f, wPulse),
+                            "!!! ULTRA MAX — Musuh tidak bisa gerak !!!");
+                    } else if (GhostMode::fSpeed >= 35.0f) {
                         Dummy(ImVec2(0, 6));
                         SetCursorPosX(GetCursorPosX() + 10.0f);
-                        TextColored(ImVec4(0.38f, 0.72f, 0.92f, 1.0f), "Deflect offset (rad)");
-                        PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                        PushStyleVar(ImGuiStyleVar_GrabRounding,  10.0f);
-                        PushStyleColor(ImGuiCol_FrameBg,          ImVec4(0.06f, 0.10f, 0.20f, 1.0f));
-                        PushStyleColor(ImGuiCol_SliderGrab,       ImVec4(0.05f, 0.55f, 0.78f, 1.0f));
-                        PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.08f, 0.70f, 0.95f, 1.0f));
-                        SetNextItemWidth(sabW - 20.0f);
-                        SliderFloat("##sabOffset", &EnemySabotage::fOffset, 0.02f, 0.40f, "%.3f rad");
-                        PopStyleColor(3);
-                        PopStyleVar(2);
+                        TextColored(ImVec4(1.0f, 0.55f, 0.10f, 1.0f),
+                            "!  Kecepatan Tinggi — efek kuat");
                     }
+                } else {
+                    // Inactive hint
+                    Dummy(ImVec2(0, 8));
+                    SetCursorPosX(GetCursorPosX() + 10.0f);
+                    TextColored(ImVec4(0.38f, 0.34f, 0.46f, 1.0f),
+                        "Aktifkan untuk inject semua sabotase\nke musuh secara bersamaan.");
+                    Dummy(ImVec2(0, 4));
                 }
 
-                Dummy(ImVec2(0, 10));
+                Dummy(ImVec2(0, 12));
 
-                // Measure actual content height and draw bg retroactively
-                float sabBodyActualH = GetCursorScreenPos().y - sabBodyStart.y;
-                sabDl->ChannelsSetCurrent(0);
-                sabDl->AddRectFilled(sabBodyStart,
-                    ImVec2(sabBodyStart.x + sabW, sabBodyStart.y + sabBodyActualH),
-                    IM_COL32(7, 12, 24, 222), 10.0f, ImDrawFlags_RoundCornersBottom);
-                sabDl->AddRect(sabBodyStart,
-                    ImVec2(sabBodyStart.x + sabW, sabBodyStart.y + sabBodyActualH),
-                    IM_COL32(0, 120, 165, 100), 10.0f, ImDrawFlags_RoundCornersBottom, 1.0f);
-                sabDl->ChannelsMerge();
+                // Draw body BG retroactively
+                float gmBodyActualH = GetCursorScreenPos().y - gmBodyStart.y;
+                gmDl->ChannelsSetCurrent(0);
+                gmDl->AddRectFilledMultiColor(
+                    gmBodyStart,
+                    ImVec2(gmBodyStart.x + gmW, gmBodyStart.y + gmBodyActualH),
+                    IM_COL32(14,  5, 26, 228), IM_COL32(18,  6, 32, 228),
+                    IM_COL32(12,  4, 22, 228), IM_COL32(16,  5, 28, 228));
+                gmDl->AddRect(gmBodyStart,
+                    ImVec2(gmBodyStart.x + gmW, gmBodyStart.y + gmBodyActualH),
+                    IM_COL32(120, 30, 200, 110), 10.0f, ImDrawFlags_RoundCornersBottom, 1.0f);
+                gmDl->ChannelsMerge();
             }
 
             break;
@@ -1296,7 +1350,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
         buttonClicker.Update();
         AutoAim::Update();
         PocketSelector::Update();
-        EnemySabotage::Update();
+        GhostMode::Update();
 
         g_espStateReady = false;
         g_espIsInGame   = false;    // reset tiap frame — DrawESP akan set true jika memang in-game

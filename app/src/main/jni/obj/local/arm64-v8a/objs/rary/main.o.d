@@ -187,6 +187,7 @@
   /home/runner/workspace/app/src/main/jni/game/inc/BreakSpecial.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimSafety.h \
   /home/runner/workspace/app/src/main/jni/game/inc/EnemySabotage.h \
+  /home/runner/workspace/app/src/main/jni/game/inc/GhostMode.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimLockTarget.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimBreak.h \
   /home/runner/workspace/app/src/main/jni/game/inc/AimLock8Ball.h \
@@ -568,6 +569,8 @@
 /home/runner/workspace/app/src/main/jni/game/inc/AimSafety.h:
 
 /home/runner/workspace/app/src/main/jni/game/inc/EnemySabotage.h:
+
+/home/runner/workspace/app/src/main/jni/game/inc/GhostMode.h:
 
 /home/runner/workspace/app/src/main/jni/game/inc/AimLockTarget.h:
 
