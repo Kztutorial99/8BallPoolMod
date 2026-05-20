@@ -21,12 +21,23 @@ DEFINES(int32_t, setActiveVisualCue, ptr arg1) {
     return _setActiveVisualCue(arg1);
 }
 
+// ── VIP Hooks — return true only when Experiment::bVIPActive is set ───────────
+DEFINES(bool, isVIPFeatureActive) {
+    if (Experiment::bVIPActive) return true;
+    return _isVIPFeatureActive();
+}
+
+DEFINES(bool, isPayingUser) {
+    if (Experiment::bVIPActive) return true;
+    return _isPayingUser();
+}
+
 void __HOOKS__() {
     LOGI("__HOOKS__");
 
     HOOK(libmain + O(0x2d911e0), setActiveVisualCue); // to get sharedGameManager
-    // HOOK(libmain + 0x368b390, STRUE); // isVIPFeatureActive
-    // HOOK(libmain + 0x358fdc4, STRUE); // isPayingUser
+    HOOK(libmain + O(0x368b390), isVIPFeatureActive); // VIP flag — controlled by Experiment::bVIPActive
+    HOOK(libmain + O(0x358fdc4), isPayingUser);       // Paying user — controlled by Experiment::bVIPActive
    // HOOK(libmain + O(0x3068c94), StartMatch);
 
     // HOOK(libmain + 0x390cd80, convertToGL);
