@@ -577,9 +577,9 @@ static void DrawSidebar(float sidebarW, float winH) {
         IM_COL32(0,120,170, 0), IM_COL32(0,185,225,120),
         IM_COL32(0,185,225,120), IM_COL32(0,120,170, 0));
 
-    // "FLUX" brand text
-    const char* brandA = O("FLUX");
-    const char* brandB = O("PRO");
+    // "FLUX" brand text — plain strings (no obfuscation, these are visible UI labels)
+    const char* brandA = "FLUX";
+    const char* brandB = "PRO";
     SetWindowFontScale(1.20f);
     ImVec2 szA = CalcTextSize(brandA);
     SetCursorPos(ImVec2((sidebarW - szA.x) * 0.5f, 9.0f));
@@ -594,17 +594,24 @@ static void DrawSidebar(float sidebarW, float winH) {
     float tabAvailH = winH - hdrH;
     float tabH      = tabAvailH / 4.0f;
 
+    // Plain string labels — O() macro TIDAK boleh dipakai untuk display text
+    // karena hasilnya bisa berupa pointer ke buffer yang sama (ID collision)
+    // dan karakter obfuscated menyebabkan teks tampil sebagai "???"
     struct { const char* lbl; int icon; } tabs[4] = {
-        { O("Draw"),   0 },
-        { O("8 Ball"), 1 },
-        { O("9 Ball"), 2 },
-        { O("Info"),   3 },
+        { "Draw",   0 },
+        { "8 Ball", 1 },
+        { "9 Ball", 2 },
+        { "Info",   3 },
     };
     for (int i = 0; i < 4; i++) {
         SetCursorPos(ImVec2(0.0f, hdrH + i * tabH));
+        // PushID(i) memastikan setiap tab punya ImGui ID unik
+        // sehingga semua tab bisa diklik (fix: 8 Ball tab tidak bisa diklik)
+        PushID(i);
         if (VerticalTabButton(tabs[i].lbl, tabs[i].icon,
                               g_menu.currentTab == i, sidebarW, tabH))
             g_menu.currentTab = i;
+        PopID();
     }
 
     EndChild();
