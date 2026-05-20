@@ -966,113 +966,6 @@ static void DrawContentArea(float contentW, float winH) {
             ModeSwitch8(O("Aim Predict"),     AimMode::EIGHTBALL_PREDICT);
             ModeSwitch8(O("Aim Lock 8"),      AimMode::EIGHTBALL_8LOCK);
 
-            // ── Pocket Info (read-only, selalu otomatis) ──────────────────
-            if (g_aimMode == AimMode::EIGHTBALL_PREDICT || g_aimMode == AimMode::EIGHTBALL_8LOCK) {
-                Dummy(ImVec2(0, 14));
-
-                float cardW = GetContentRegionAvail().x;
-                ImVec2 cPos = GetCursorScreenPos();
-                ImDrawList* dlp = GetWindowDrawList();
-
-                // Tentukan pocket terakhir yang dipilih engine
-                int lastPkt = -1;
-                if (g_aimMode == AimMode::EIGHTBALL_PREDICT)
-                    lastPkt = AimLockTarget::lastTargetPocket;
-                else
-                    lastPkt = AimLock8Ball::lastTargetPocket;
-
-                bool hasResult = (AutoAim::bAimed.load() && lastPkt >= 0);
-
-                // Background pill
-                float cardH = 48.0f;
-                dlp->AddRectFilled(cPos, ImVec2(cPos.x + cardW, cPos.y + cardH),
-                    IM_COL32(14, 22, 40, 200), 10.0f);
-
-                // Label kiri — "Pocket"
-                SetCursorPosY(GetCursorPosY() + 12.0f);
-                SetCursorPosX(GetCursorPosX() + 14.0f);
-                TextColored(ImVec4(0.45f, 0.50f, 0.65f, 1.0f), "Pocket");
-
-                SameLine();
-
-                // Nilai pocket di kanan
-                if (hasResult) {
-                    char pBuf[16];
-                    snprintf(pBuf, sizeof(pBuf), "P%d", lastPkt);
-                    // Pill hijau kecil di belakang angka
-                    ImVec2 vp = GetCursorScreenPos();
-                    ImVec2 ts = CalcTextSize(pBuf);
-                    float pad = 8.0f;
-                    float t   = (float)GetTime();
-                    float gA  = 0.55f + 0.30f * sinf(t * 3.0f);
-                    dlp->AddRectFilled(
-                        ImVec2(vp.x - pad, vp.y - 3),
-                        ImVec2(vp.x + ts.x + pad, vp.y + ts.y + 3),
-                        IM_COL32(8, 50, 25, 200), 6.0f);
-                    dlp->AddRect(
-                        ImVec2(vp.x - pad, vp.y - 3),
-                        ImVec2(vp.x + ts.x + pad, vp.y + ts.y + 3),
-                        ImColor(0.05f, 0.90f, 0.42f, gA), 6.0f, 0, 1.2f);
-                    TextColored(ImVec4(0.10f, 0.95f, 0.50f, 1.0f), "%s", pBuf);
-                    SameLine(0, 12.0f);
-                    // Label: user-selected vs auto
-                    int selPkt = PocketSelector::Get();
-                    if (selPkt >= 0) {
-                        TextColored(ImVec4(1.0f, 0.85f, 0.15f, 0.95f), "(locked)");
-                    } else {
-                        TextColored(ImVec4(0.35f, 0.40f, 0.50f, 0.80f), "(auto)");
-                    }
-                } else if (g_autoPlayCalculating.load() || g_aimThreadRunning.load()) {
-                    TextColored(ImVec4(1.0f, 0.75f, 0.0f, 0.90f), "scanning...");
-                } else {
-                    TextColored(ImVec4(0.35f, 0.40f, 0.55f, 0.70f), "-- (press aim)");
-                }
-
-                Dummy(ImVec2(0, cardH - 24.0f));
-            }
-
-            // Pocket Selector info + reset button
-            {
-                int selPkt = PocketSelector::Get();
-                Dummy(ImVec2(0, 10));
-
-                float infoW = GetContentRegionAvail().x;
-                ImVec2 infoPos = GetCursorScreenPos();
-                ImDrawList* dlp2 = GetWindowDrawList();
-
-                // Background card
-                float infoH = selPkt >= 0 ? 70.0f : 72.0f;
-                dlp2->AddRectFilled(infoPos, ImVec2(infoPos.x + infoW, infoPos.y + infoH),
-                    IM_COL32(12, 18, 32, 210), 10.0f);
-                dlp2->AddRect(infoPos, ImVec2(infoPos.x + infoW, infoPos.y + infoH),
-                    selPkt >= 0 ? IM_COL32(230, 180, 20, 180) : IM_COL32(50, 60, 90, 160),
-                    10.0f, 0, 1.2f);
-
-                SetCursorPosY(GetCursorPosY() + 8.0f);
-                SetCursorPosX(GetCursorPosX() + 12.0f);
-
-                if (selPkt >= 0) {
-                    TextColored(ImVec4(1.0f, 0.85f, 0.15f, 1.0f), "Pocket Terpilih:");
-                    SameLine();
-                    const char* pNames[6] = {"Top-Left","Top-Center","Top-Right","Bot-Right","Bot-Center","Bot-Left"};
-                    TextColored(ImVec4(0.15f, 1.0f, 0.55f, 1.0f), " [%d] %s", selPkt, pNames[selPkt]);
-
-                    SetCursorPosX(GetCursorPosX() + 12.0f);
-                    PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                    PushStyleColor(ImGuiCol_Button,        ImVec4(0.50f, 0.15f, 0.08f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.20f, 0.10f, 1.0f));
-                    PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.40f, 0.10f, 0.05f, 1.0f));
-                    if (Button(O("Reset Auto"), ImVec2(infoW - 24.0f, 26.0f)))
-                        PocketSelector::Reset();
-                    PopStyleColor(3);
-                    PopStyleVar();
-                }
-                // Tinggi card menyesuaikan konten
-                float usedH = selPkt >= 0 ? 46.0f : 46.0f;
-                float leftH = infoH - usedH;
-                if (leftH > 0) Dummy(ImVec2(0, leftH));
-            }
-
             // ── Enemy Sabotage ─────────────────────────────────────────────
             {
                 Dummy(ImVec2(0, 16));
@@ -1099,7 +992,7 @@ static void DrawContentArea(float contentW, float winH) {
                         ImDrawFlags_RoundCornersTop, 1.6f);
                 }
                 SetWindowFontScale(0.88f);
-                const char* sabTitle = O("  Enemy Sabotage");
+                const char* sabTitle = "  Enemy Sabotage";
                 ImVec2 sabTitleSz = CalcTextSize(sabTitle);
                 SetCursorPosY(GetCursorPosY() + (sabHdrH - sabTitleSz.y) * 0.5f);
                 SetCursorPosX(GetCursorPosX() + 8.0f);
@@ -1116,87 +1009,132 @@ static void DrawContentArea(float contentW, float winH) {
 
                 Dummy(ImVec2(0, 8));
                 SetCursorPosX(GetCursorPosX() + 10.0f);
-                if (ToggleSwitch(O("Aktifkan Sabotase Musuh"), &EnemySabotage::bActive)) {}
+                if (ToggleSwitch("Aktifkan Sabotase Musuh", &EnemySabotage::bActive)) {}
 
                 if (EnemySabotage::bActive) {
                     Dummy(ImVec2(0, 8));
                     SetCursorPosX(GetCursorPosX() + 10.0f);
-                    TextColored(ImVec4(0.45f, 0.78f, 1.0f, 1.0f), O("Mode Serangan:"));
+                    TextColored(ImVec4(0.45f, 0.78f, 1.0f, 1.0f), "Mode Serangan:");
                     Dummy(ImVec2(0, 5));
 
-                    // 14 mode buttons (3 columns × 5 rows, last row 2 items)
-                    struct { const char* lbl; } modes[14] = {
-                        { O("Aim Deflect")  },
-                        { O("Pwr Drain")    },
-                        { O("Spin Chaos")   },
-                        { O("Combo")        },
-                        { O("Aim Invert")   },
-                        { O("Micro Jitter") },
-                        { O("Top Lock")     },
-                        { O("Pwr Surge")    },
-                        { O("Chaos MAX")    },
-                        { O("Angle Zero")   },
-                        { O("Eng Random")   },
-                        { O("Pwr Glitch")   },
-                        { O("Angle Drift")  },
-                        { O("BLACKOUT")     },
+                    // ── 19 Mode buttons — 2 kolom agar label tidak terpotong ──
+                    // Mode 0-13: standar | Mode 14-18: ULTRA RISK
+                    struct { const char* lbl; bool ultraRisk; } modes[19] = {
+                        { "Aim Deflect",  false },   //  0
+                        { "Pwr Drain",    false },   //  1
+                        { "Spin Chaos",   false },   //  2
+                        { "Combo",        false },   //  3
+                        { "Aim Invert",   true  },   //  4
+                        { "Micro Jitter", true  },   //  5
+                        { "Top Lock",     true  },   //  6
+                        { "Pwr Surge",    true  },   //  7
+                        { "Chaos MAX",    true  },   //  8
+                        { "Angle Zero",   true  },   //  9
+                        { "Eng Random",   true  },   // 10
+                        { "Pwr Glitch",   true  },   // 11
+                        { "Angle Drift",  true  },   // 12
+                        { "BLACKOUT",     true  },   // 13
+                        // ── ULTRA RISK ──────────────────────────
+                        { "No Shoot",     true  },   // 14
+                        { "Ctrl Turn",    true  },   // 15
+                        { "Force Foul",   true  },   // 16
+                        { "Scratch+",     true  },   // 17
+                        { "GODMODE",      true  },   // 18
                     };
 
-                    float colW = (sabW - 20.0f) / 3.0f;
-                    for (int mi = 0; mi < 14; mi++) {
-                        bool isSel   = (EnemySabotage::iMode == mi);
-                        bool isRisky = (mi >= 4);   // modes 4-13 are high risk
+                    // 2 kolom: lebih lebar → label tidak terpotong
+                    float colW = (sabW - 24.0f) / 2.0f;
+
+                    for (int mi = 0; mi < 19; mi++) {
+                        bool isSel      = (EnemySabotage::iMode == mi);
+                        bool isUltra    = (mi >= 14);
+                        bool isRisky    = (mi >= 4);
                         PushID(mi + 900);
 
-                        ImVec4 btnCol  = isSel
-                            ? ImVec4(0.04f, 0.42f, 0.58f, 1.0f)
-                            : (isRisky
-                                ? ImVec4(0.10f, 0.14f, 0.25f, 1.0f)
-                                : ImVec4(0.07f, 0.11f, 0.20f, 1.0f));
-                        ImVec4 btnHov  = isSel
-                            ? ImVec4(0.06f, 0.52f, 0.72f, 1.0f)
-                            : ImVec4(0.12f, 0.24f, 0.38f, 1.0f);
-                        ImVec4 btnAct  = ImVec4(0.03f, 0.32f, 0.48f, 1.0f);
+                        ImVec4 btnCol, btnHov, btnAct;
+                        if (isSel) {
+                            // Aktif: biru cerah
+                            btnCol = ImVec4(0.04f, 0.42f, 0.58f, 1.0f);
+                            btnHov = ImVec4(0.06f, 0.52f, 0.72f, 1.0f);
+                            btnAct = ImVec4(0.03f, 0.32f, 0.48f, 1.0f);
+                        } else if (isUltra) {
+                            // Ultra risk: merah gelap
+                            btnCol = ImVec4(0.28f, 0.06f, 0.06f, 1.0f);
+                            btnHov = ImVec4(0.42f, 0.08f, 0.08f, 1.0f);
+                            btnAct = ImVec4(0.20f, 0.04f, 0.04f, 1.0f);
+                        } else if (isRisky) {
+                            // High risk: biru-gelap
+                            btnCol = ImVec4(0.10f, 0.14f, 0.26f, 1.0f);
+                            btnHov = ImVec4(0.14f, 0.22f, 0.38f, 1.0f);
+                            btnAct = ImVec4(0.07f, 0.10f, 0.20f, 1.0f);
+                        } else {
+                            // Normal: abu gelap
+                            btnCol = ImVec4(0.07f, 0.11f, 0.20f, 1.0f);
+                            btnHov = ImVec4(0.12f, 0.20f, 0.32f, 1.0f);
+                            btnAct = ImVec4(0.05f, 0.08f, 0.16f, 1.0f);
+                        }
 
                         PushStyleColor(ImGuiCol_Button,        btnCol);
                         PushStyleColor(ImGuiCol_ButtonHovered, btnHov);
                         PushStyleColor(ImGuiCol_ButtonActive,  btnAct);
                         PushStyleVar(ImGuiStyleVar_FrameRounding, 7.0f);
 
-                        if (mi % 3 == 0) SetCursorPosX(GetCursorPosX() + 10.0f);
-                        if (Button(modes[mi].lbl, ImVec2(colW - 4.0f, 28.0f)))
+                        // Kolom kiri: indent 10px, kolom kanan: SameLine
+                        if (mi % 2 == 0) SetCursorPosX(GetCursorPosX() + 10.0f);
+                        if (Button(modes[mi].lbl, ImVec2(colW - 4.0f, 32.0f)))
                             EnemySabotage::iMode = mi;
 
                         PopStyleVar();
                         PopStyleColor(3);
                         PopID();
 
-                        if ((mi % 3) < 2) { SameLine(0, 4.0f); }
-                        else              { Dummy(ImVec2(0, 3)); }
+                        if (mi % 2 == 0) { SameLine(0, 4.0f); }
+                        else             { Dummy(ImVec2(0, 4.0f)); }
                     }
 
-                    // Risky badge for selected mode >= 4
-                    if (EnemySabotage::iMode >= 4) {
-                        Dummy(ImVec2(0, 4));
-                        SetCursorPosX(GetCursorPosX() + 10.0f);
+                    // ── Badge untuk mode yang dipilih ─────────────────────────
+                    Dummy(ImVec2(0, 4));
+                    SetCursorPosX(GetCursorPosX() + 10.0f);
+                    if (EnemySabotage::iMode >= 14) {
+                        TextColored(ImVec4(1.0f, 0.20f, 0.20f, 1.0f),
+                            "!!! ULTRA RISK — Sangat berbahaya!");
+                    } else if (EnemySabotage::iMode >= 4) {
                         TextColored(ImVec4(1.0f, 0.55f, 0.15f, 1.0f),
-                            O("!  Mode berisiko tinggi"));
+                            "!  Mode berisiko tinggi");
                     }
 
-                    // Deflect offset slider (modes 0, 3, 4, 5, 8)
+                    // ── Ctrl Turn: pilih pocket target ────────────────────────
+                    if (EnemySabotage::iMode == 15) {
+                        Dummy(ImVec2(0, 6));
+                        SetCursorPosX(GetCursorPosX() + 10.0f);
+                        TextColored(ImVec4(0.38f, 0.72f, 0.92f, 1.0f), "Arahkan ke pocket:");
+                        const char* pocketNames[] = {
+                            "0 - Top Left", "1 - Top Center", "2 - Top Right",
+                            "3 - Bot Right", "4 - Bot Center", "5 - Bot Left"
+                        };
+                        PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+                        PushStyleColor(ImGuiCol_FrameBg,   ImVec4(0.06f, 0.10f, 0.20f, 1.0f));
+                        PushStyleColor(ImGuiCol_Header,    ImVec4(0.04f, 0.42f, 0.58f, 1.0f));
+                        SetNextItemWidth(sabW - 20.0f);
+                        Combo("##ctrlPocket", &EnemySabotage::iCtrlPocket, pocketNames, 6);
+                        PopStyleColor(2);
+                        PopStyleVar();
+                    }
+
+                    // ── Deflect offset slider (modes 0, 3, 4, 5, 8) ──────────
                     if (EnemySabotage::iMode == 0 || EnemySabotage::iMode == 3 ||
                         EnemySabotage::iMode == 4 || EnemySabotage::iMode == 5 ||
                         EnemySabotage::iMode == 8) {
                         Dummy(ImVec2(0, 6));
                         SetCursorPosX(GetCursorPosX() + 10.0f);
-                        TextColored(ImVec4(0.38f, 0.72f, 0.92f, 1.0f), O("Deflect offset (rad)"));
+                        TextColored(ImVec4(0.38f, 0.72f, 0.92f, 1.0f), "Deflect offset (rad)");
                         PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
                         PushStyleVar(ImGuiStyleVar_GrabRounding,  10.0f);
                         PushStyleColor(ImGuiCol_FrameBg,          ImVec4(0.06f, 0.10f, 0.20f, 1.0f));
                         PushStyleColor(ImGuiCol_SliderGrab,       ImVec4(0.05f, 0.55f, 0.78f, 1.0f));
                         PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.08f, 0.70f, 0.95f, 1.0f));
                         SetNextItemWidth(sabW - 20.0f);
-                        SliderFloat(O("##sabOffset"), &EnemySabotage::fOffset, 0.02f, 0.40f, "%.3f rad");
+                        SliderFloat("##sabOffset", &EnemySabotage::fOffset, 0.02f, 0.40f, "%.3f rad");
                         PopStyleColor(3);
                         PopStyleVar(2);
                     }
@@ -1400,7 +1338,7 @@ INLINE void DrawMenu(ImGuiIO& io) {
             float sizeScale = 1.0f + (float)persistent_int[O("iMenuSizeOffset")] * 0.03f;
             if (sizeScale < 0.3f) sizeScale = 0.3f;
             float winW = g_menu.sidebarWidth * sizeScale;
-            float winH = 560.0f * sizeScale;
+            float winH = 700.0f * sizeScale;
             
             SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
             SetNextWindowPos(ImVec2(Width / 2.0f, Height / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
