@@ -36,3 +36,9 @@ id = "KqTGvBNlgMv-CrdYkJKIc"
 uri = "file://library_autoaim.zip"
 type = "unspecified"
 title = "library.so — AutoAim Build (arm64-v8a)"
+
+[[outputs]]
+id = "HcVsMWzbji2H5verZW6dL"
+uri = "file://app/build/outputs/apk/debug/FluxProEngine_GlassUI.tar.gz"
+type = "unspecified"
+title = "Flux Pro Engine — Glass UI Build (app-debug.apk)"
