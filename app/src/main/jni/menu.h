@@ -114,7 +114,9 @@ static void DrawTabIcon(ImDrawList* dl, ImVec2 center, float sz, int iconType, b
     }
 }
 
-static bool SidebarButton(const char* label, int iconType, bool selected, float width) {
+// ── Vertical Tab Button — untuk sidebar kiri ─────────────────────────────────
+static bool VerticalTabButton(const char* label, int iconType, bool selected,
+                              float width, float height) {
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems) return false;
 
@@ -122,13 +124,8 @@ static bool SidebarButton(const char* label, int iconType, bool selected, float 
     const ImGuiStyle& style = g.Style;
     const ImGuiID id = window->GetID(label);
 
-    float iconSize = 40.0f;
-    float vPad     = 12.0f;
-    float btnH     = vPad + iconSize + 5.0f + g.FontSize * 0.86f + vPad;
-
     ImVec2 pos  = window->DC.CursorPos;
-    ImVec2 size = ImVec2(width, btnH);
-
+    ImVec2 size = ImVec2(width, height);
     const ImRect bb(pos, pos + size);
     ItemSize(size, style.FramePadding.y);
     if (!ItemAdd(bb, id)) return false;
@@ -137,72 +134,56 @@ static bool SidebarButton(const char* label, int iconType, bool selected, float 
     bool pressed = ButtonBehavior(bb, id, &hovered, &held);
 
     ImDrawList* dl = window->DrawList;
-    float t = (float)GetTime();
 
-    float iconBgR = iconSize * 0.5f + 7.0f;
-    ImVec2 iconCenter = ImVec2(
-        bb.Min.x + width * 0.5f,
-        bb.Min.y + vPad + iconSize * 0.5f
-    );
+    float iconSz = 34.0f;
+    ImVec2 iconCenter = ImVec2(bb.Min.x + width * 0.5f,
+                               bb.Min.y + height * 0.40f);
 
     if (selected) {
-        // ── Glass pill — Red theme ────────────────────────────────────────
-        ImVec2 pMin = ImVec2(iconCenter.x - iconBgR, iconCenter.y - iconBgR);
-        ImVec2 pMax = ImVec2(iconCenter.x + iconBgR, iconCenter.y + iconBgR);
-        float pr = 14.0f;
-        // Soft outer glow — red
+        // Left accent bar — ice blue
         dl->AddRectFilled(
-            ImVec2(pMin.x - 3, pMin.y - 3), ImVec2(pMax.x + 3, pMax.y + 3),
-            IM_COL32(200, 30, 50, 25), pr + 4.0f);
-        // Glass body — dark crimson gradient
-        dl->AddRectFilledMultiColor(pMin, pMax,
-            IM_COL32(160, 22, 38, 210), IM_COL32(185, 28, 46, 210),
-            IM_COL32(148, 18, 32, 210), IM_COL32(135, 15, 28, 210));
-        // Glass top gloss
+            ImVec2(bb.Min.x, bb.Min.y + height * 0.14f),
+            ImVec2(bb.Min.x + 3.2f, bb.Max.y - height * 0.14f),
+            IM_COL32(0, 185, 225, 210), 2.0f);
+        // Glass highlight bg
         dl->AddRectFilledMultiColor(
-            pMin, ImVec2(pMax.x, pMin.y + (pMax.y - pMin.y) * 0.45f),
-            IM_COL32(255,255,255,32), IM_COL32(255,255,255,32),
-            IM_COL32(255,255,255, 4), IM_COL32(255,255,255, 4));
-        // Crisp glass border — red
-        dl->AddRect(pMin, pMax, IM_COL32(240, 70, 90, 80), pr, 0, 1.0f);
-        // Inner rim
-        dl->AddRect(
-            ImVec2(pMin.x + 1, pMin.y + 1),
-            ImVec2(pMax.x - 1, pMax.y - 1),
-            IM_COL32(255, 180, 190, 20), pr - 1.0f, 0, 0.6f);
-    } else if (hovered) {
-        // Subtle hover overlay
+            bb.Min, bb.Max,
+            IM_COL32(0, 130, 175, 28), IM_COL32(0, 110, 155, 28),
+            IM_COL32(0,  90, 135, 12), IM_COL32(0,  70, 115, 12));
+        // Top sheen
+        dl->AddRectFilledMultiColor(
+            bb.Min, ImVec2(bb.Max.x, bb.Min.y + height * 0.35f),
+            IM_COL32(255,255,255,16), IM_COL32(255,255,255,16),
+            IM_COL32(255,255,255, 0), IM_COL32(255,255,255, 0));
+        // Bottom micro-glow line
         dl->AddRectFilled(
-            ImVec2(bb.Min.x + 6.0f, bb.Min.y + 4.0f),
-            ImVec2(bb.Max.x - 6.0f, bb.Max.y - 4.0f),
-            IM_COL32(255, 255, 255, 10), 14.0f);
-        dl->AddRect(
-            ImVec2(bb.Min.x + 6.0f, bb.Min.y + 4.0f),
-            ImVec2(bb.Max.x - 6.0f, bb.Max.y - 4.0f),
-            IM_COL32(220, 80, 100, 30), 14.0f, 0, 0.8f);
+            ImVec2(bb.Min.x + width * 0.25f, bb.Max.y - 1.0f),
+            ImVec2(bb.Max.x - width * 0.25f, bb.Max.y),
+            IM_COL32(0, 175, 215, 55));
+    } else if (hovered) {
+        dl->AddRectFilled(bb.Min, bb.Max, IM_COL32(255, 255, 255, 7));
+        dl->AddRect(bb.Min, bb.Max, IM_COL32(0, 140, 180, 18), 0, 0, 0.6f);
     }
 
-    // Vector icon
-    DrawTabIcon(dl, iconCenter, iconSize, iconType, selected);
+    // Separator line between tabs (except last)
+    dl->AddRectFilled(
+        ImVec2(bb.Min.x + 12.0f, bb.Max.y - 0.6f),
+        ImVec2(bb.Max.x - 12.0f, bb.Max.y),
+        IM_COL32(255, 255, 255, 8));
+
+    // Icon
+    DrawTabIcon(dl, iconCenter, iconSz, iconType, selected);
 
     // Label
-    ImVec2 labelSize = CalcTextSize(label);
+    float fSzSmall = GImGui->FontSize * 0.70f;
+    ImVec2 labelSz = GImGui->Font->CalcTextSizeA(fSzSmall, FLT_MAX, 0, label);
     ImVec2 textPos = ImVec2(
-        bb.Min.x + (width - labelSize.x) * 0.5f,
-        bb.Min.y + vPad + iconSize + 5.0f
-    );
+        bb.Min.x + (width - labelSz.x) * 0.5f,
+        bb.Min.y + height * 0.69f);
     ImU32 textCol = selected
-        ? IM_COL32(220, 235, 255, 255)
-        : IM_COL32(100, 118, 150, 200);
-    dl->AddText(textPos, textCol, label);
-
-    // Active indicator dot — red glow
-    if (selected) {
-        float dotX = bb.Min.x + width * 0.5f;
-        float dotY = bb.Max.y - 5.0f;
-        dl->AddCircleFilled(ImVec2(dotX, dotY), 5.0f, IM_COL32(220, 40, 60, 45));
-        dl->AddCircleFilled(ImVec2(dotX, dotY), 2.8f, IM_COL32(255, 100, 120, 220));
-    }
+        ? IM_COL32(120, 205, 255, 255)
+        : IM_COL32(72, 105, 140, 195);
+    dl->AddText(GImGui->Font, fSzSmall, textPos, textCol, label);
 
     return pressed;
 }
@@ -259,8 +240,8 @@ static bool ToggleSwitch(const char* label, bool* v) {
     ImVec2 togglePos = ImVec2(bb.Max.x - width - 14.0f, bb.Min.y + (rowH - height) * 0.5f);
     ImVec2 toggleEnd = ImVec2(togglePos.x + width, togglePos.y + height);
 
-    ImVec4 offColor = ImVec4(0.20f, 0.12f, 0.13f, 1.0f);
-    ImVec4 onColor  = ImVec4(0.72f, 0.08f, 0.14f, 1.0f);
+    ImVec4 offColor = ImVec4(0.10f, 0.14f, 0.22f, 1.0f);
+    ImVec4 onColor  = ImVec4(0.05f, 0.58f, 0.78f, 1.0f);
     ImVec4 bgColorV = ImLerp(offColor, onColor, animT);
     // Track shadow
     dl->AddRectFilled(
@@ -545,67 +526,89 @@ INLINE void DrawESP(ImDrawList* draw) {
     }
 }
 
-static void DrawSidebar(float sidebarW) {
-    ImGuiContext& g  = *GImGui;
-    ImDrawList*   dl = GetWindowDrawList();
-    ImVec2        wp = GetWindowPos();
+// ── Sidebar Kiri Vertikal — Smooth Dark Glass ─────────────────────────────────
+static void DrawSidebar(float sidebarW, float winH) {
+    ImVec2 csp = GetCursorScreenPos();
+    ImDrawList* dl = GetWindowDrawList();
 
-    float btnW    = sidebarW / 4.0f;
-    float marginB = 12.0f;
-
-    dl->ChannelsSplit(2);
-    dl->ChannelsSetCurrent(1);
-
-    BeginGroup();
-    SetCursorPos(ImVec2(0.0f, 0.0f));
-    if (SidebarButton(O("Draw"),   0, g_menu.currentTab == 0, btnW)) g_menu.currentTab = 0;
-    SameLine(0, 0);
-    if (SidebarButton(O("8 Ball"), 1, g_menu.currentTab == 1, btnW)) g_menu.currentTab = 1;
-    SameLine(0, 0);
-    if (SidebarButton(O("9 Ball"), 2, g_menu.currentTab == 2, btnW)) g_menu.currentTab = 2;
-    SameLine(0, 0);
-    if (SidebarButton(O("Info"),   3, g_menu.currentTab == 3, btnW)) g_menu.currentTab = 3;
-    EndGroup();
-
-    // Measure actual rendered height — this is the true wrap_content
-    float sidebarH = GetItemRectMax().y - wp.y;
-
-    // ── Glass sidebar background — Dark/Glass/Red ────────────────────────
-    dl->ChannelsSetCurrent(0);
-    // Base glass layer — deep dark red, semi-transparent
+    // ── Background panel (drawn before child for correct layering) ────────
     dl->AddRectFilledMultiColor(
-        wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH),
-        IM_COL32(28,  6,  9, 248), IM_COL32(38,  9, 13, 248),
-        IM_COL32(32,  7, 11, 248), IM_COL32(24,  5,  8, 248));
-    // Top gloss sheen — white highlight fading down
+        csp, ImVec2(csp.x + sidebarW, csp.y + winH),
+        IM_COL32( 5,  8, 18, 255), IM_COL32( 9, 13, 24, 255),
+        IM_COL32( 7, 11, 21, 255), IM_COL32( 4,  7, 15, 255));
+    // Top gloss sheen
     dl->AddRectFilledMultiColor(
-        wp, ImVec2(wp.x + sidebarW, wp.y + sidebarH * 0.38f),
-        IM_COL32(255,255,255,18), IM_COL32(255,255,255,18),
+        csp, ImVec2(csp.x + sidebarW, csp.y + winH * 0.28f),
+        IM_COL32(255,255,255,16), IM_COL32(255,255,255,16),
         IM_COL32(255,255,255, 0), IM_COL32(255,255,255, 0));
-    // Bottom subtle gradient darkening
+    // Bottom darkening
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x, wp.y + sidebarH * 0.62f),
-        ImVec2(wp.x + sidebarW, wp.y + sidebarH),
+        ImVec2(csp.x, csp.y + winH * 0.68f),
+        ImVec2(csp.x + sidebarW, csp.y + winH),
         IM_COL32(0,0,0, 0), IM_COL32(0,0,0, 0),
-        IM_COL32(0,0,0,40), IM_COL32(0,0,0,40));
-    dl->ChannelsMerge();
-
-    // Bottom separator — glass edge glow (red theme)
-    float sepBotY = wp.y + sidebarH - 1.0f;
+        IM_COL32(0,0,0,45), IM_COL32(0,0,0,45));
+    // Right edge separator — ice blue glow
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x,                    sepBotY),
-        ImVec2(wp.x + sidebarW * 0.4f, sepBotY + 1.2f),
-        IM_COL32(200,30,50, 0), IM_COL32(200,30,50,90),
-        IM_COL32(200,30,50,90), IM_COL32(200,30,50, 0));
-    dl->AddRectFilledMultiColor(
-        ImVec2(wp.x + sidebarW * 0.4f, sepBotY),
-        ImVec2(wp.x + sidebarW,        sepBotY + 1.2f),
-        IM_COL32(200,30,50,90), IM_COL32(200,30,50, 0),
-        IM_COL32(200,30,50, 0), IM_COL32(200,30,50,90));
+        ImVec2(csp.x + sidebarW - 1.5f, csp.y),
+        ImVec2(csp.x + sidebarW,        csp.y + winH),
+        IM_COL32(0, 155, 200,  0), IM_COL32(0, 155, 200, 95),
+        IM_COL32(0, 155, 200, 95), IM_COL32(0, 155, 200,  0));
 
-    // Bottom margin — cursor pushed past the true sidebar height
-    SetCursorPos(ImVec2(0.0f, sidebarH));
-    Dummy(ImVec2(sidebarW, marginB));
+    // ── Child window for interactive tab buttons ───────────────────────────
+    PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+    BeginChild(O("##VSidebar"), ImVec2(sidebarW, winH), false,
+               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    ImDrawList* sdl = GetWindowDrawList();
+    ImVec2      swp = GetWindowPos();
+
+    // ── Header mod name ───────────────────────────────────────────────────
+    float hdrH = 60.0f;
+
+    // Header bg strip
+    sdl->AddRectFilledMultiColor(
+        swp, ImVec2(swp.x + sidebarW, swp.y + hdrH),
+        IM_COL32( 4,  7, 18, 255), IM_COL32( 8, 12, 25, 255),
+        IM_COL32( 6, 10, 22, 255), IM_COL32( 3,  6, 16, 255));
+    // Header bottom accent line
+    sdl->AddRectFilledMultiColor(
+        ImVec2(swp.x + 4.0f, swp.y + hdrH - 1.2f),
+        ImVec2(swp.x + sidebarW - 4.0f, swp.y + hdrH),
+        IM_COL32(0,120,170, 0), IM_COL32(0,185,225,120),
+        IM_COL32(0,185,225,120), IM_COL32(0,120,170, 0));
+
+    // "FLUX" brand text
+    const char* brandA = O("FLUX");
+    const char* brandB = O("PRO");
+    SetWindowFontScale(1.20f);
+    ImVec2 szA = CalcTextSize(brandA);
+    SetCursorPos(ImVec2((sidebarW - szA.x) * 0.5f, 9.0f));
+    TextColored(ImVec4(0.42f, 0.82f, 1.0f, 1.0f), "%s", brandA);
+    SetWindowFontScale(0.68f);
+    ImVec2 szB = CalcTextSize(brandB);
+    SetCursorPos(ImVec2((sidebarW - szB.x) * 0.5f, 9.0f + szA.y * 1.20f - 1.0f));
+    TextColored(ImVec4(0.28f, 0.58f, 0.80f, 0.82f), "%s", brandB);
+    SetWindowFontScale(1.0f);
+
+    // ── 4 Vertical Tab Buttons ────────────────────────────────────────────
+    float tabAvailH = winH - hdrH;
+    float tabH      = tabAvailH / 4.0f;
+
+    struct { const char* lbl; int icon; } tabs[4] = {
+        { O("Draw"),   0 },
+        { O("8 Ball"), 1 },
+        { O("9 Ball"), 2 },
+        { O("Info"),   3 },
+    };
+    for (int i = 0; i < 4; i++) {
+        SetCursorPos(ImVec2(0.0f, hdrH + i * tabH));
+        if (VerticalTabButton(tabs[i].lbl, tabs[i].icon,
+                              g_menu.currentTab == i, sidebarW, tabH))
+            g_menu.currentTab = i;
+    }
+
+    EndChild();
+    PopStyleColor();
 }
 
 // Shared vertical position for DrawToggleButton and DrawFloatingButton (they move together)
@@ -780,60 +783,54 @@ static void DrawWinCenterBanner(ImGuiIO& io) {
 }
 
 
-static void DrawContentArea(float winW, float winH) {
+static void DrawContentArea(float contentW, float winH) {
     bool need_save = false;
-    
-    ImDrawList* dl  = GetWindowDrawList();
-    ImVec2      wp  = GetWindowPos();
 
-    // startY este punctul unde se termină bara de butoane (Sidebar)
-    float startY   = GetCursorPosY();
-    float contentW = winW;
+    ImDrawList* dl = GetWindowDrawList();
+    ImVec2      wp = GetWindowPos();
 
-    // ── Glass content area background — Dark/Glass/Red ───────────────────
-    // Deep dark red base
+    // Position of this content panel (right of sidebar)
+    float startX = GetCursorPosX();
+    float startY = GetCursorPosY();   // 0 in vertical layout
+
+    // ── Smooth Dark Glass background ──────────────────────────────────────
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x, wp.y + startY),
-        ImVec2(wp.x + contentW, wp.y + winH),
-        IM_COL32(18,  4,  6, 252), IM_COL32(18,  4,  6, 252),
-        IM_COL32(24,  6,  9, 252), IM_COL32(24,  6,  9, 252));
-    // Left subtle red edge glow
+        ImVec2(wp.x + startX, wp.y + startY),
+        ImVec2(wp.x + startX + contentW, wp.y + winH),
+        IM_COL32(8, 11, 22, 252), IM_COL32(10, 14, 26, 252),
+        IM_COL32(9,  13, 24, 252), IM_COL32(7,  10, 20, 252));
+    // Left subtle ice-blue edge
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x, wp.y + startY),
-        ImVec2(wp.x + 2.0f, wp.y + winH),
-        IM_COL32(200,30,50,55), IM_COL32(200,30,50,55),
-        IM_COL32(200,30,50,12), IM_COL32(200,30,50,12));
-    // Right subtle red edge glow
+        ImVec2(wp.x + startX,        wp.y + startY),
+        ImVec2(wp.x + startX + 2.0f, wp.y + winH),
+        IM_COL32(0,155,200,38), IM_COL32(0,155,200,38),
+        IM_COL32(0,155,200, 8), IM_COL32(0,155,200, 8));
+    // Right subtle ice-blue edge
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x + contentW - 2.0f, wp.y + startY),
-        ImVec2(wp.x + contentW,        wp.y + winH),
-        IM_COL32(200,30,50,55), IM_COL32(200,30,50,55),
-        IM_COL32(200,30,50,12), IM_COL32(200,30,50,12));
+        ImVec2(wp.x + startX + contentW - 2.0f, wp.y + startY),
+        ImVec2(wp.x + startX + contentW,        wp.y + winH),
+        IM_COL32(0,155,200,38), IM_COL32(0,155,200,38),
+        IM_COL32(0,155,200, 8), IM_COL32(0,155,200, 8));
     // Bottom vignette
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x, wp.y + winH * 0.75f),
-        ImVec2(wp.x + contentW, wp.y + winH),
+        ImVec2(wp.x + startX, wp.y + winH * 0.78f),
+        ImVec2(wp.x + startX + contentW, wp.y + winH),
         IM_COL32(0,0,0, 0), IM_COL32(0,0,0, 0),
-        IM_COL32(0,0,0,60), IM_COL32(0,0,0,60));
-    
-    static const char* const tabTitles[] = {
-        "Draw",
-        "8 Ball",
-        "9 Ball",
-        "Info"
-    };
-    // Tab accent colors — red theme
+        IM_COL32(0,0,0,55), IM_COL32(0,0,0,55));
+
+    static const char* const tabTitles[] = { "Draw", "8 Ball", "9 Ball", "Info" };
+    // Tab accent colors — smooth ice blue variations
     const ImU32 tabAccents[] = {
-        IM_COL32(220, 50,  70, 220),
-        IM_COL32(210, 35,  55, 220),
-        IM_COL32(200, 40,  60, 220),
-        IM_COL32(230, 55,  75, 220),
+        IM_COL32( 0, 185, 225, 215),
+        IM_COL32(10, 170, 210, 215),
+        IM_COL32(20, 195, 230, 215),
+        IM_COL32( 0, 160, 200, 215),
     };
 
     const char* currentTitle = tabTitles[g_menu.currentTab];
     ImU32 accentCol = tabAccents[g_menu.currentTab];
 
-    float titlePadT = 14.0f;
+    float titlePadT = 13.0f;
     float titlePadB = 10.0f;
 
     // Title with larger font
@@ -845,38 +842,37 @@ static void DrawContentArea(float winW, float winH) {
 
     // Subtle title background strip
     dl->AddRectFilled(
-        ImVec2(wp.x, wp.y + startY),
-        ImVec2(wp.x + contentW, wp.y + startY + titleBlockH),
-        IM_COL32(8, 16, 38, 200));
+        ImVec2(wp.x + startX, wp.y + startY),
+        ImVec2(wp.x + startX + contentW, wp.y + startY + titleBlockH),
+        IM_COL32(6, 10, 22, 210));
 
     // Left accent stripe
     dl->AddRectFilled(
-        ImVec2(wp.x, wp.y + startY + titlePadT * 0.5f),
-        ImVec2(wp.x + 3.5f, wp.y + startY + titleBlockH - titlePadT * 0.5f),
+        ImVec2(wp.x + startX, wp.y + startY + titlePadT * 0.5f),
+        ImVec2(wp.x + startX + 3.5f, wp.y + startY + titleBlockH - titlePadT * 0.5f),
         accentCol, 2.0f);
 
-    // Title text — draw directly so we can use font scale without affecting cursor flow
+    // Title text
     SetWindowFontScale(1.18f);
-    float centeredX = (contentW - ts.x) * 0.5f;
+    float centeredX = startX + (contentW - ts.x) * 0.5f;
     SetCursorPos(ImVec2(centeredX, startY + titlePadT));
-    TextColored(ImVec4(0.92f, 0.95f, 1.0f, 1.0f), "%s", currentTitle);
+    TextColored(ImVec4(0.88f, 0.95f, 1.0f, 1.0f), "%s", currentTitle);
     SetWindowFontScale(1.0f);
 
-    // Separator line with gradient fade on both ends
+    // Separator line — ice blue gradient
     float lineY = startY + titleBlockH;
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x,               wp.y + lineY - 0.5f),
-        ImVec2(wp.x + contentW * 0.35f, wp.y + lineY + 1.0f),
-        IM_COL32(0, 0, 0, 0), accentCol, accentCol, IM_COL32(0, 0, 0, 0));
+        ImVec2(wp.x + startX,                   wp.y + lineY - 0.5f),
+        ImVec2(wp.x + startX + contentW * 0.35f, wp.y + lineY + 1.0f),
+        IM_COL32(0,0,0,0), accentCol, accentCol, IM_COL32(0,0,0,0));
     dl->AddRectFilledMultiColor(
-        ImVec2(wp.x + contentW * 0.35f, wp.y + lineY - 0.5f),
-        ImVec2(wp.x + contentW,         wp.y + lineY + 1.0f),
-        accentCol, IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0), accentCol);
+        ImVec2(wp.x + startX + contentW * 0.35f, wp.y + lineY - 0.5f),
+        ImVec2(wp.x + startX + contentW,          wp.y + lineY + 1.0f),
+        accentCol, IM_COL32(0,0,0,0), IM_COL32(0,0,0,0), accentCol);
 
     float headerH = lineY - startY + 8.0f;
-    SetCursorPos(ImVec2(10.0f, startY + headerH));
-    
-    // Începutul zonei de child (conținutul propriu-zis)
+    SetCursorPos(ImVec2(startX + 10.0f, startY + headerH));
+
     PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
     BeginChild(O("##ContentArea"), ImVec2(contentW - 20.0f, winH - startY - headerH - 10.0f), false);
     
@@ -1063,39 +1059,6 @@ static void DrawContentArea(float winW, float winH) {
                         PocketSelector::Reset();
                     PopStyleColor(3);
                     PopStyleVar();
-                } else {
-                    // Ambil lastTargetPocket dari mode yang aktif
-                    int lastPkt = -1;
-                    if (g_aimMode == AimMode::EIGHTBALL_PREDICT)
-                        lastPkt = AimLockTarget::lastTargetPocket;
-                    else if (g_aimMode == AimMode::EIGHTBALL_8LOCK)
-                        lastPkt = AimLock8Ball::lastTargetPocket;
-
-                    if (lastPkt >= 0 && !g_aimThreadRunning.load()) {
-                        // Ada hasil aim sebelumnya — tampilkan tombol Lock
-                        const char* pNamesL[6] = {"Top-L","Top-C","Top-R","Bot-R","Bot-C","Bot-L"};
-                        TextColored(ImVec4(0.55f, 0.65f, 0.90f, 1.0f),
-                            "Saran: [%d] %s", lastPkt, pNamesL[lastPkt]);
-
-                        SetCursorPosX(GetCursorPosX() + 12.0f);
-                        PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                        PushStyleColor(ImGuiCol_Button,        ImVec4(0.08f, 0.35f, 0.55f, 1.0f));
-                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.50f, 0.78f, 1.0f));
-                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.06f, 0.28f, 0.44f, 1.0f));
-                        char lockLabel[40];
-                        snprintf(lockLabel, sizeof(lockLabel),
-                            "Kunci ke [%d] %s", lastPkt, pNamesL[lastPkt]);
-                        if (Button(lockLabel, ImVec2(infoW - 24.0f, 26.0f)))
-                            PocketSelector::selectedPocket.store(lastPkt);
-                        PopStyleColor(3);
-                        PopStyleVar();
-                    } else {
-                        TextColored(ImVec4(0.45f, 0.55f, 0.70f, 1.0f),
-                            "Jalankan Auto Aim dahulu");
-                        SetCursorPosX(GetCursorPosX() + 12.0f);
-                        TextColored(ImVec4(0.30f, 0.38f, 0.55f, 0.80f),
-                            "Lalu klik Lock untuk mengunci pocket");
-                    }
                 }
                 // Tinggi card menyesuaikan konten
                 float usedH = selPkt >= 0 ? 46.0f : 46.0f;
@@ -1105,97 +1068,121 @@ static void DrawContentArea(float winW, float winH) {
 
             // ── Enemy Sabotage ─────────────────────────────────────────────
             {
-                Dummy(ImVec2(0, 18));
+                Dummy(ImVec2(0, 16));
 
-                // Section header card
                 float sabW = GetContentRegionAvail().x;
-                ImVec2 sabHdrPos = GetCursorScreenPos();
                 ImDrawList* sabDl = GetWindowDrawList();
 
+                // ── Header card ───────────────────────────────────────────
                 float sabHdrH = 32.0f;
+                ImVec2 sabHdrPos = GetCursorScreenPos();
                 sabDl->AddRectFilled(sabHdrPos,
                     ImVec2(sabHdrPos.x + sabW, sabHdrPos.y + sabHdrH),
-                    IM_COL32(55, 8, 8, 230), 10.0f, ImDrawFlags_RoundCornersTop);
+                    IM_COL32(6, 12, 28, 235), 10.0f, ImDrawFlags_RoundCornersTop);
                 sabDl->AddRect(sabHdrPos,
                     ImVec2(sabHdrPos.x + sabW, sabHdrPos.y + sabHdrH),
-                    IM_COL32(220, 45, 45, 160), 10.0f, ImDrawFlags_RoundCornersTop, 1.0f);
-
-                // Animated red pulse on header
+                    IM_COL32(0, 165, 210, 140), 10.0f, ImDrawFlags_RoundCornersTop, 1.0f);
+                // Animated ice pulse
                 {
                     float t = (float)GetTime();
-                    float alpha = 0.35f + 0.25f * sinf(t * 3.5f);
+                    float alpha = 0.30f + 0.22f * sinf(t * 3.2f);
                     sabDl->AddRect(sabHdrPos,
                         ImVec2(sabHdrPos.x + sabW, sabHdrPos.y + sabHdrH),
-                        IM_COL32(255, 60, 60, (int)(alpha * 255)), 10.0f,
-                        ImDrawFlags_RoundCornersTop, 1.8f);
+                        IM_COL32(0, 200, 255, (int)(alpha * 255)), 10.0f,
+                        ImDrawFlags_RoundCornersTop, 1.6f);
                 }
-
-                SetWindowFontScale(0.90f);
+                SetWindowFontScale(0.88f);
                 const char* sabTitle = O("  Enemy Sabotage");
                 ImVec2 sabTitleSz = CalcTextSize(sabTitle);
                 SetCursorPosY(GetCursorPosY() + (sabHdrH - sabTitleSz.y) * 0.5f);
                 SetCursorPosX(GetCursorPosX() + 8.0f);
-                TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "%s", sabTitle);
+                TextColored(ImVec4(0.35f, 0.82f, 1.0f, 1.0f), "%s", sabTitle);
                 SetWindowFontScale(1.0f);
 
-                // Body card
-                Dummy(ImVec2(0, 0));
-                ImVec2 sabBodyPos = GetCursorScreenPos();
-                float sabBodyH = EnemySabotage::bActive ? 160.0f : 70.0f;
-                sabDl->AddRectFilled(sabBodyPos,
-                    ImVec2(sabBodyPos.x + sabW, sabBodyPos.y + sabBodyH),
-                    IM_COL32(30, 8, 8, 220), 10.0f, ImDrawFlags_RoundCornersBottom);
-                sabDl->AddRect(sabBodyPos,
-                    ImVec2(sabBodyPos.x + sabW, sabBodyPos.y + sabBodyH),
-                    IM_COL32(140, 30, 30, 120), 10.0f, ImDrawFlags_RoundCornersBottom, 1.0f);
+                // ── Body card — dynamic height, NO fixed cutoff ───────────
+                Dummy(ImVec2(0, 2));
+                ImVec2 sabBodyStart = GetCursorScreenPos();
+
+                // Draw body BG at end (after we know height). Use channel split.
+                sabDl->ChannelsSplit(2);
+                sabDl->ChannelsSetCurrent(1);
 
                 Dummy(ImVec2(0, 8));
                 SetCursorPosX(GetCursorPosX() + 10.0f);
-
-                // Toggle on/off
                 if (ToggleSwitch(O("Aktifkan Sabotase Musuh"), &EnemySabotage::bActive)) {}
 
                 if (EnemySabotage::bActive) {
-                    Dummy(ImVec2(0, 10));
+                    Dummy(ImVec2(0, 8));
                     SetCursorPosX(GetCursorPosX() + 10.0f);
-                    TextColored(ImVec4(0.75f, 0.40f, 0.40f, 1.0f), O("Mode Serangan:"));
-                    Dummy(ImVec2(0, 6));
+                    TextColored(ImVec4(0.45f, 0.78f, 1.0f, 1.0f), O("Mode Serangan:"));
+                    Dummy(ImVec2(0, 5));
 
-                    // Mode radio buttons
-                    const char* modeLabels[4] = {
-                        O("Aim Deflect  (geser bidikan)"),
-                        O("Power Drain  (lemahkan power)"),
-                        O("Spin Chaos   (spin liar)"),
-                        O("Combo        (semua sekaligus)"),
+                    // 9 mode buttons (3 columns × 3 rows)
+                    struct { const char* lbl; const char* tip; } modes[9] = {
+                        { O("Aim Deflect"),  O("Geser bidikan") },
+                        { O("Pwr Drain"),    O("Power lemah")   },
+                        { O("Spin Chaos"),   O("Spin gila")     },
+                        { O("Combo"),        O("Deflect+Drain+Spin") },
+                        { O("Aim Invert"),   O("Arah terbalik") },
+                        { O("Micro Jitter"), O("Osilasi kecil") },
+                        { O("Top Lock"),     O("Topspin max")   },
+                        { O("Pwr Surge"),    O("Power max")     },
+                        { O("Chaos MAX"),    O("Semua extreme") },
                     };
-                    for (int mi = 0; mi < 4; mi++) {
+
+                    float colW = (sabW - 20.0f) / 3.0f;
+                    for (int mi = 0; mi < 9; mi++) {
                         bool isSel = (EnemySabotage::iMode == mi);
+                        bool isRisky = (mi >= 4);    // modes 4-8 are new risky ones
                         PushID(mi + 900);
-                        PushStyleColor(ImGuiCol_Button,
-                            isSel ? ImVec4(0.60f, 0.08f, 0.08f, 1.0f)
-                                  : ImVec4(0.18f, 0.06f, 0.06f, 1.0f));
-                        PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.75f, 0.12f, 0.12f, 1.0f));
-                        PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.50f, 0.06f, 0.06f, 1.0f));
-                        PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-                        SetCursorPosX(GetCursorPosX() + 10.0f);
-                        if (Button(modeLabels[mi], ImVec2(sabW - 20.0f, 30.0f)))
+
+                        ImVec4 btnCol  = isSel
+                            ? ImVec4(0.04f, 0.42f, 0.58f, 1.0f)
+                            : (isRisky
+                                ? ImVec4(0.10f, 0.14f, 0.25f, 1.0f)
+                                : ImVec4(0.07f, 0.11f, 0.20f, 1.0f));
+                        ImVec4 btnHov  = isSel
+                            ? ImVec4(0.06f, 0.52f, 0.72f, 1.0f)
+                            : ImVec4(0.12f, 0.24f, 0.38f, 1.0f);
+                        ImVec4 btnAct  = ImVec4(0.03f, 0.32f, 0.48f, 1.0f);
+
+                        PushStyleColor(ImGuiCol_Button,        btnCol);
+                        PushStyleColor(ImGuiCol_ButtonHovered, btnHov);
+                        PushStyleColor(ImGuiCol_ButtonActive,  btnAct);
+                        PushStyleVar(ImGuiStyleVar_FrameRounding, 7.0f);
+
+                        if (mi % 3 == 0) SetCursorPosX(GetCursorPosX() + 10.0f);
+                        if (Button(modes[mi].lbl, ImVec2(colW - 4.0f, 28.0f)))
                             EnemySabotage::iMode = mi;
+
                         PopStyleVar();
                         PopStyleColor(3);
                         PopID();
-                        Dummy(ImVec2(0, 3));
+
+                        if ((mi % 3) < 2) { SameLine(0, 4.0f); }
+                        else              { Dummy(ImVec2(0, 3)); }
                     }
 
-                    // Aim offset slider (only relevant for modes 0 and 3)
-                    if (EnemySabotage::iMode == 0 || EnemySabotage::iMode == 3) {
+                    // Risky badge for selected mode >= 4
+                    if (EnemySabotage::iMode >= 4) {
+                        Dummy(ImVec2(0, 4));
+                        SetCursorPosX(GetCursorPosX() + 10.0f);
+                        TextColored(ImVec4(1.0f, 0.55f, 0.15f, 1.0f),
+                            O("!  Mode berisiko tinggi"));
+                    }
+
+                    // Deflect offset slider (modes 0, 3, 4, 5, 8)
+                    if (EnemySabotage::iMode == 0 || EnemySabotage::iMode == 3 ||
+                        EnemySabotage::iMode == 4 || EnemySabotage::iMode == 5 ||
+                        EnemySabotage::iMode == 8) {
                         Dummy(ImVec2(0, 6));
                         SetCursorPosX(GetCursorPosX() + 10.0f);
-                        TextColored(ImVec4(0.65f, 0.35f, 0.35f, 1.0f), O("Deflect offset (rad)"));
+                        TextColored(ImVec4(0.38f, 0.72f, 0.92f, 1.0f), O("Deflect offset (rad)"));
                         PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-                        PushStyleVar(ImGuiStyleVar_GrabRounding, 10.0f);
-                        PushStyleColor(ImGuiCol_FrameBg,        ImVec4(0.15f, 0.05f, 0.05f, 1.0f));
-                        PushStyleColor(ImGuiCol_SliderGrab,     ImVec4(0.85f, 0.15f, 0.15f, 1.0f));
-                        PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0.25f, 0.25f, 1.0f));
+                        PushStyleVar(ImGuiStyleVar_GrabRounding,  10.0f);
+                        PushStyleColor(ImGuiCol_FrameBg,          ImVec4(0.06f, 0.10f, 0.20f, 1.0f));
+                        PushStyleColor(ImGuiCol_SliderGrab,       ImVec4(0.05f, 0.55f, 0.78f, 1.0f));
+                        PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.08f, 0.70f, 0.95f, 1.0f));
                         SetNextItemWidth(sabW - 20.0f);
                         SliderFloat(O("##sabOffset"), &EnemySabotage::fOffset, 0.02f, 0.40f, "%.3f rad");
                         PopStyleColor(3);
@@ -1203,7 +1190,18 @@ static void DrawContentArea(float winW, float winH) {
                     }
                 }
 
-                Dummy(ImVec2(0, sabBodyH - (EnemySabotage::bActive ? 155.0f : 60.0f)));
+                Dummy(ImVec2(0, 10));
+
+                // Measure actual content height and draw bg retroactively
+                float sabBodyActualH = GetCursorScreenPos().y - sabBodyStart.y;
+                sabDl->ChannelsSetCurrent(0);
+                sabDl->AddRectFilled(sabBodyStart,
+                    ImVec2(sabBodyStart.x + sabW, sabBodyStart.y + sabBodyActualH),
+                    IM_COL32(7, 12, 24, 222), 10.0f, ImDrawFlags_RoundCornersBottom);
+                sabDl->AddRect(sabBodyStart,
+                    ImVec2(sabBodyStart.x + sabW, sabBodyStart.y + sabBodyActualH),
+                    IM_COL32(0, 120, 165, 100), 10.0f, ImDrawFlags_RoundCornersBottom, 1.0f);
+                sabDl->ChannelsMerge();
             }
 
             break;
@@ -1395,10 +1393,12 @@ INLINE void DrawMenu(ImGuiIO& io) {
             SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
             SetNextWindowPos(ImVec2(Width / 2.0f, Height / 2.0f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
             
-            // ── Glass window style (Dark / Glass / Red) ──────────────────
-            PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.08f, 0.02f, 0.03f, 0.90f));
-            PushStyleVar(ImGuiStyleVar_WindowRounding, 28.0f);
-            PushStyleVar(ImGuiStyleVar_ChildRounding,  20.0f);
+            // ── Smooth Dark Glass window style ────────────────────────────
+            float sidebarW = 118.0f * sizeScale;
+
+            PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.02f, 0.03f, 0.07f, 0.93f));
+            PushStyleVar(ImGuiStyleVar_WindowRounding, 26.0f);
+            PushStyleVar(ImGuiStyleVar_ChildRounding,  18.0f);
             PushStyleVar(ImGuiStyleVar_WindowPadding,  ImVec2(0, 0));
             PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
             PushStyleVar(ImGuiStyleVar_Alpha, g_menu.menuAlpha);
@@ -1408,53 +1408,55 @@ INLINE void DrawMenu(ImGuiIO& io) {
                                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 
             if (Begin(O("##MainMenu"), &g_menu.isOpen, winFlags)) {
-                DrawSidebar(winW);
-                DrawContentArea(winW, winH);
+                // Left vertical sidebar, then content to the right
+                DrawSidebar(sidebarW, winH);
+                SameLine(0, 0);
+                DrawContentArea(winW - sidebarW, winH);
 
-                // ── Glass border overlay (drawn last, on top of all content) ──
+                // ── Glass border overlay — Smooth Dark Glass / Ice Blue ────
                 ImDrawList* bdl = GetWindowDrawList();
                 ImVec2 bPos  = GetWindowPos();
                 ImVec2 bSize = GetWindowSize();
                 ImVec2 bMax  = ImVec2(bPos.x + bSize.x, bPos.y + bSize.y);
-                float  br    = 28.0f;
+                float  br    = 26.0f;
 
-                // Layer 1 — diffuse outer glow (red)
+                // Layer 1 — diffuse outer glow (ice blue)
                 bdl->AddRect(
                     ImVec2(bPos.x - 3.0f, bPos.y - 3.0f),
                     ImVec2(bMax.x + 3.0f, bMax.y + 3.0f),
-                    IM_COL32(200, 30, 50, 22), br + 5.0f, 0, 6.0f);
+                    IM_COL32(0, 165, 210, 18), br + 5.0f, 0, 6.0f);
 
-                // Layer 2 — medium red glow
+                // Layer 2 — medium ice glow
                 bdl->AddRect(
                     ImVec2(bPos.x - 1.0f, bPos.y - 1.0f),
                     ImVec2(bMax.x + 1.0f, bMax.y + 1.0f),
-                    IM_COL32(220, 45, 65, 45), br + 2.0f, 0, 2.5f);
+                    IM_COL32(0, 180, 225, 38), br + 2.0f, 0, 2.5f);
 
-                // Layer 3 — main crisp red glass edge
-                bdl->AddRect(bPos, bMax, IM_COL32(240, 60, 80, 80), br, 0, 1.0f);
+                // Layer 3 — main crisp dark-glass edge
+                bdl->AddRect(bPos, bMax, IM_COL32(0, 160, 210, 65), br, 0, 1.0f);
 
-                // Layer 4 — inner bright rim
+                // Layer 4 — inner pale rim
                 bdl->AddRect(
                     ImVec2(bPos.x + 1.0f, bPos.y + 1.0f),
                     ImVec2(bMax.x - 1.0f, bMax.y - 1.0f),
-                    IM_COL32(255, 180, 190, 20), br - 1.0f, 0, 0.7f);
+                    IM_COL32(180, 235, 255, 14), br - 1.0f, 0, 0.7f);
 
                 // Top gloss bar — white horizontal sheen
                 bdl->AddRectFilledMultiColor(
-                    ImVec2(bPos.x + 28.0f, bPos.y + 1.0f),
-                    ImVec2(bMax.x - 28.0f, bPos.y + 2.2f),
-                    IM_COL32(255,255,255, 0), IM_COL32(255,255,255,55),
-                    IM_COL32(255,255,255,55), IM_COL32(255,255,255, 0));
+                    ImVec2(bPos.x + 26.0f, bPos.y + 1.0f),
+                    ImVec2(bMax.x - 26.0f, bPos.y + 2.2f),
+                    IM_COL32(255,255,255, 0), IM_COL32(255,255,255,50),
+                    IM_COL32(255,255,255,50), IM_COL32(255,255,255, 0));
 
-                // Bottom dark rim — shadow edge
+                // Bottom dark rim
                 bdl->AddRectFilledMultiColor(
-                    ImVec2(bPos.x + 28.0f, bMax.y - 2.0f),
-                    ImVec2(bMax.x - 28.0f, bMax.y - 0.5f),
-                    IM_COL32(0,0,0, 0), IM_COL32(0,0,0,50),
-                    IM_COL32(0,0,0,50), IM_COL32(0,0,0, 0));
+                    ImVec2(bPos.x + 26.0f, bMax.y - 2.0f),
+                    ImVec2(bMax.x - 26.0f, bMax.y - 0.5f),
+                    IM_COL32(0,0,0, 0), IM_COL32(0,0,0,55),
+                    IM_COL32(0,0,0,55), IM_COL32(0,0,0, 0));
             }
             End();
-            
+
             PopStyleVar(5);
             PopStyleColor();
         }

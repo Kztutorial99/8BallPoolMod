@@ -48,3 +48,9 @@ id = "DZlYGfA0dzogyqadv6fKQ"
 uri = "file://app/build/outputs/apk/debug/FluxProEngine_RedGlass.tar.gz"
 type = "unspecified"
 title = "Flux Pro Engine — Red Glass Theme (app-debug.apk)"
+
+[[outputs]]
+id = "hzoM6zwU1n9eAVt3fgjwN"
+uri = "file://app/build/outputs/apk/debug/FluxProEngine_SmoothDarkGlass.tar.gz"
+type = "unspecified"
+title = "Flux Pro Engine — Smooth Dark Glass (app-debug.apk)"
